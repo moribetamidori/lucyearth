@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --text-primary: #0a0a0a;
+  --text-secondary: #6b7280;
+  --accent: #3b82f6;
+  --accent-light: #93c5fd;
+  --border: #e5e7eb;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-pixel), monospace;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+  }
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.neo-button {
+  background: white;
+  transition: all 0.1s ease;
+  font-weight: 400;
+}
+
+.neo-button:active {
+  transform: translate(2px, 2px);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shimmer-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-light) 50%,
+    transparent 100%
+  );
+  animation: shimmer 3s infinite;
+}
