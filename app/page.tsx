@@ -345,7 +345,7 @@ function LoginModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: ()
 
     // Simple password check - you can change this password
     // For better security, we're using a hash comparison
-    const correctPasswordHash = 'lucyearth2025'; // Change this to your desired password
+    const correctPasswordHash = 'le25'; // Change this to your desired password
 
     if (password === correctPasswordHash) {
       onSuccess();
