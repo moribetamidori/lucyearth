@@ -207,15 +207,21 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
               >
                 <div className="text-xs">{day}</div>
                 {poopImage && (
-                  <img
-                    src={poopImage.image_url}
-                    alt={poopImage.label}
-                    title={poopImage.label}
-                    className="w-20 h-20 object-cover mt-1"
-                  />
+                  <>
+                    {/* Show tiny emoji on mobile, image on desktop */}
+                    <div className="text-[9px] sm:hidden" title={poopImage.label}>
+                      💩
+                    </div>
+                    <img
+                      src={poopImage.image_url}
+                      alt={poopImage.label}
+                      title={poopImage.label}
+                      className="hidden sm:block w-20 h-20 object-cover mt-1"
+                    />
+                  </>
                 )}
                 {hasNote && (
-                  <div className="absolute top-1 right-1 text-xs" title="Has note">
+                  <div className="absolute top-1 right-1 text-xs hidden sm:block" title="Has note">
                     📝
                   </div>
                 )}
