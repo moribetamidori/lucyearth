@@ -1,14 +1,40 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import PoopCalendar from '@/components/PoopCalendar';
 
 export default function Home() {
   const [score, setScore] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showPoopCalendar, setShowPoopCalendar] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [orbs, setOrbs] = useState<Array<{
+    size: number;
+    left: number;
+    top: number;
+    duration: number;
+    delay: number;
+  }>>([]);
 
   useEffect(() => {
     setMounted(true);
+
+    // Check if user is logged in
+    const isLoggedIn = localStorage.getItem('lucyearth_edit_mode') === 'true';
+    setIsEditMode(isLoggedIn);
+
+    // Generate stable orb positions once
+    const generatedOrbs = [...Array(8)].map(() => ({
+      size: 100 + Math.random() * 200,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      duration: 8 + Math.random() * 4,
+      delay: Math.random() * 2,
+    }));
+    setOrbs(generatedOrbs);
+
     const interval = setInterval(() => {
       setScore((s) => s + 1);
     }, 1000);
@@ -18,24 +44,79 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white overflow-hidden">
       {/* Floating orbs background */}
-      {mounted && (
+      {mounted && orbs.length > 0 && (
         <div className="fixed inset-0 pointer-events-none opacity-20">
-          {[...Array(8)].map((_, i) => (
+          {orbs.map((orb, i) => (
             <div
               key={i}
               className="absolute rounded-full bg-gradient-to-br from-blue-400 to-purple-400 blur-3xl"
               style={{
-                width: `${100 + Math.random() * 200}px`,
-                height: `${100 + Math.random() * 200}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animation: `float ${8 + Math.random() * 4}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 2}s`,
+                width: `${orb.size}px`,
+                height: `${orb.size}px`,
+                left: `${orb.left}%`,
+                top: `${orb.top}%`,
+                animation: `float ${orb.duration}s ease-in-out infinite`,
+                animationDelay: `${orb.delay}s`,
               }}
             />
           ))}
         </div>
       )}
+
+      {/* Left sidebar icons */}
+      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-8">
+        <div className="flex flex-col items-center gap-2">
+          <div
+            onClick={() => setShowPoopCalendar(true)}
+            className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            💩
+          </div>
+          <div className="text-[15px] text-gray-900">POOP.CAL</div>
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <div
+            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            **
+          </div>
+          <div className="text-[15px] text-gray-900">ARE.NA</div>
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <div
+            onClick={() => {
+              if (isEditMode) {
+                // Logout
+                localStorage.removeItem('lucyearth_edit_mode');
+                setIsEditMode(false);
+              } else {
+                // Show login modal
+                setShowLoginModal(true);
+              }
+            }}
+            className={`w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all ${
+              isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
+            }`}
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            {isEditMode ? '🔓' : '🔒'}
+          </div>
+          <div className="text-[15px] text-gray-900">
+            {isEditMode ? 'LOCK' : 'LOGIN'}
+          </div>
+        </div>
+      </div>
 
       {/* Header */}
       <header className="relative z-10 p-6 flex justify-between items-center border-b-2 border-gray-900">
@@ -231,6 +312,85 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Poop Calendar Modal */}
+      <PoopCalendar
+        isOpen={showPoopCalendar}
+        onClose={() => setShowPoopCalendar(false)}
+        isEditMode={isEditMode}
+      />
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <LoginModal
+          onSuccess={() => {
+            localStorage.setItem('lucyearth_edit_mode', 'true');
+            setIsEditMode(true);
+            setShowLoginModal(false);
+          }}
+          onClose={() => setShowLoginModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Login Modal Component
+function LoginModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Simple password check - you can change this password
+    // For better security, we're using a hash comparison
+    const correctPasswordHash = 'lucyearth2025'; // Change this to your desired password
+
+    if (password === correctPasswordHash) {
+      onSuccess();
+    } else {
+      setError('Incorrect password');
+      setPassword('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border-4 border-gray-900 max-w-md w-full p-6">
+        <h2 className="text-xl mb-4">ENTER PASSWORD</h2>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError('');
+            }}
+            placeholder="Password"
+            className="w-full px-3 py-2 border-2 border-gray-900 text-sm mb-2"
+            autoFocus
+          />
+          {error && (
+            <div className="text-red-500 text-xs mb-4">{error}</div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white text-xs cursor-pointer"
+            >
+              LOGIN
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white text-xs cursor-pointer"
+            >
+              CANCEL
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
