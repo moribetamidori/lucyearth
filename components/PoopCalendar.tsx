@@ -19,7 +19,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
   const [noteText, setNoteText] = useState('');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingEntry, setViewingEntry] = useState<{ image: PoopImage | null; note: string | null } | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   // Fetch poop images
   useEffect(() => {
@@ -39,7 +39,8 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
   const fetchCalendarEntries = async () => {
     const { data, error } = await supabase
       .from('calendar_entries')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: true });
 
     if (data) setCalendarEntries(data);
   };
@@ -57,62 +58,112 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
 
   const handleDateClick = (day: number) => {
     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const existingEntry = calendarEntries.find(e => e.date === dateStr);
+    const existingEntries = calendarEntries.filter(e => e.date === dateStr);
 
     if (!isEditMode) {
-      // View mode - show entry if it exists
-      if (existingEntry?.poop_image_id) {
-        const image = poopImages.find(img => img.id === existingEntry.poop_image_id);
-        setViewingEntry({
-          image: image || null,
-          note: existingEntry.notes || null,
-        });
+      // View mode - show entries if they exist
+      if (existingEntries.length > 0) {
+        setSelectedDate(dateStr);
         setShowViewModal(true);
       }
       return;
     }
 
-    // Edit mode
+    // Edit mode - always open picker to add new entry
     setSelectedDate(dateStr);
-    setNoteText(existingEntry?.notes || '');
-    setSelectedImageId(existingEntry?.poop_image_id || null);
+    setNoteText('');
+    setSelectedImageId(null);
     setShowImagePicker(true);
   };
 
-  const handleSaveEntry = async () => {
+  const handleSaveEntry = async (closeAfter: boolean = false) => {
     if (!selectedDate || !selectedImageId) return;
 
-    const { data, error } = await supabase
-      .from('calendar_entries')
-      .upsert({
-        date: selectedDate,
-        poop_image_id: selectedImageId,
-        notes: noteText || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'date' });
+    console.log('Saving entry:', { date: selectedDate, poop_image_id: selectedImageId, notes: noteText, editingEntryId });
 
-    if (!error) {
-      await fetchCalendarEntries();
+    let error;
+
+    if (editingEntryId) {
+      // Update existing entry
+      const result = await supabase
+        .from('calendar_entries')
+        .update({
+          poop_image_id: selectedImageId,
+          notes: noteText || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingEntryId);
+      error = result.error;
+    } else {
+      // Insert new entry
+      const result = await supabase
+        .from('calendar_entries')
+        .insert({
+          date: selectedDate,
+          poop_image_id: selectedImageId,
+          notes: noteText || null,
+          updated_at: new Date().toISOString(),
+        });
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Error saving entry:', error);
+      alert(`Failed to save entry: ${error.message}`);
+      return;
+    }
+
+    console.log('Entry saved successfully');
+    await fetchCalendarEntries();
+    setNoteText('');
+    setSelectedImageId(null);
+    setEditingEntryId(null);
+
+    if (closeAfter) {
       setShowImagePicker(false);
       setSelectedDate(null);
-      setNoteText('');
-      setSelectedImageId(null);
     }
   };
 
-  const getPoopImageForDate = (day: number) => {
+  const handleDeleteEntry = async (entryId: string) => {
+    if (!confirm('Are you sure you want to delete this entry?')) return;
+
+    const { error } = await supabase
+      .from('calendar_entries')
+      .delete()
+      .eq('id', entryId);
+
+    if (error) {
+      console.error('Error deleting entry:', error);
+      alert(`Failed to delete entry: ${error.message}`);
+      return;
+    }
+
+    await fetchCalendarEntries();
+  };
+
+  const handleEditEntry = (entry: CalendarEntry) => {
+    setEditingEntryId(entry.id);
+    setSelectedImageId(entry.poop_image_id);
+    setNoteText(entry.notes || '');
+  };
+
+  const getEntriesForDate = (day: number) => {
     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const entry = calendarEntries.find(e => e.date === dateStr);
-    if (entry?.poop_image_id) {
-      return poopImages.find(img => img.id === entry.poop_image_id);
+    return calendarEntries.filter(e => e.date === dateStr);
+  };
+
+  const getPoopImageForDate = (day: number) => {
+    const entries = getEntriesForDate(day);
+    if (entries.length > 0 && entries[0].poop_image_id) {
+      return poopImages.find(img => img.id === entries[0].poop_image_id);
     }
     return null;
   };
 
   const hasNoteForDate = (day: number) => {
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const entry = calendarEntries.find(e => e.date === dateStr);
-    return entry?.notes && entry.notes.trim().length > 0;
+    const entries = getEntriesForDate(day);
+    return entries.some(entry => entry.notes && entry.notes.trim().length > 0);
   };
 
   const nextMonth = () => {
@@ -193,9 +244,11 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
 
           {[...Array(daysInMonth)].map((_, i) => {
             const day = i + 1;
+            const entries = getEntriesForDate(day);
             const poopImage = getPoopImageForDate(day);
             const hasNote = hasNoteForDate(day);
-            const hasEntry = poopImage !== null;
+            const hasEntry = entries.length > 0;
+            const additionalCount = entries.length - 1;
 
             return (
               <div
@@ -211,6 +264,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
                     {/* Show tiny emoji on mobile, image on desktop */}
                     <div className="text-[9px] sm:hidden" title={poopImage.label}>
                       💩
+                      {additionalCount > 0 && <span className="text-[8px]">+{additionalCount}</span>}
                     </div>
                     <img
                       src={poopImage.image_url}
@@ -221,8 +275,13 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
                   </>
                 )}
                 {hasNote && (
-                  <div className="absolute top-1 right-1 text-xs hidden sm:block" title="Has note">
+                  <div className="absolute top-1 left-1 text-xs hidden sm:block" title="Has note">
                     📝
+                  </div>
+                )}
+                {additionalCount > 0 && (
+                  <div className="absolute top-1 right-1 text-[10px] font-bold text-blue-600 hidden sm:block">
+                    +{additionalCount}
                   </div>
                 )}
               </div>
@@ -231,10 +290,58 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
         </div>
 
         {/* Image Picker Modal */}
-        {showImagePicker && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white border-4 border-gray-900 p-6 max-w-md w-full">
-              <h3 className="text-base mb-4">SELECT POOP IMAGE</h3>
+        {showImagePicker && selectedDate && (
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white border-4 border-gray-900 p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <h3 className="text-base mb-4">
+                {editingEntryId ? 'EDIT POOP ENTRY' : 'ADD POOP ENTRY'} - {selectedDate}
+              </h3>
+
+              {/* Show existing entries for this date */}
+              {getEntriesForDate(parseInt(selectedDate.split('-')[2])).length > 0 && (
+                <div className="mb-4 p-4 border-2 border-gray-900 bg-gray-50">
+                  <div className="text-xs text-gray-500 mb-2">
+                    EXISTING ENTRIES FOR THIS DAY ({getEntriesForDate(parseInt(selectedDate.split('-')[2])).length})
+                  </div>
+                  <div className="space-y-2">
+                    {getEntriesForDate(parseInt(selectedDate.split('-')[2])).map((entry, idx) => {
+                      const img = poopImages.find(img => img.id === entry.poop_image_id);
+                      const isEditing = editingEntryId === entry.id;
+                      return (
+                        <div
+                          key={entry.id || idx}
+                          className={`flex items-center justify-between p-2 border-2 transition-colors ${
+                            isEditing ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 text-xs">
+                            {img && (
+                              <img src={img.image_url} alt={img.label} className="w-8 h-8 object-cover" />
+                            )}
+                            <span>{img?.label}</span>
+                            {entry.notes && <span className="text-gray-500" title={entry.notes}>📝</span>}
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleEditEntry(entry)}
+                              className="px-2 py-1 border border-gray-900 hover:bg-blue-500 hover:text-white text-[10px] cursor-pointer"
+                            >
+                              {isEditing ? 'EDITING' : 'EDIT'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEntry(entry.id)}
+                              className="px-2 py-1 border border-gray-900 hover:bg-red-500 hover:text-white text-[10px] cursor-pointer"
+                            >
+                              DELETE
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-4 mb-4">
                 {poopImages.map(img => (
                   <div
@@ -266,18 +373,29 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
                 />
               </div>
               <div className="flex gap-2">
+                {!editingEntryId && (
+                  <button
+                    onClick={() => handleSaveEntry(false)}
+                    disabled={!selectedImageId}
+                    className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-blue-500 hover:text-white text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ADD ANOTHER ENTRY
+                  </button>
+                )}
                 <button
-                  onClick={handleSaveEntry}
+                  onClick={() => handleSaveEntry(true)}
                   disabled={!selectedImageId}
                   className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  SAVE
+                  {editingEntryId ? 'UPDATE & CLOSE' : 'SAVE & CLOSE'}
                 </button>
                 <button
                   onClick={() => {
                     setShowImagePicker(false);
+                    setSelectedDate(null);
                     setNoteText('');
                     setSelectedImageId(null);
+                    setEditingEntryId(null);
                   }}
                   className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white text-xs cursor-pointer"
                 >
@@ -289,28 +407,42 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
         )}
 
         {/* View Modal - for non-edit mode */}
-        {showViewModal && viewingEntry && (
+        {showViewModal && selectedDate && (
           <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white border-4 border-gray-900 max-w-lg w-full p-8">
-              <div className="flex flex-col items-center">
-                {viewingEntry.image && (
-                  <img
-                    src={viewingEntry.image.image_url}
-                    alt={viewingEntry.image.label}
-                    className="max-w-full max-h-96 object-contain mb-4"
-                  />
-                )}
-                {viewingEntry.note && (
-                  <div className="w-full mt-4 p-4 border-2 border-gray-900 bg-gray-50">
-                    <div className="text-xs text-gray-500 mb-2">NOTE</div>
-                    <div className="text-sm whitespace-pre-wrap">{viewingEntry.note}</div>
-                  </div>
-                )}
+            <div className="bg-white border-4 border-gray-900 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+              <h3 className="text-base mb-4">ENTRIES FOR {selectedDate}</h3>
+              <div className="space-y-6">
+                {getEntriesForDate(parseInt(selectedDate.split('-')[2])).map((entry, idx) => {
+                  const image = poopImages.find(img => img.id === entry.poop_image_id);
+                  return (
+                    <div key={entry.id || idx} className="border-2 border-gray-900 p-4">
+                      <div className="text-xs text-gray-500 mb-2">ENTRY {idx + 1}</div>
+                      <div className="flex flex-col items-center">
+                        {image && (
+                          <div className="flex flex-col items-center mb-4">
+                            <img
+                              src={image.image_url}
+                              alt={image.label}
+                              className="max-w-full max-h-64 object-contain mb-2"
+                            />
+                            <div className="text-sm font-semibold">{image.label}</div>
+                          </div>
+                        )}
+                        {entry.notes && (
+                          <div className="w-full p-4 border-2 border-gray-900 bg-gray-50">
+                            <div className="text-xs text-gray-500 mb-2">NOTE</div>
+                            <div className="text-sm whitespace-pre-wrap">{entry.notes}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <button
                 onClick={() => {
                   setShowViewModal(false);
-                  setViewingEntry(null);
+                  setSelectedDate(null);
                 }}
                 className="mt-6 px-4 py-2 border-2 border-gray-900 hover:bg-blue-500 hover:text-white text-xs w-full cursor-pointer"
               >
