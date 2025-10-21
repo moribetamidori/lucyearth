@@ -109,33 +109,35 @@ export default function Home() {
       )}
 
       {/* Left sidebar icons */}
-      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-8">
-        <div className="flex flex-col items-center gap-2">
+      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-8 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex-row max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
             onClick={() => setShowPoopCalendar(true)}
-            className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
-            💩
+            <span className="max-sm:text-lg">💩</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">POOP.CAL</span>
           </div>
-          <div className="text-[15px] text-gray-900">POOP.CAL</div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">POOP.CAL</div>
         </div>
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
-            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
-            **
+            <span className="max-sm:text-sm">**</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">ARE.NA</span>
           </div>
-          <div className="text-[15px] text-gray-900">ARE.NA</div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">ARE.NA</div>
         </div>
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
             onClick={() => {
               if (isEditMode) {
@@ -147,7 +149,7 @@ export default function Home() {
                 setShowLoginModal(true);
               }
             }}
-            className={`w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all ${
+            className={`w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1 ${
               isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
             }`}
             style={{
@@ -155,33 +157,37 @@ export default function Home() {
               imageRendering: 'pixelated',
             }}
           >
-            {isEditMode ? '🔓' : '🔒'}
+            <span className="max-sm:text-base">{isEditMode ? '🔓' : '🔒'}</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              {isEditMode ? 'LOCK' : 'LOGIN'}
+            </span>
           </div>
-          <div className="text-[15px] text-gray-900">
+          <div className="text-[15px] text-gray-900 max-sm:hidden">
             {isEditMode ? 'LOCK' : 'LOGIN'}
           </div>
         </div>
 
         {/* Hidden cat icon - only shows after 10+ clicks */}
         {showCatIcon && (
-          <div className="flex flex-col items-center gap-2 animate-fadeIn">
+          <div className="flex flex-col items-center gap-2 animate-fadeIn max-sm:gap-0">
             <div
               onClick={() => setShowCatProfile(true)}
-              className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all"
+              className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
-              🐱
+              <span className="max-sm:text-lg">🐱</span>
+              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CATS</span>
             </div>
-            <div className="text-[15px] text-gray-900">CATS</div>
+            <div className="text-[15px] text-gray-900 max-sm:hidden">CATS</div>
           </div>
         )}
       </div>
 
       {/* Header */}
-      <header className="relative z-10 p-6 flex justify-between items-center border-b-2 border-gray-900">
+      <header className="relative z-10 p-6 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-blue-500 animate-pulse" />
           <div className="text-base">lucyearth.system</div>
@@ -196,11 +202,11 @@ export default function Home() {
 
       {/* Main content */}
       <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl flex-grow flex items-center justify-center">
-        <div className="relative">
+        <div className="relative flex justify-center w-full">
           <img
             src="/gifs/oranges.gif"
             alt="Orange cats"
-            className="h-auto cursor-pointer hover:scale-105 transition-transform"
+            className="h-auto cursor-pointer hover:scale-105 transition-transform max-sm:w-[80%]"
             style={{ imageRendering: 'pixelated', width: '50%' }}
             onClick={async (e) => {
               const rect = e.currentTarget.getBoundingClientRect();
@@ -248,7 +254,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 p-8 border-t-2 border-gray-900 mt-auto">
+      <footer className="relative z-10 p-8 mt-auto">
         <div className="text-center">
           <div className="text-sm text-gray-400">
             © 2025 LUCYEARTH

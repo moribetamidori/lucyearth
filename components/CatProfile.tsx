@@ -44,31 +44,40 @@ export default function CatProfile({
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      return;
-    }
+    // Convert FileList to array for easier processing
+    const fileArray = Array.from(files);
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Image size must be less than 10MB");
-      return;
+    // Validate all files
+    for (const file of fileArray) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert(`"${file.name}" is not an image file. Please select only image files.`);
+        return;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`"${file.name}" is larger than 10MB. Please select smaller images.`);
+        return;
+      }
     }
 
     setIsUploading(true);
     try {
-      await uploadCatPicture(file, anonId);
+      // Upload all files sequentially
+      for (const file of fileArray) {
+        await uploadCatPicture(file, anonId);
+      }
       await loadCatPictures();
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload image. Please try again.");
+      alert("Failed to upload one or more images. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -252,6 +261,7 @@ export default function CatProfile({
               accept="image/*,.heic,.heif"
               onChange={handleFileSelect}
               className="hidden"
+              multiple
             />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -317,7 +327,7 @@ export default function CatProfile({
 
   const renderBackpack = () => {
     return (
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {backpackItems.map((item) => (
           <div
             key={item.id}
