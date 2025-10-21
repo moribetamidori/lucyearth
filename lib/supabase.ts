@@ -44,3 +44,19 @@ export type CatPicture = {
   anon_id: string | null;
   created_at: string;
 };
+
+export type ArenaCollection = {
+  id: string;
+  title: string;
+  anon_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ArenaBlock = {
+  id: string;
+  collection_id: string;
+  image_url: string;
+  anon_id: string | null;
+  created_at: string;
+};

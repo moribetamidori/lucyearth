@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
 import CatProfile from '@/components/CatProfile';
 import ActivityLog from '@/components/ActivityLog';
+import ArenaModal from '@/components/ArenaModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -31,6 +32,7 @@ export default function Home() {
   const [catMessage, setCatMessage] = useState<string>('');
   const [messageTimeoutId, setMessageTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [showActivityLog, setShowActivityLog] = useState<boolean>(false);
+  const [showArenaModal, setShowArenaModal] = useState<boolean>(false);
   const [userNumber, setUserNumber] = useState<number>(0);
 
   // Helper function to log activities
@@ -150,6 +152,10 @@ export default function Home() {
         </div>
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
+            onClick={() => {
+              setShowArenaModal(true);
+              logActivity('Opened Are.na', 'Viewed Arena collections');
+            }}
             className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
@@ -364,8 +370,10 @@ export default function Home() {
             localStorage.setItem('lucyearth_edit_mode', 'true');
             setIsEditMode(true);
             setShowLoginModal(false);
+            logActivity('Successful login', 'User logged in as admin');
           }}
           onClose={() => setShowLoginModal(false)}
+          onFailedAttempt={() => logActivity('Failed login attempt', 'Incorrect password entered')}
         />
       )}
 
@@ -384,12 +392,29 @@ export default function Home() {
         anonId={anonId}
         userNumber={userNumber}
       />
+
+      {/* Arena Modal */}
+      <ArenaModal
+        isOpen={showArenaModal}
+        onClose={() => setShowArenaModal(false)}
+        isEditMode={isEditMode}
+        anonId={anonId}
+        onLogActivity={logActivity}
+      />
     </div>
   );
 }
 
 // Login Modal Component
-function LoginModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
+function LoginModal({
+  onSuccess,
+  onClose,
+  onFailedAttempt
+}: {
+  onSuccess: () => void;
+  onClose: () => void;
+  onFailedAttempt: () => void;
+}) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -405,6 +430,7 @@ function LoginModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: ()
     } else {
       setError('Incorrect password');
       setPassword('');
+      onFailedAttempt();
     }
   };
 
@@ -412,6 +438,9 @@ function LoginModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: ()
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white border-4 border-gray-900 max-w-md w-full p-6">
         <h2 className="text-xl mb-4">ENTER PASSWORD</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          If you don&apos;t know the password, you&apos;re not admin. Please exit.
+        </p>
         <form onSubmit={handleSubmit}>
           <input
             type="password"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { uploadCatPicture, fetchCatPictures } from "@/lib/imageUpload";
+import { uploadCatPicture, fetchCatPictures, deleteCatPicture } from "@/lib/imageUpload";
 import type { CatPicture } from "@/lib/supabase";
 
 type CatProfileProps = {
@@ -80,6 +80,20 @@ export default function CatProfile({
       alert("Failed to upload one or more images. Please try again.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDeletePicture = async (pic: CatPicture) => {
+    if (!confirm("Delete this picture?")) return;
+
+    const success = await deleteCatPicture(pic.id, pic.image_url);
+    if (success) {
+      await loadCatPictures();
+      // Adjust current page if needed
+      const totalPages = Math.ceil((catPictures.length - 1) / PICTURES_PER_PAGE);
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
     }
   };
 
@@ -278,15 +292,26 @@ export default function CatProfile({
           {currentPictures.map((pic) => (
             <div
               key={pic.id}
-              onClick={() => setSelectedImage(pic.image_url)}
-              className="aspect-square border-2 border-gray-900 overflow-hidden bg-gray-100 hover:border-orange-400 transition-colors cursor-pointer"
+              className="relative aspect-square border-2 border-gray-900 overflow-hidden bg-gray-100 hover:border-orange-400 transition-colors cursor-pointer group"
             >
               <img
                 src={pic.image_url}
                 alt="Cat picture"
                 className="w-full h-full object-cover"
                 style={{ imageRendering: "pixelated" }}
+                onClick={() => setSelectedImage(pic.image_url)}
               />
+              {isEditMode && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePicture(pic);
+                  }}
+                  className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           ))}
 
