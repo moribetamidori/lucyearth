@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
+import CatProfile from '@/components/CatProfile';
+import { supabase } from '@/lib/supabase';
 
 export default function Home() {
   const [score, setScore] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showPoopCalendar, setShowPoopCalendar] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -17,6 +18,50 @@ export default function Home() {
     duration: number;
     delay: number;
   }>>([]);
+  const [pets, setPets] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+  }>>([]);
+  const [anonId, setAnonId] = useState<string>('');
+  const [catClicks, setCatClicks] = useState<number>(0);
+  const [showCatIcon, setShowCatIcon] = useState<boolean>(false);
+  const [showCatProfile, setShowCatProfile] = useState<boolean>(false);
+
+  // Initialize anonymous user
+  useEffect(() => {
+    const initAnonUser = async () => {
+      // Get or create anonymous user ID
+      let storedAnonId = localStorage.getItem('lucyearth_anon_id');
+
+      if (!storedAnonId) {
+        // Generate a new anonymous ID
+        storedAnonId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        localStorage.setItem('lucyearth_anon_id', storedAnonId);
+      }
+
+      setAnonId(storedAnonId);
+
+      // Check if user exists in database
+      const { data: existingUser } = await supabase
+        .from('anon_users')
+        .select('*')
+        .eq('anon_id', storedAnonId)
+        .single();
+
+      if (existingUser) {
+        setCatClicks(existingUser.cat_clicks);
+        setShowCatIcon(existingUser.cat_clicks > 10);
+      } else {
+        // Create new anonymous user record
+        await supabase
+          .from('anon_users')
+          .insert({ anon_id: storedAnonId, cat_clicks: 0 });
+      }
+    };
+
+    initAnonUser();
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -42,7 +87,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white overflow-hidden">
+    <div className="min-h-screen bg-white overflow-hidden flex flex-col">
       {/* Floating orbs background */}
       {mounted && orbs.length > 0 && (
         <div className="fixed inset-0 pointer-events-none opacity-20">
@@ -116,6 +161,23 @@ export default function Home() {
             {isEditMode ? 'LOCK' : 'LOGIN'}
           </div>
         </div>
+
+        {/* Hidden cat icon - only shows after 10+ clicks */}
+        {showCatIcon && (
+          <div className="flex flex-col items-center gap-2 animate-fadeIn">
+            <div
+              onClick={() => setShowCatProfile(true)}
+              className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all"
+              style={{
+                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+                imageRendering: 'pixelated',
+              }}
+            >
+              🐱
+            </div>
+            <div className="text-[15px] text-gray-900">CATS</div>
+          </div>
+        )}
       </div>
 
       {/* Header */}
@@ -133,179 +195,60 @@ export default function Home() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl">
-        {/* Animated Wireframe Airplane */}
-        <div className="flex justify-center mb-32 mt-20">
-          <div
-            className="relative"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            style={{
-              animation: 'float 4s ease-in-out infinite',
+      <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl flex-grow flex items-center justify-center">
+        <div className="relative">
+          <img
+            src="/gifs/oranges.gif"
+            alt="Orange cats"
+            className="h-auto cursor-pointer hover:scale-105 transition-transform"
+            style={{ imageRendering: 'pixelated', width: '50%' }}
+            onClick={async (e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const id = Date.now();
+
+              setPets(prev => [...prev, { id, x, y }]);
+
+              setTimeout(() => {
+                setPets(prev => prev.filter(pet => pet.id !== id));
+              }, 1000);
+
+              // Update click count in database
+              if (anonId) {
+                const newClickCount = catClicks + 1;
+                setCatClicks(newClickCount);
+
+                await supabase
+                  .from('anon_users')
+                  .update({ cat_clicks: newClickCount })
+                  .eq('anon_id', anonId);
+
+                // Show cat icon if clicks > 10
+                if (newClickCount > 10) {
+                  setShowCatIcon(true);
+                }
+              }
             }}
-          >
-            <svg
-              width="400"
-              height="300"
-              viewBox="0 0 400 300"
-              className={`transition-all duration-500 ${isHovered ? 'scale-110' : ''}`}
+          />
+          {pets.map(pet => (
+            <div
+              key={pet.id}
+              className="absolute pointer-events-none text-2xl font-bold"
               style={{
-                filter: isHovered ? 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))' : 'none',
+                left: `${pet.x}px`,
+                top: `${pet.y}px`,
+                animation: 'float-up 1s ease-out forwards',
               }}
             >
-              {/* Airplane body */}
-              <path
-                d="M 200 100 L 280 140 L 200 180 L 120 140 Z"
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth="2"
-                className="animate-pulse"
-              />
-
-              {/* Wings */}
-              <line x1="140" y1="140" x2="60" y2="120" stroke="#8b5cf6" strokeWidth="2" />
-              <line x1="260" y1="140" x2="340" y2="120" stroke="#8b5cf6" strokeWidth="2" />
-              <line x1="60" y1="120" x2="80" y2="160" stroke="#8b5cf6" strokeWidth="2" />
-              <line x1="340" y1="120" x2="320" y2="160" stroke="#8b5cf6" strokeWidth="2" />
-              <line x1="80" y1="160" x2="140" y2="140" stroke="#8b5cf6" strokeWidth="2" />
-              <line x1="320" y1="160" x2="260" y2="140" stroke="#8b5cf6" strokeWidth="2" />
-
-              {/* Tail */}
-              <line x1="120" y1="140" x2="100" y2="100" stroke="#3b82f6" strokeWidth="2" />
-              <line x1="100" y1="100" x2="110" y2="80" stroke="#3b82f6" strokeWidth="2" />
-              <line x1="110" y1="80" x2="130" y2="130" stroke="#3b82f6" strokeWidth="2" />
-
-              {/* Nose */}
-              <line x1="280" y1="140" x2="320" y2="140" stroke="#3b82f6" strokeWidth="3" />
-
-              {/* Interior lines */}
-              <line x1="200" y1="100" x2="200" y2="180" stroke="#93c5fd" strokeWidth="1" opacity="0.5" />
-              <line x1="160" y1="120" x2="240" y2="160" stroke="#93c5fd" strokeWidth="1" opacity="0.5" />
-              <line x1="160" y1="160" x2="240" y2="120" stroke="#93c5fd" strokeWidth="1" opacity="0.5" />
-
-              {/* Cockpit */}
-              <circle cx="260" cy="140" r="8" fill="none" stroke="#3b82f6" strokeWidth="2" />
-
-              {/* Engine details */}
-              <circle cx="180" cy="120" r="4" fill="none" stroke="#8b5cf6" strokeWidth="1.5" />
-              <circle cx="180" cy="160" r="4" fill="none" stroke="#8b5cf6" strokeWidth="1.5" />
-
-              {/* Motion lines */}
-              <line
-                x1="100"
-                y1="140"
-                x2="60"
-                y2="140"
-                stroke="#93c5fd"
-                strokeWidth="1"
-                opacity="0.3"
-                strokeDasharray="5,5"
-              >
-                <animate
-                  attributeName="x1"
-                  values="100;80;100"
-                  dur="1s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="x2"
-                  values="60;40;60"
-                  dur="1s"
-                  repeatCount="indefinite"
-                />
-              </line>
-              <line
-                x1="110"
-                y1="150"
-                x2="70"
-                y2="150"
-                stroke="#93c5fd"
-                strokeWidth="1"
-                opacity="0.2"
-                strokeDasharray="5,5"
-              >
-                <animate
-                  attributeName="x1"
-                  values="110;90;110"
-                  dur="1.2s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="x2"
-                  values="70;50;70"
-                  dur="1.2s"
-                  repeatCount="indefinite"
-                />
-              </line>
-            </svg>
-            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-sm text-gray-400 whitespace-nowrap">
-              FLIGHT MODE ACTIVE
+              ❤️ +1
             </div>
-          </div>
-        </div>
-
-        {/* Feature cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-32">
-          <div className="glass-card p-8 text-center border-2 border-gray-900">
-            <div className="text-4xl mb-4">◇</div>
-            <div className="text-sm text-gray-400 mb-3">VELOCITY</div>
-            <div className="text-2xl">0.99c</div>
-          </div>
-          <div className="glass-card p-8 text-center border-2 border-gray-900">
-            <div className="text-4xl mb-4">◯</div>
-            <div className="text-sm text-gray-400 mb-3">EFFICIENCY</div>
-            <div className="text-2xl">99.9%</div>
-          </div>
-          <div className="glass-card p-8 text-center border-2 border-gray-900">
-            <div className="text-4xl mb-4">△</div>
-            <div className="text-sm text-gray-400 mb-3">PRECISION</div>
-            <div className="text-2xl">∞</div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex flex-wrap justify-center gap-4 mb-32">
-          <button className="neo-button px-8 py-4 border-2 border-gray-900 text-base cursor-pointer hover:bg-blue-500 hover:text-white transition-colors">
-            LAUNCH
-          </button>
-          <button className="neo-button px-8 py-4 border-2 border-gray-900 text-base cursor-pointer hover:bg-blue-500 hover:text-white transition-colors">
-            EXPLORE
-          </button>
-          <button className="neo-button px-8 py-4 border-2 border-gray-900 text-base cursor-pointer hover:bg-blue-500 hover:text-white transition-colors">
-            CONNECT
-          </button>
-        </div>
-
-        {/* Timeline / Status */}
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="shimmer-line pb-6">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-400">SYSTEM</div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-green-500 animate-pulse" />
-                <div className="text-sm text-gray-500">ONLINE</div>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-6 text-center">
-            <div>
-              <div className="text-xl mb-2">247</div>
-              <div className="text-sm text-gray-400">NODES</div>
-            </div>
-            <div>
-              <div className="text-xl mb-2">1.2M</div>
-              <div className="text-sm text-gray-400">TRANS</div>
-            </div>
-            <div>
-              <div className="text-xl mb-2">∞</div>
-              <div className="text-sm text-gray-400">POSSIBLE</div>
-            </div>
-          </div>
+          ))}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 mt-20 p-8 border-t-2 border-gray-900">
+      <footer className="relative z-10 p-8 border-t-2 border-gray-900 mt-auto">
         <div className="text-center">
           <div className="text-sm text-gray-400">
             © 2025 LUCYEARTH
@@ -331,6 +274,14 @@ export default function Home() {
           onClose={() => setShowLoginModal(false)}
         />
       )}
+
+      {/* Cat Profile Modal */}
+      <CatProfile
+        isOpen={showCatProfile}
+        onClose={() => setShowCatProfile(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+      />
     </div>
   );
 }

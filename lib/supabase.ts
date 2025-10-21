@@ -29,3 +29,18 @@ export type CalendarEntry = {
   created_at: string;
   updated_at: string;
 };
+
+export type AnonUser = {
+  id: string;
+  anon_id: string;
+  cat_clicks: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CatPicture = {
+  id: string;
+  image_url: string;
+  anon_id: string | null;
+  created_at: string;
+};

@@ -50,6 +50,17 @@ body {
   }
 }
 
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.9);
   transition: all 0.2s ease;
