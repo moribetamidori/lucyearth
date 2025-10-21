@@ -7,9 +7,11 @@ type PoopCalendarProps = {
   isOpen: boolean;
   onClose: () => void;
   isEditMode: boolean;
+  anonId: string;
+  onLogActivity: (action: string, details?: string) => void;
 };
 
-export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalendarProps) {
+export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLogActivity }: PoopCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 9, 1)); // Oct 2025
   const [poopImages, setPoopImages] = useState<PoopImage[]>([]);
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
@@ -65,6 +67,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
       if (existingEntries.length > 0) {
         setSelectedDate(dateStr);
         setShowViewModal(true);
+        onLogActivity('Clicked calendar date', `Viewed entries for ${dateStr}`);
       }
       return;
     }
@@ -74,6 +77,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode }: PoopCalend
     setNoteText('');
     setSelectedImageId(null);
     setShowImagePicker(true);
+    onLogActivity('Clicked calendar date', `Adding entry for ${dateStr}`);
   };
 
   const handleSaveEntry = async (closeAfter: boolean = false) => {

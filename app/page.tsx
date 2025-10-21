@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
 import CatProfile from '@/components/CatProfile';
+import ActivityLog from '@/components/ActivityLog';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -27,6 +28,19 @@ export default function Home() {
   const [catClicks, setCatClicks] = useState<number>(0);
   const [showCatIcon, setShowCatIcon] = useState<boolean>(false);
   const [showCatProfile, setShowCatProfile] = useState<boolean>(false);
+  const [catMessage, setCatMessage] = useState<string>('');
+  const [messageTimeoutId, setMessageTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [showActivityLog, setShowActivityLog] = useState<boolean>(false);
+  const [userNumber, setUserNumber] = useState<number>(0);
+
+  // Helper function to log activities
+  const logActivity = async (action: string, details?: string) => {
+    if (anonId) {
+      await supabase
+        .from('activity_logs')
+        .insert({ anon_id: anonId, action, details: details || null });
+    }
+  };
 
   // Initialize anonymous user
   useEffect(() => {
@@ -52,11 +66,18 @@ export default function Home() {
       if (existingUser) {
         setCatClicks(existingUser.cat_clicks);
         setShowCatIcon(existingUser.cat_clicks > 10);
+        setUserNumber(existingUser.user_number || 0);
       } else {
         // Create new anonymous user record
-        await supabase
+        const { data: newUser } = await supabase
           .from('anon_users')
-          .insert({ anon_id: storedAnonId, cat_clicks: 0 });
+          .insert({ anon_id: storedAnonId, cat_clicks: 0 })
+          .select()
+          .single();
+
+        if (newUser) {
+          setUserNumber(newUser.user_number || 0);
+        }
       }
     };
 
@@ -112,7 +133,10 @@ export default function Home() {
       <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-8 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex-row max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
-            onClick={() => setShowPoopCalendar(true)}
+            onClick={() => {
+              setShowPoopCalendar(true);
+              logActivity('Opened Poop Calendar', 'Viewed poop tracking calendar');
+            }}
             className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
@@ -171,7 +195,10 @@ export default function Home() {
         {showCatIcon && (
           <div className="flex flex-col items-center gap-2 animate-fadeIn max-sm:gap-0">
             <div
-              onClick={() => setShowCatProfile(true)}
+              onClick={() => {
+                setShowCatProfile(true);
+                logActivity('Opened Cat Profile', 'Clicked on the Cat app icon');
+              }}
               className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
@@ -184,6 +211,25 @@ export default function Home() {
             <div className="text-[15px] text-gray-900 max-sm:hidden">CATS</div>
           </div>
         )}
+
+        {/* Activity Log icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowActivityLog(true);
+              logActivity('Opened Activity Log', 'Viewed activity history');
+            }}
+            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-purple-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📋</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">LOG</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
+        </div>
       </div>
 
       {/* Header */}
@@ -202,7 +248,7 @@ export default function Home() {
 
       {/* Main content */}
       <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl flex-grow flex items-center justify-center">
-        <div className="relative flex justify-center w-full">
+        <div className="relative flex flex-col items-center w-full">
           <img
             src="/gifs/oranges.gif"
             alt="Orange cats"
@@ -225,14 +271,49 @@ export default function Home() {
                 const newClickCount = catClicks + 1;
                 setCatClicks(newClickCount);
 
+                // Log the cat pat
+                logActivity('Petted the cat', `Cat pat #${newClickCount}`);
+
                 await supabase
                   .from('anon_users')
                   .update({ cat_clicks: newClickCount })
                   .eq('anon_id', anonId);
 
                 // Show cat icon if clicks > 10
-                if (newClickCount > 10) {
+                if (newClickCount === 10) {
                   setShowCatIcon(true);
+                  logActivity('Discovered hidden Cat app', 'Unlocked the secret Cat profile after 10 pats!');
+                } else if (newClickCount > 10 && !showCatIcon) {
+                  setShowCatIcon(true);
+                }
+
+                // Show progressive messages - don't let clicks override the message timer
+                let message = '';
+                let duration = 2000; // Default 2 seconds
+
+                if (newClickCount === 3) {
+                  message = '😽 Meow~';
+                } else if (newClickCount === 5) {
+                  message = '😻 Keep Going';
+                } else if (newClickCount === 8) {
+                  message = '😼 Almost There!';
+                } else if (newClickCount === 10) {
+                  message = "🎁 I think we're friends now! Check out the Cat app.";
+                  duration = 10000; // 10 seconds for the final message
+                }
+
+                if (message) {
+                  // Clear any existing timeout to start fresh
+                  if (messageTimeoutId) {
+                    clearTimeout(messageTimeoutId);
+                  }
+
+                  setCatMessage(message);
+                  const newTimeoutId = setTimeout(() => {
+                    setCatMessage('');
+                    setMessageTimeoutId(null);
+                  }, duration);
+                  setMessageTimeoutId(newTimeoutId);
                 }
               }
             }}
@@ -250,6 +331,11 @@ export default function Home() {
               ❤️ +1
             </div>
           ))}
+          {catMessage && (
+            <div className="mt-4 text-2xl font-bold text-center animate-fadeIn max-sm:text-lg max-sm:px-4">
+              {catMessage}
+            </div>
+          )}
         </div>
       </main>
 
@@ -267,6 +353,8 @@ export default function Home() {
         isOpen={showPoopCalendar}
         onClose={() => setShowPoopCalendar(false)}
         isEditMode={isEditMode}
+        anonId={anonId}
+        onLogActivity={logActivity}
       />
 
       {/* Login Modal */}
@@ -287,6 +375,14 @@ export default function Home() {
         onClose={() => setShowCatProfile(false)}
         anonId={anonId}
         isEditMode={isEditMode}
+      />
+
+      {/* Activity Log Modal */}
+      <ActivityLog
+        isOpen={showActivityLog}
+        onClose={() => setShowActivityLog(false)}
+        anonId={anonId}
+        userNumber={userNumber}
       />
     </div>
   );
