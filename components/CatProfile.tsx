@@ -86,14 +86,17 @@ export default function CatProfile({
   const handleDeletePicture = async (pic: CatPicture) => {
     if (!confirm("Delete this picture?")) return;
 
-    const success = await deleteCatPicture(pic.id, pic.image_url);
-    if (success) {
+    try {
+      await deleteCatPicture(pic.id, pic.image_url);
       await loadCatPictures();
       // Adjust current page if needed
       const totalPages = Math.ceil((catPictures.length - 1) / PICTURES_PER_PAGE);
       if (currentPage > totalPages && totalPages > 0) {
         setCurrentPage(totalPages);
       }
+    } catch (error) {
+      console.error("Failed to delete picture:", error);
+      alert("Failed to delete picture. Please try again.");
     }
   };
 
