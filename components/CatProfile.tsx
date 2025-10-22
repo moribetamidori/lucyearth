@@ -24,6 +24,7 @@ export default function CatProfile({
   const [isUploading, setIsUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const PICTURES_PER_PAGE = 9;
@@ -302,7 +303,11 @@ export default function CatProfile({
                 alt="Cat picture"
                 className="w-full h-full object-cover"
                 style={{ imageRendering: "pixelated" }}
-                onClick={() => setSelectedImage(pic.image_url)}
+                onClick={() => {
+                  const index = catPictures.findIndex(p => p.id === pic.id);
+                  setSelectedImage(pic.image_url);
+                  setSelectedImageIndex(index);
+                }}
               />
               {isEditMode && (
                 <button
@@ -449,25 +454,76 @@ export default function CatProfile({
       </div>
 
       {/* Image Lightbox - Within modal */}
-      {selectedImage && (
+      {selectedImage && selectedImageIndex >= 0 && catPictures.length > 0 && (
         <div
           className="absolute inset-0 backdrop-blur-md bg-white/80 flex items-center justify-center z-10 p-8"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => {
+            setSelectedImage(null);
+            setSelectedImageIndex(-1);
+          }}
         >
-          <div className="relative max-w-full max-h-full">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-8 right-0 text-gray-900 text-3xl hover:text-orange-400 transition-colors"
-            >
-              ×
-            </button>
-            <img
-              src={selectedImage}
-              alt="Enlarged cat picture"
-              className="max-w-full max-h-[calc(90vh-8rem)] object-contain border-4 border-gray-900"
-              style={{ imageRendering: 'pixelated' }}
-              onClick={(e) => e.stopPropagation()}
-            />
+          <div className="flex items-center justify-center gap-6 max-w-full max-h-full">
+            {/* Previous button */}
+            {selectedImageIndex > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newIndex = selectedImageIndex - 1;
+                  setSelectedImageIndex(newIndex);
+                  setSelectedImage(catPictures[newIndex].image_url);
+                }}
+                className="bg-gray-900 text-white px-4 py-2 text-2xl hover:bg-orange-400 transition-colors border-2 border-gray-900 flex-shrink-0"
+              >
+                ←
+              </button>
+            ) : (
+              <div className="w-16" />
+            )}
+
+            {/* Image container */}
+            <div className="relative flex flex-col items-center gap-4">
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  setSelectedImage(null);
+                  setSelectedImageIndex(-1);
+                }}
+                className="self-end text-gray-900 text-3xl hover:text-orange-400 transition-colors"
+              >
+                ×
+              </button>
+
+              {/* Image */}
+              <img
+                src={selectedImage}
+                alt="Enlarged cat picture"
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
+                style={{ imageRendering: 'pixelated' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+
+              {/* Image counter */}
+              <div className="bg-gray-900 text-white px-4 py-2 text-sm border-2 border-gray-900">
+                {selectedImageIndex + 1} / {catPictures.length}
+              </div>
+            </div>
+
+            {/* Next button */}
+            {selectedImageIndex < catPictures.length - 1 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newIndex = selectedImageIndex + 1;
+                  setSelectedImageIndex(newIndex);
+                  setSelectedImage(catPictures[newIndex].image_url);
+                }}
+                className="bg-gray-900 text-white px-4 py-2 text-2xl hover:bg-orange-400 transition-colors border-2 border-gray-900 flex-shrink-0"
+              >
+                →
+              </button>
+            ) : (
+              <div className="w-16" />
+            )}
           </div>
         </div>
       )}

@@ -40,6 +40,7 @@ export default function ArenaModal({
   const [newCollectionTitle, setNewCollectionTitle] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -337,7 +338,9 @@ export default function ArenaModal({
                         alt="Block"
                         className="w-full h-full object-cover cursor-pointer hover:opacity-90"
                         onClick={() => {
+                          const index = blocks.findIndex(b => b.id === block.id);
                           setSelectedImage(block.image_url);
+                          setSelectedImageIndex(index);
                           onLogActivity(
                             'Viewed Arena block',
                             `Collection: ${currentCollection.title}, Block ID: ${block.id}`
@@ -362,24 +365,75 @@ export default function ArenaModal({
       </div>
 
       {/* Image lightbox */}
-      {selectedImage && (
+      {selectedImage && selectedImageIndex >= 0 && blocks.length > 0 && (
         <div
           className="fixed inset-0 backdrop-blur-md bg-white/80 z-[60] flex items-center justify-center p-8"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => {
+            setSelectedImage(null);
+            setSelectedImageIndex(-1);
+          }}
         >
-          <div className="relative max-w-full max-h-full">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-12 right-0 text-gray-900 text-4xl hover:text-blue-500 transition-colors"
-            >
-              ×
-            </button>
-            <img
-              src={selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[calc(90vh-8rem)] object-contain border-4 border-black"
-              onClick={(e) => e.stopPropagation()}
-            />
+          <div className="flex items-center justify-center gap-6 max-w-full max-h-full">
+            {/* Previous button */}
+            {selectedImageIndex > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newIndex = selectedImageIndex - 1;
+                  setSelectedImageIndex(newIndex);
+                  setSelectedImage(blocks[newIndex].image_url);
+                }}
+                className="bg-black text-white px-4 py-2 text-2xl hover:bg-blue-500 transition-colors border-2 border-black flex-shrink-0"
+              >
+                ←
+              </button>
+            ) : (
+              <div className="w-16" />
+            )}
+
+            {/* Image container */}
+            <div className="relative flex flex-col items-center gap-4">
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  setSelectedImage(null);
+                  setSelectedImageIndex(-1);
+                }}
+                className="self-end text-gray-900 text-4xl hover:text-blue-500 transition-colors"
+              >
+                ×
+              </button>
+
+              {/* Image */}
+              <img
+                src={selectedImage}
+                alt="Full size"
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
+                onClick={(e) => e.stopPropagation()}
+              />
+
+              {/* Image counter */}
+              <div className="bg-black text-white px-4 py-2 text-sm border-2 border-black">
+                {selectedImageIndex + 1} / {blocks.length}
+              </div>
+            </div>
+
+            {/* Next button */}
+            {selectedImageIndex < blocks.length - 1 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newIndex = selectedImageIndex + 1;
+                  setSelectedImageIndex(newIndex);
+                  setSelectedImage(blocks[newIndex].image_url);
+                }}
+                className="bg-black text-white px-4 py-2 text-2xl hover:bg-blue-500 transition-colors border-2 border-black flex-shrink-0"
+              >
+                →
+              </button>
+            ) : (
+              <div className="w-16" />
+            )}
           </div>
         </div>
       )}
