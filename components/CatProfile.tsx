@@ -25,7 +25,13 @@ export default function CatProfile({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
+  const [showControls, setShowControls] = useState(true);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownSwipeHint = useRef(false);
 
   const PICTURES_PER_PAGE = 9;
 
@@ -35,6 +41,77 @@ export default function CatProfile({
       loadCatPictures();
     }
   }, [isOpen, activeTab]);
+
+  // Auto-hide controls after 2 seconds of inactivity
+  const resetHideControlsTimer = () => {
+    setShowControls(true);
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current);
+    }
+    hideControlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 2000);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideControlsTimeoutRef.current) {
+        clearTimeout(hideControlsTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Reset controls when image changes
+  useEffect(() => {
+    if (selectedImage) {
+      resetHideControlsTimer();
+      // Show swipe hint on mobile only once per session when first opening an image
+      if (!hasShownSwipeHint.current) {
+        setShowSwipeHint(true);
+        hasShownSwipeHint.current = true;
+        const hintTimer = setTimeout(() => {
+          setShowSwipeHint(false);
+        }, 3000);
+        return () => clearTimeout(hintTimer);
+      }
+    } else {
+      // Reset hint flag when closing the lightbox
+      hasShownSwipeHint.current = false;
+    }
+  }, [selectedImage]);
+
+  // Swipe detection
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    setShowSwipeHint(false);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && selectedImageIndex < catPictures.length - 1) {
+      const newIndex = selectedImageIndex + 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(catPictures[newIndex].image_url);
+    }
+    if (isRightSwipe && selectedImageIndex > 0) {
+      const newIndex = selectedImageIndex - 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(catPictures[newIndex].image_url);
+    }
+  };
 
   const loadCatPictures = async () => {
     const pictures = await fetchCatPictures();
@@ -456,75 +533,103 @@ export default function CatProfile({
       {/* Image Lightbox - Within modal */}
       {selectedImage && selectedImageIndex >= 0 && catPictures.length > 0 && (
         <div
-          className="absolute inset-0 backdrop-blur-md bg-white/80 flex items-center justify-center z-10 p-8"
-          onClick={() => {
-            setSelectedImage(null);
-            setSelectedImageIndex(-1);
+          className="absolute inset-0 backdrop-blur-md bg-white/80 flex items-center justify-between z-10 p-4"
+          onMouseMove={resetHideControlsTimer}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedImage(null);
+              setSelectedImageIndex(-1);
+            } else {
+              resetHideControlsTimer();
+            }
           }}
         >
-          <div className="flex items-center justify-center gap-6 max-w-full max-h-full">
-            {/* Previous button */}
-            {selectedImageIndex > 0 ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const newIndex = selectedImageIndex - 1;
-                  setSelectedImageIndex(newIndex);
-                  setSelectedImage(catPictures[newIndex].image_url);
-                }}
-                className="bg-gray-900 text-white px-4 py-2 text-2xl hover:bg-orange-400 transition-colors border-2 border-gray-900 flex-shrink-0"
-              >
-                ←
-              </button>
-            ) : (
-              <div className="w-16" />
-            )}
+          {/* Close button - Fixed top right */}
+          <button
+            onClick={() => {
+              setSelectedImage(null);
+              setSelectedImageIndex(-1);
+            }}
+            className={`fixed top-4 right-4 text-gray-900 text-4xl hover:text-orange-400 transition-all duration-300 z-50 bg-white/80 w-12 h-12 flex items-center justify-center border-2 border-gray-900 ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            ×
+          </button>
 
-            {/* Image container */}
-            <div className="relative flex flex-col items-center gap-4">
-              {/* Close button */}
-              <button
-                onClick={() => {
-                  setSelectedImage(null);
-                  setSelectedImageIndex(-1);
-                }}
-                className="self-end text-gray-900 text-3xl hover:text-orange-400 transition-colors"
-              >
-                ×
-              </button>
-
-              {/* Image */}
-              <img
-                src={selectedImage}
-                alt="Enlarged cat picture"
-                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
-                style={{ imageRendering: 'pixelated' }}
-                onClick={(e) => e.stopPropagation()}
-              />
-
-              {/* Image counter */}
-              <div className="bg-gray-900 text-white px-4 py-2 text-sm border-2 border-gray-900">
-                {selectedImageIndex + 1} / {catPictures.length}
-              </div>
-            </div>
-
-            {/* Next button */}
-            {selectedImageIndex < catPictures.length - 1 ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const newIndex = selectedImageIndex + 1;
-                  setSelectedImageIndex(newIndex);
-                  setSelectedImage(catPictures[newIndex].image_url);
-                }}
-                className="bg-gray-900 text-white px-4 py-2 text-2xl hover:bg-orange-400 transition-colors border-2 border-gray-900 flex-shrink-0"
-              >
-                →
-              </button>
-            ) : (
-              <div className="w-16" />
-            )}
+          {/* Image counter - Fixed bottom center */}
+          <div
+            className={`fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 text-sm border-2 border-gray-900 transition-all duration-300 z-50 ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {selectedImageIndex + 1} / {catPictures.length}
           </div>
+          {/* Previous button - Desktop only */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedImageIndex > 0) {
+                const newIndex = selectedImageIndex - 1;
+                setSelectedImageIndex(newIndex);
+                setSelectedImage(catPictures[newIndex].image_url);
+              }
+            }}
+            disabled={selectedImageIndex === 0}
+            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            ←
+          </button>
+
+          {/* Image container with swipe support */}
+          <div
+            className="relative flex flex-col items-center gap-4 flex-1 mx-2 md:mx-4"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {/* Swipe hint animation - Mobile only */}
+            {showSwipeHint && (
+              <div className="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                <div className="flex gap-4 items-center animate-pulse">
+                  <div className="text-4xl text-gray-900/50 animate-[wiggle_1s_ease-in-out_infinite]">←</div>
+                  <div className="text-sm text-gray-900/70 bg-white/90 px-3 py-2 rounded border-2 border-gray-900">
+                    Swipe to navigate
+                  </div>
+                  <div className="text-4xl text-gray-900/50 animate-[wiggle_1s_ease-in-out_infinite]">→</div>
+                </div>
+              </div>
+            )}
+
+            {/* Image */}
+            <img
+              src={selectedImage}
+              alt="Enlarged cat picture"
+              className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
+              style={{ imageRendering: 'pixelated' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Next button - Desktop only */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedImageIndex < catPictures.length - 1) {
+                const newIndex = selectedImageIndex + 1;
+                setSelectedImageIndex(newIndex);
+                setSelectedImage(catPictures[newIndex].image_url);
+              }
+            }}
+            disabled={selectedImageIndex === catPictures.length - 1}
+            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            →
+          </button>
         </div>
       )}
     </div>
