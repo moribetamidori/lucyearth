@@ -110,29 +110,42 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
 }
 
 /**
- * Uploads a cat picture to Supabase storage and saves metadata
- * @param file - The image file to upload
+ * Uploads a cat picture or video to Supabase storage and saves metadata
+ * @param file - The image or video file to upload
  * @param anonId - The anonymous user ID (optional)
- * @returns Promise with the uploaded image URL
+ * @returns Promise with the uploaded media URL
  */
 export async function uploadCatPicture(
   file: File,
   anonId?: string
 ): Promise<{ url: string; id: string }> {
   try {
-    // Convert to WebP
-    const webpBlob = await convertToWebP(file, 0.8);
+    const isVideo = file.type.startsWith('video/');
+    let uploadBlob: Blob;
+    let fileName: string;
+    let contentType: string;
 
-    // Generate unique filename
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 9);
-    const fileName = `${timestamp}_${randomStr}.webp`;
+
+    if (isVideo) {
+      // For videos, upload as-is without conversion
+      uploadBlob = file;
+      const extension = file.name.split('.').pop() || 'mp4';
+      fileName = `${timestamp}_${randomStr}.${extension}`;
+      contentType = file.type;
+    } else {
+      // For images, convert to WebP
+      uploadBlob = await convertToWebP(file, 0.8);
+      fileName = `${timestamp}_${randomStr}.webp`;
+      contentType = 'image/webp';
+    }
 
     // Upload to Supabase storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('cat-pictures')
-      .upload(fileName, webpBlob, {
-        contentType: 'image/webp',
+      .upload(fileName, uploadBlob, {
+        contentType: contentType,
         cacheControl: '3600',
       });
 
@@ -145,14 +158,15 @@ export async function uploadCatPicture(
       .from('cat-pictures')
       .getPublicUrl(fileName);
 
-    const imageUrl = urlData.publicUrl;
+    const mediaUrl = urlData.publicUrl;
 
     // Save metadata to database
     const { data: dbData, error: dbError } = await supabase
       .from('cat_pictures')
       .insert({
-        image_url: imageUrl,
+        image_url: mediaUrl,
         anon_id: anonId || null,
+        media_type: isVideo ? 'video' : 'image',
       })
       .select()
       .single();
@@ -161,9 +175,9 @@ export async function uploadCatPicture(
       throw dbError;
     }
 
-    return { url: imageUrl, id: dbData.id };
+    return { url: mediaUrl, id: dbData.id };
   } catch (error) {
-    console.error('Error uploading cat picture:', error);
+    console.error('Error uploading cat media:', error);
     throw error;
   }
 }

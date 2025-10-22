@@ -43,6 +43,7 @@ export type CatPicture = {
   image_url: string;
   anon_id: string | null;
   created_at: string;
+  media_type?: 'image' | 'video';
 };
 
 export type ArenaCollection = {
@@ -59,4 +60,5 @@ export type ArenaBlock = {
   image_url: string;
   anon_id: string | null;
   created_at: string;
+  media_type?: 'image' | 'video';
 };

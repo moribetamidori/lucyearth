@@ -94,26 +94,39 @@ export async function deleteCollection(collectionId: string): Promise<boolean> {
   }
 }
 
-// Upload a block (image) to a collection
+// Upload a block (image or video) to a collection
 export async function uploadBlockToCollection(
   file: File,
   collectionId: string,
   anonId: string
 ): Promise<ArenaBlock | null> {
   try {
-    // Convert to WebP
-    const webpBlob = await convertToWebP(file);
+    const isVideo = file.type.startsWith('video/');
+    let uploadBlob: Blob;
+    let fileName: string;
+    let contentType: string;
 
-    // Generate unique filename
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
-    const fileName = `${timestamp}_${randomString}.webp`;
+
+    if (isVideo) {
+      // For videos, upload as-is without conversion
+      uploadBlob = file;
+      const extension = file.name.split('.').pop() || 'mp4';
+      fileName = `${timestamp}_${randomString}.${extension}`;
+      contentType = file.type;
+    } else {
+      // For images, convert to WebP
+      uploadBlob = await convertToWebP(file);
+      fileName = `${timestamp}_${randomString}.webp`;
+      contentType = 'image/webp';
+    }
 
     // Upload to Supabase storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('arena-blocks')
-      .upload(fileName, webpBlob, {
-        contentType: 'image/webp',
+      .upload(fileName, uploadBlob, {
+        contentType: contentType,
         cacheControl: '3600',
       });
 
@@ -132,6 +145,7 @@ export async function uploadBlockToCollection(
           collection_id: collectionId,
           image_url: publicUrl,
           anon_id: anonId,
+          media_type: isVideo ? 'video' : 'image',
         },
       ])
       .select()

@@ -185,12 +185,14 @@ export default function ArenaModal({
 
     // Validate files
     for (const file of fileArray) {
-      if (!file.type.startsWith('image/')) {
-        alert(`"${file.name}" is not an image file.`);
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        alert(`"${file.name}" is not an image or video file.`);
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`"${file.name}" is larger than 10MB.`);
+      const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        const maxSizeMB = file.type.startsWith('video/') ? '50MB' : '10MB';
+        alert(`"${file.name}" is larger than ${maxSizeMB}.`);
         return;
       }
     }
@@ -202,11 +204,11 @@ export default function ArenaModal({
       }
       onLogActivity(
         'Uploaded blocks to Arena collection',
-        `Collection: ${currentCollection.title}, Images: ${fileArray.length}`
+        `Collection: ${currentCollection.title}, Files: ${fileArray.length}`
       );
       await loadBlocks(currentCollection.id);
     } catch (error) {
-      alert('Failed to upload one or more images.');
+      alert('Failed to upload one or more files.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -380,7 +382,7 @@ export default function ArenaModal({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*,.heic,.heif"
+                    accept="image/*,.heic,.heif,video/*"
                     multiple
                     onChange={handleFileSelect}
                     className="hidden"
@@ -390,7 +392,7 @@ export default function ArenaModal({
                     disabled={isUploading}
                     className="px-4 py-2 bg-black text-white hover:bg-blue-500 disabled:bg-gray-400 transition-colors"
                   >
-                    {isUploading ? 'Uploading...' : '+ Add Images'}
+                    {isUploading ? 'Uploading...' : '+ Add Media'}
                   </button>
                 </div>
               )}
@@ -401,39 +403,65 @@ export default function ArenaModal({
               ) : blocks.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No blocks yet.
-                  {isEditMode && ' Add some images!'}
+                  {isEditMode && ' Add some media!'}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-                  {blocks.map((block) => (
-                    <div
-                      key={block.id}
-                      className="relative aspect-square border-2 border-black group"
-                    >
-                      <img
-                        src={block.image_url}
-                        alt="Block"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90"
-                        onClick={() => {
-                          const index = blocks.findIndex(b => b.id === block.id);
-                          setSelectedImage(block.image_url);
-                          setSelectedImageIndex(index);
-                          onLogActivity(
-                            'Viewed Arena block',
-                            `Collection: ${currentCollection.title}, Block ID: ${block.id}`
-                          );
-                        }}
-                      />
-                      {isEditMode && (
-                        <button
-                          onClick={() => handleDeleteBlock(block)}
-                          className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          Del
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                  {blocks.map((block) => {
+                    const isVideo = block.media_type === 'video';
+                    return (
+                      <div
+                        key={block.id}
+                        className="relative aspect-square border-2 border-black group"
+                      >
+                        {isVideo ? (
+                          <video
+                            src={block.image_url}
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90"
+                            onClick={() => {
+                              const index = blocks.findIndex(b => b.id === block.id);
+                              setSelectedImage(block.image_url);
+                              setSelectedImageIndex(index);
+                              onLogActivity(
+                                'Viewed Arena block',
+                                `Collection: ${currentCollection.title}, Block ID: ${block.id}`
+                              );
+                            }}
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={block.image_url}
+                            alt="Block"
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90"
+                            onClick={() => {
+                              const index = blocks.findIndex(b => b.id === block.id);
+                              setSelectedImage(block.image_url);
+                              setSelectedImageIndex(index);
+                              onLogActivity(
+                                'Viewed Arena block',
+                                `Collection: ${currentCollection.title}, Block ID: ${block.id}`
+                              );
+                            }}
+                          />
+                        )}
+                        {isVideo && (
+                          <div className="absolute top-1 left-1 bg-black text-white px-1.5 py-0.5 text-xs">
+                            ▶
+                          </div>
+                        )}
+                        {isEditMode && (
+                          <button
+                            onClick={() => handleDeleteBlock(block)}
+                            className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            Del
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -514,13 +542,25 @@ export default function ArenaModal({
               </div>
             )}
 
-            {/* Image */}
-            <img
-              src={selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
-              onClick={(e) => e.stopPropagation()}
-            />
+            {/* Image or Video */}
+            {blocks[selectedImageIndex]?.media_type === 'video' ? (
+              <video
+                src={selectedImage}
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
+                onClick={(e) => e.stopPropagation()}
+                controls
+                autoPlay
+                loop
+                playsInline
+              />
+            ) : (
+              <img
+                src={selectedImage}
+                alt="Full size"
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </div>
 
           {/* Next button - Desktop only */}

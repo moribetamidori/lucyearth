@@ -130,15 +130,17 @@ export default function CatProfile({
 
     // Validate all files
     for (const file of fileArray) {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        alert(`"${file.name}" is not an image file. Please select only image files.`);
+      // Validate file type (accept images and videos)
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+        alert(`"${file.name}" is not an image or video file. Please select only image or video files.`);
         return;
       }
 
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`"${file.name}" is larger than 10MB. Please select smaller images.`);
+      // Validate file size (max 50MB for videos, 10MB for images)
+      const maxSize = file.type.startsWith("video/") ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        const maxSizeMB = file.type.startsWith("video/") ? "50MB" : "10MB";
+        alert(`"${file.name}" is larger than ${maxSizeMB}. Please select a smaller file.`);
         return;
       }
     }
@@ -155,7 +157,7 @@ export default function CatProfile({
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload one or more images. Please try again.");
+      alert("Failed to upload one or more files. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -353,7 +355,7 @@ export default function CatProfile({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.heic,.heif"
+              accept="image/*,.heic,.heif,video/*"
               onChange={handleFileSelect}
               className="hidden"
               multiple
@@ -363,46 +365,69 @@ export default function CatProfile({
               disabled={isUploading}
               className="px-6 py-2 border-2 border-gray-900 hover:bg-orange-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
-              {isUploading ? "UPLOADING..." : "+ UPLOAD PICTURE"}
+              {isUploading ? "UPLOADING..." : "+ UPLOAD MEDIA"}
             </button>
           </div>
         )}
 
         {/* Pictures grid */}
         <div className="grid grid-cols-3 gap-4">
-          {currentPictures.map((pic) => (
-            <div
-              key={pic.id}
-              className="relative aspect-square border-2 border-gray-900 overflow-hidden bg-gray-100 hover:border-orange-400 transition-colors cursor-pointer group"
-            >
-              <img
-                src={pic.image_url}
-                alt="Cat picture"
-                className="w-full h-full object-cover"
-                style={{ imageRendering: "pixelated" }}
-                onClick={() => {
-                  const index = catPictures.findIndex(p => p.id === pic.id);
-                  setSelectedImage(pic.image_url);
-                  setSelectedImageIndex(index);
-                }}
-              />
-              {isEditMode && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeletePicture(pic);
-                  }}
-                  className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          ))}
+          {currentPictures.map((pic) => {
+            const isVideo = pic.media_type === 'video';
+            return (
+              <div
+                key={pic.id}
+                className="relative aspect-square border-2 border-gray-900 overflow-hidden bg-gray-100 hover:border-orange-400 transition-colors cursor-pointer group"
+              >
+                {isVideo ? (
+                  <video
+                    src={pic.image_url}
+                    className="w-full h-full object-cover"
+                    onClick={() => {
+                      const index = catPictures.findIndex(p => p.id === pic.id);
+                      setSelectedImage(pic.image_url);
+                      setSelectedImageIndex(index);
+                    }}
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={pic.image_url}
+                    alt="Cat picture"
+                    className="w-full h-full object-cover"
+                    style={{ imageRendering: "pixelated" }}
+                    onClick={() => {
+                      const index = catPictures.findIndex(p => p.id === pic.id);
+                      setSelectedImage(pic.image_url);
+                      setSelectedImageIndex(index);
+                    }}
+                  />
+                )}
+                {/* Video indicator badge */}
+                {isVideo && (
+                  <div className="absolute top-2 left-2 bg-gray-900 text-white px-2 py-1 text-xs">
+                    ▶ VIDEO
+                  </div>
+                )}
+                {isEditMode && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePicture(pic);
+                    }}
+                    className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           {catPictures.length === 0 && !isUploading && (
             <div className="col-span-3 text-center py-12 text-gray-400 border-2 border-dashed border-gray-300">
-              No pictures yet. Upload your first cat picture!
+              No media yet. Upload your first cat picture or video!
             </div>
           )}
         </div>
@@ -603,14 +628,26 @@ export default function CatProfile({
               </div>
             )}
 
-            {/* Image */}
-            <img
-              src={selectedImage}
-              alt="Enlarged cat picture"
-              className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
-              style={{ imageRendering: 'pixelated' }}
-              onClick={(e) => e.stopPropagation()}
-            />
+            {/* Image or Video */}
+            {catPictures[selectedImageIndex]?.media_type === 'video' ? (
+              <video
+                src={selectedImage}
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
+                onClick={(e) => e.stopPropagation()}
+                controls
+                autoPlay
+                loop
+                playsInline
+              />
+            ) : (
+              <img
+                src={selectedImage}
+                alt="Enlarged cat picture"
+                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
+                style={{ imageRendering: 'pixelated' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </div>
 
           {/* Next button - Desktop only */}
