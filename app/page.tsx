@@ -5,6 +5,7 @@ import PoopCalendar from '@/components/PoopCalendar';
 import CatProfile from '@/components/CatProfile';
 import ActivityLog from '@/components/ActivityLog';
 import ArenaModal from '@/components/ArenaModal';
+import Journal from '@/components/Journal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -33,6 +34,7 @@ export default function Home() {
   const [messageTimeoutId, setMessageTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [showActivityLog, setShowActivityLog] = useState<boolean>(false);
   const [showArenaModal, setShowArenaModal] = useState<boolean>(false);
+  const [showJournal, setShowJournal] = useState<boolean>(false);
   const [userNumber, setUserNumber] = useState<number>(0);
 
   // Helper function to log activities
@@ -236,6 +238,25 @@ export default function Home() {
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
         </div>
+
+        {/* Journal icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowJournal(true);
+              logActivity('Opened Journal', 'Viewing journal entries');
+            }}
+            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📔</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
+        </div>
       </div>
 
       {/* Header */}
@@ -397,6 +418,15 @@ export default function Home() {
       <ArenaModal
         isOpen={showArenaModal}
         onClose={() => setShowArenaModal(false)}
+        isEditMode={isEditMode}
+        anonId={anonId}
+        onLogActivity={logActivity}
+      />
+
+      {/* Journal Modal */}
+      <Journal
+        isOpen={showJournal}
+        onClose={() => setShowJournal(false)}
         isEditMode={isEditMode}
         anonId={anonId}
         onLogActivity={logActivity}

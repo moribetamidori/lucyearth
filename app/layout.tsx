@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { VT323 } from "next/font/google";
+import { VT323, Courier_Prime } from "next/font/google";
 import "./globals.css";
 
 const pixelFont = VT323({
   weight: "400",
   variable: "--font-pixel",
+  subsets: ["latin"],
+});
+
+const courierFont = Courier_Prime({
+  weight: ["400", "700"],
+  variable: "--font-courier",
   subsets: ["latin"],
 });
 
@@ -20,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${pixelFont.variable} antialiased`}>
+      <body className={`${pixelFont.variable} ${courierFont.variable} antialiased`}>
         {children}
       </body>
     </html>

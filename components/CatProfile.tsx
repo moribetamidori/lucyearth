@@ -382,6 +382,7 @@ export default function CatProfile({
                 {isVideo ? (
                   <video
                     src={pic.image_url}
+                    poster={pic.thumbnail_url || undefined}
                     className="w-full h-full object-cover"
                     onClick={() => {
                       const index = catPictures.findIndex(p => p.id === pic.id);
@@ -632,6 +633,7 @@ export default function CatProfile({
             {catPictures[selectedImageIndex]?.media_type === 'video' ? (
               <video
                 src={selectedImage}
+                poster={catPictures[selectedImageIndex]?.thumbnail_url || undefined}
                 className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
                 onClick={(e) => e.stopPropagation()}
                 controls

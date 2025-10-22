@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { generateVideoThumbnail } from './videoThumbnail';
 
 /**
  * Converts HEIC to PNG first if needed
@@ -124,6 +125,7 @@ export async function uploadCatPicture(
     let uploadBlob: Blob;
     let fileName: string;
     let contentType: string;
+    let thumbnailUrl: string | null = null;
 
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 9);
@@ -134,6 +136,29 @@ export async function uploadCatPicture(
       const extension = file.name.split('.').pop() || 'mp4';
       fileName = `${timestamp}_${randomStr}.${extension}`;
       contentType = file.type;
+
+      // Generate and upload thumbnail for videos
+      try {
+        const thumbnailBlob = await generateVideoThumbnail(file);
+        const thumbnailFileName = `${timestamp}_${randomStr}_thumb.jpg`;
+
+        const { error: thumbUploadError } = await supabase.storage
+          .from('cat-pictures')
+          .upload(thumbnailFileName, thumbnailBlob, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+          });
+
+        if (!thumbUploadError) {
+          const { data: thumbUrlData } = supabase.storage
+            .from('cat-pictures')
+            .getPublicUrl(thumbnailFileName);
+          thumbnailUrl = thumbUrlData.publicUrl;
+        }
+      } catch (thumbError) {
+        console.warn('Failed to generate video thumbnail:', thumbError);
+        // Continue without thumbnail if generation fails
+      }
     } else {
       // For images, convert to WebP
       uploadBlob = await convertToWebP(file, 0.8);
@@ -167,6 +192,7 @@ export async function uploadCatPicture(
         image_url: mediaUrl,
         anon_id: anonId || null,
         media_type: isVideo ? 'video' : 'image',
+        thumbnail_url: thumbnailUrl,
       })
       .select()
       .single();

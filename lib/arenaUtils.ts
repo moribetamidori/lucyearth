@@ -1,5 +1,6 @@
 import { supabase, ArenaCollection, ArenaBlock } from './supabase';
 import { convertToWebP } from './imageUpload';
+import { generateVideoThumbnail } from './videoThumbnail';
 
 // Create a new collection
 export async function createCollection(
@@ -105,6 +106,7 @@ export async function uploadBlockToCollection(
     let uploadBlob: Blob;
     let fileName: string;
     let contentType: string;
+    let thumbnailUrl: string | null = null;
 
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
@@ -115,6 +117,29 @@ export async function uploadBlockToCollection(
       const extension = file.name.split('.').pop() || 'mp4';
       fileName = `${timestamp}_${randomString}.${extension}`;
       contentType = file.type;
+
+      // Generate and upload thumbnail for videos
+      try {
+        const thumbnailBlob = await generateVideoThumbnail(file);
+        const thumbnailFileName = `${timestamp}_${randomString}_thumb.jpg`;
+
+        const { error: thumbUploadError } = await supabase.storage
+          .from('arena-blocks')
+          .upload(thumbnailFileName, thumbnailBlob, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+          });
+
+        if (!thumbUploadError) {
+          const { data: thumbUrlData } = supabase.storage
+            .from('arena-blocks')
+            .getPublicUrl(thumbnailFileName);
+          thumbnailUrl = thumbUrlData.publicUrl;
+        }
+      } catch (thumbError) {
+        console.warn('Failed to generate video thumbnail:', thumbError);
+        // Continue without thumbnail if generation fails
+      }
     } else {
       // For images, convert to WebP
       uploadBlob = await convertToWebP(file);
@@ -146,6 +171,7 @@ export async function uploadBlockToCollection(
           image_url: publicUrl,
           anon_id: anonId,
           media_type: isVideo ? 'video' : 'image',
+          thumbnail_url: thumbnailUrl,
         },
       ])
       .select()

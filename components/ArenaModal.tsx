@@ -417,6 +417,7 @@ export default function ArenaModal({
                         {isVideo ? (
                           <video
                             src={block.image_url}
+                            poster={block.thumbnail_url || undefined}
                             className="w-full h-full object-cover cursor-pointer hover:opacity-90"
                             onClick={() => {
                               const index = blocks.findIndex(b => b.id === block.id);
@@ -546,6 +547,7 @@ export default function ArenaModal({
             {blocks[selectedImageIndex]?.media_type === 'video' ? (
               <video
                 src={selectedImage}
+                poster={blocks[selectedImageIndex]?.thumbnail_url || undefined}
                 className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
                 onClick={(e) => e.stopPropagation()}
                 controls
