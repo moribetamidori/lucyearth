@@ -6,6 +6,7 @@ import CatProfile from '@/components/CatProfile';
 import ActivityLog from '@/components/ActivityLog';
 import ArenaModal from '@/components/ArenaModal';
 import Journal from '@/components/Journal';
+import Achievements from '@/components/Achievements';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -36,6 +37,7 @@ export default function Home() {
   const [showArenaModal, setShowArenaModal] = useState<boolean>(false);
   const [showJournal, setShowJournal] = useState<boolean>(false);
   const [userNumber, setUserNumber] = useState<number>(0);
+  const [showAchievements, setShowAchievements] = useState<boolean>(false);
 
   // Helper function to log activities
   const logActivity = async (action: string, details?: string) => {
@@ -220,6 +222,25 @@ export default function Home() {
           </div>
         )}
 
+        {/* Journal icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowJournal(true);
+              logActivity('Opened Journal', 'Viewing journal entries');
+            }}
+            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📘</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
+        </div>
+
         {/* Activity Log icon - always visible */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
@@ -238,25 +259,6 @@ export default function Home() {
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
         </div>
-
-        {/* Journal icon - always visible */}
-        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-          <div
-            onClick={() => {
-              setShowJournal(true);
-              logActivity('Opened Journal', 'Viewing journal entries');
-            }}
-            className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
-            style={{
-              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-              imageRendering: 'pixelated',
-            }}
-          >
-            <span className="max-sm:text-base">📔</span>
-            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
-          </div>
-          <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
-        </div>
       </div>
 
       {/* Header */}
@@ -265,7 +267,16 @@ export default function Home() {
           <div className="w-2 h-2 bg-blue-500 animate-pulse" />
           <div className="text-base">lucyearth.system</div>
         </div>
-        <div className="flex gap-4 text-sm text-gray-500">
+        <div className="flex gap-4 text-sm text-gray-500 items-center">
+          <button
+            onClick={() => {
+              setShowAchievements(true);
+              logActivity('Opened Achievements', 'Viewing achievements');
+            }}
+            className="text-2xl hover:scale-110 transition-transform cursor-pointer"
+          >
+            🏆
+          </button>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-blue-500" />
             <span>{String(score).padStart(4, '0')}</span>
@@ -430,6 +441,13 @@ export default function Home() {
         isEditMode={isEditMode}
         anonId={anonId}
         onLogActivity={logActivity}
+      />
+
+      {/* Achievements Modal */}
+      <Achievements
+        isOpen={showAchievements}
+        onClose={() => setShowAchievements(false)}
+        catClicks={catClicks}
       />
     </div>
   );
