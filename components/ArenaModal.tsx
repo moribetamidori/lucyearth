@@ -9,6 +9,7 @@ import {
   deleteCollection,
   uploadBlockToCollection,
   deleteBlock,
+  moveBlock,
 } from '@/lib/arenaUtils';
 
 interface ArenaModalProps {
@@ -45,6 +46,8 @@ export default function ArenaModal({
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [blockToMove, setBlockToMove] = useState<ArenaBlock | null>(null);
+  const [showMoveDropdown, setShowMoveDropdown] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,6 +79,23 @@ export default function ArenaModal({
       }
     };
   }, []);
+
+  // Close move dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showMoveDropdown) {
+        setShowMoveDropdown(null);
+      }
+    };
+
+    if (showMoveDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showMoveDropdown]);
 
   // Reset controls when image changes
   useEffect(() => {
@@ -225,6 +245,24 @@ export default function ArenaModal({
       onLogActivity('Deleted Arena block', `Collection: ${currentCollection.title}`);
       await loadBlocks(currentCollection.id);
       await loadCollections(); // Update block count
+    }
+  };
+
+  const handleMoveBlock = async (block: ArenaBlock, targetCollectionId: string) => {
+    if (!currentCollection) return;
+
+    const targetCollection = collections.find(c => c.id === targetCollectionId);
+    if (!targetCollection) return;
+
+    const success = await moveBlock(block.id, targetCollectionId);
+    if (success) {
+      onLogActivity(
+        'Moved Arena block',
+        `From: ${currentCollection.title} to ${targetCollection.title}`
+      );
+      setShowMoveDropdown(null);
+      await loadBlocks(currentCollection.id);
+      await loadCollections(); // Update block counts
     }
   };
 
@@ -453,12 +491,56 @@ export default function ArenaModal({
                           </div>
                         )}
                         {isEditMode && (
-                          <button
-                            onClick={() => handleDeleteBlock(block)}
-                            className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowMoveDropdown(showMoveDropdown === block.id ? null : block.id);
+                              }}
+                              className="bg-blue-500 text-white px-1.5 py-0.5 text-xs hover:bg-blue-600"
+                            >
+                              Move
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBlock(block);
+                              }}
+                              className="bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                            >
+                              Del
+                            </button>
+                          </div>
+                        )}
+                        {/* Move dropdown */}
+                        {isEditMode && showMoveDropdown === block.id && (
+                          <div
+                            className="absolute top-8 right-1 bg-white border-2 border-black shadow-lg z-10 min-w-[150px] max-h-[200px] overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            Del
-                          </button>
+                            <div className="text-xs font-bold p-2 border-b-2 border-black">
+                              Move to:
+                            </div>
+                            {collections
+                              .filter(c => c.id !== currentCollection?.id)
+                              .map(collection => (
+                                <button
+                                  key={collection.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveBlock(block, collection.id);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 border-b border-gray-200 last:border-b-0"
+                                >
+                                  {collection.title}
+                                </button>
+                              ))}
+                            {collections.filter(c => c.id !== currentCollection?.id).length === 0 && (
+                              <div className="px-2 py-2 text-xs text-gray-500">
+                                No other collections
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );

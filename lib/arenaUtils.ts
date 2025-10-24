@@ -233,3 +233,22 @@ export async function deleteBlock(blockId: string, imageUrl: string): Promise<bo
     return false;
   }
 }
+
+// Move a block to another collection
+export async function moveBlock(
+  blockId: string,
+  targetCollectionId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('arena_blocks')
+      .update({ collection_id: targetCollectionId })
+      .eq('id', blockId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error moving block:', error);
+    return false;
+  }
+}
