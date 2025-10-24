@@ -138,26 +138,8 @@ export default function Home() {
       )}
 
       {/* Left sidebar icons */}
-      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-8 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex-row max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
-        {/* Douban icon - first position on desktop */}
-        <div className="flex flex-col items-center gap-2 max-sm:hidden">
-          <div
-            onClick={() => {
-              setShowDoubanModal(true);
-              logActivity('Opened Douban', 'Viewed Douban ratings');
-            }}
-            className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all"
-            style={{
-              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-              imageRendering: 'pixelated',
-            }}
-          >
-            <span className="text-green-600 font-bold">豆</span>
-          </div>
-          <div className="text-[15px] text-gray-900">DOUBAN</div>
-        </div>
-
-        {/* Poop Cal icon - second position on desktop, with Poop Cal above Douban on mobile */}
+      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-cols-2 gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
+        {/* Poop Cal icon - first position on desktop */}
         <div className="flex flex-col items-center gap-2 max-sm:flex-col max-sm:gap-2">
           {/* Poop Cal icon */}
           <div className="flex flex-col items-center gap-2 max-sm:gap-0">
@@ -166,7 +148,7 @@ export default function Home() {
                 setShowPoopCalendar(true);
                 logActivity('Opened Poop Calendar', 'Viewed poop tracking calendar');
               }}
-              className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+              className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
@@ -197,112 +179,149 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Douban icon - second position on desktop (right of POOP.CAL) */}
+        <div className="flex flex-col items-center gap-2 max-sm:hidden">
+          <div
+            onClick={() => {
+              setShowDoubanModal(true);
+              logActivity('Opened Douban', 'Viewed Douban ratings');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="text-green-600 font-bold">豆</span>
+          </div>
+          <div className="text-[15px] text-gray-900">DOUBAN</div>
+        </div>
+
         {/* Are.na icon */}
-          <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-            <div
-              onClick={() => {
-                setShowArenaModal(true);
-                logActivity('Opened Are.na', 'Viewed Arena collections');
-              }}
-              className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
-              style={{
-                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-                imageRendering: 'pixelated',
-              }}
-            >
-              <span className="max-sm:text-sm">**</span>
-              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">ARE.NA</span>
-            </div>
-            <div className="text-[15px] text-gray-900 max-sm:hidden">ARE.NA</div>
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowArenaModal(true);
+              logActivity('Opened Are.na', 'Viewed Arena collections');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-sm">**</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">ARE.NA</span>
           </div>
-          <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div className="text-[15px] text-gray-900 max-sm:hidden">ARE.NA</div>
+        </div>
+
+        {/* Empty space */}
+        <div className="max-sm:hidden"></div>
+
+        {/* Hidden cat icon - only shows after 10+ clicks */}
+        {showCatIcon && (
+          <div className="flex flex-col items-center gap-2 animate-fadeIn max-sm:gap-0">
             <div
               onClick={() => {
-                if (isEditMode) {
-                  // Logout
-                  localStorage.removeItem('lucyearth_edit_mode');
-                  setIsEditMode(false);
-                } else {
-                  // Show login modal
-                  setShowLoginModal(true);
-                }
+                setShowCatProfile(true);
+                logActivity('Opened Cat Profile', 'Clicked on the Cat app icon');
               }}
-              className={`w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1 ${
-                isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
-              }`}
+              className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
-              <span className="max-sm:text-base">{isEditMode ? '🔓' : '🔒'}</span>
-              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
-                {isEditMode ? 'LOCK' : 'LOGIN'}
-              </span>
+              <span className="max-sm:text-lg">🐱</span>
+              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CATS</span>
             </div>
-            <div className="text-[15px] text-gray-900 max-sm:hidden">
+            <div className="text-[15px] text-gray-900 max-sm:hidden">CATS</div>
+          </div>
+        )}
+
+        {/* Empty space - only when cats is showing */}
+        {showCatIcon && (
+          <div className="max-sm:hidden"></div>
+        )}
+
+        {/* Journal icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowJournal(true);
+              logActivity('Opened Journal', 'Viewing journal entries');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📘</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
+        </div>
+
+        {/* Empty space */}
+        <div className="max-sm:hidden"></div>
+
+        {/* Activity Log icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowActivityLog(true);
+              logActivity('Opened Activity Log', 'Viewed activity history');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-purple-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📋</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">LOG</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
+        </div>
+
+        {/* Empty space */}
+        <div className="max-sm:hidden"></div>
+
+        {/* Lock icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              if (isEditMode) {
+                // Logout
+                localStorage.removeItem('lucyearth_edit_mode');
+                setIsEditMode(false);
+              } else {
+                // Show login modal
+                setShowLoginModal(true);
+              }
+            }}
+            className={`w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1 ${
+              isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
+            }`}
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">{isEditMode ? '🔓' : '🔒'}</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               {isEditMode ? 'LOCK' : 'LOGIN'}
-            </div>
+            </span>
           </div>
-
-          {/* Hidden cat icon - only shows after 10+ clicks */}
-          {showCatIcon && (
-            <div className="flex flex-col items-center gap-2 animate-fadeIn max-sm:gap-0">
-              <div
-                onClick={() => {
-                  setShowCatProfile(true);
-                  logActivity('Opened Cat Profile', 'Clicked on the Cat app icon');
-                }}
-                className="w-16 h-16 bg-white flex items-center justify-center text-3xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
-                style={{
-                  boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-                  imageRendering: 'pixelated',
-                }}
-              >
-                <span className="max-sm:text-lg">🐱</span>
-                <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CATS</span>
-              </div>
-              <div className="text-[15px] text-gray-900 max-sm:hidden">CATS</div>
-            </div>
-          )}
-
-          {/* Journal icon - always visible */}
-          <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-            <div
-              onClick={() => {
-                setShowJournal(true);
-                logActivity('Opened Journal', 'Viewing journal entries');
-              }}
-              className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
-              style={{
-                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-                imageRendering: 'pixelated',
-              }}
-            >
-              <span className="max-sm:text-base">📘</span>
-              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
-            </div>
-            <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">
+            {isEditMode ? 'LOCK' : 'LOGIN'}
           </div>
+        </div>
 
-          {/* Activity Log icon - always visible */}
-          <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-            <div
-              onClick={() => {
-                setShowActivityLog(true);
-                logActivity('Opened Activity Log', 'Viewed activity history');
-              }}
-              className="w-16 h-16 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-purple-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
-              style={{
-                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-                imageRendering: 'pixelated',
-              }}
-            >
-              <span className="max-sm:text-base">📋</span>
-              <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">LOG</span>
-            </div>
-            <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
-          </div>
+        {/* Empty space */}
+        <div className="max-sm:hidden"></div>
       </div>
 
       {/* Header */}
