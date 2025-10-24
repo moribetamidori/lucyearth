@@ -64,3 +64,30 @@ export type ArenaBlock = {
   media_type?: 'image' | 'video';
   thumbnail_url?: string;
 };
+
+export type JournalEntry = {
+  id: string;
+  anon_id: string;
+  entry_text: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ActivityLog = {
+  id: number;
+  anon_id: string;
+  action: string;
+  details: string | null;
+  created_at: string;
+};
+
+export type DoubanRating = {
+  id: string;
+  anon_id: string | null;
+  title: string;
+  category: 'movie' | 'tv' | 'book' | 'music' | 'game';
+  rating: number; // 1-5
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
