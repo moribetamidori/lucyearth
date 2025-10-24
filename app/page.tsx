@@ -8,6 +8,7 @@ import ArenaModal from '@/components/ArenaModal';
 import Journal from '@/components/Journal';
 import Achievements from '@/components/Achievements';
 import DoubanModal from '@/components/DoubanModal';
+import LocationModal from '@/components/LocationModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -40,6 +41,7 @@ export default function Home() {
   const [userNumber, setUserNumber] = useState<number>(0);
   const [showAchievements, setShowAchievements] = useState<boolean>(false);
   const [showDoubanModal, setShowDoubanModal] = useState<boolean>(false);
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
 
   // Helper function to log activities
   const logActivity = async (action: string, details?: string) => {
@@ -216,8 +218,41 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">ARE.NA</div>
         </div>
 
-        {/* Empty space */}
-        <div className="max-sm:hidden"></div>
+        {/* Location icon - only visible on mobile, appears to the right of Douban */}
+        <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowLocationModal(true);
+              logActivity('Opened Location', 'Viewed location map');
+            }}
+            className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 transition-all flex-col pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="text-lg">📍</span>
+            <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
+          </div>
+        </div>
+
+        {/* Location icon - fourth position on desktop (right of ARE.NA), below DOUBAN */}
+        <div className="flex flex-col items-center gap-2 max-sm:hidden">
+          <div
+            onClick={() => {
+              setShowLocationModal(true);
+              logActivity('Opened Location', 'Viewed location map');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span>📍</span>
+          </div>
+          <div className="text-[15px] text-gray-900">LOCATION</div>
+        </div>
 
         {/* Hidden cat icon - only shows after 10+ clicks */}
         {showCatIcon && (
@@ -517,6 +552,15 @@ export default function Home() {
       <DoubanModal
         isOpen={showDoubanModal}
         onClose={() => setShowDoubanModal(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Location Modal */}
+      <LocationModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
         anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
