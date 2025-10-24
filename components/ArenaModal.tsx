@@ -6,6 +6,7 @@ import {
   fetchCollections,
   fetchBlocksForCollection,
   createCollection,
+  updateCollection,
   deleteCollection,
   uploadBlockToCollection,
   deleteBlock,
@@ -48,6 +49,8 @@ export default function ArenaModal({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [blockToMove, setBlockToMove] = useState<ArenaBlock | null>(null);
   const [showMoveDropdown, setShowMoveDropdown] = useState<string | null>(null);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingCollectionTitle, setEditingCollectionTitle] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,6 +177,26 @@ export default function ArenaModal({
     }
   };
 
+  const handleUpdateCollection = async (collectionId: string, oldTitle: string) => {
+    if (!editingCollectionTitle.trim() || editingCollectionTitle === oldTitle) {
+      setEditingCollectionId(null);
+      setEditingCollectionTitle('');
+      return;
+    }
+
+    const success = await updateCollection(collectionId, editingCollectionTitle);
+    if (success) {
+      onLogActivity('Updated Arena collection', `From: ${oldTitle} to: ${editingCollectionTitle}`);
+      setEditingCollectionId(null);
+      setEditingCollectionTitle('');
+      await loadCollections();
+      // Update current collection if it's being edited
+      if (currentCollection && currentCollection.id === collectionId) {
+        setCurrentCollection({ ...currentCollection, title: editingCollectionTitle });
+      }
+    }
+  };
+
   const handleDeleteCollection = async (collectionId: string, title: string) => {
     if (!confirm(`Delete collection "${title}"?`)) return;
 
@@ -293,7 +316,7 @@ export default function ArenaModal({
       <div className="fixed inset-4 sm:inset-8 md:inset-16 bg-white z-50 flex flex-col border-4 border-black shadow-[8px_8px_0_0_#000]">
         {/* Header with breadcrumb */}
         <div className="border-b-4 border-black p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-lg font-bold">
+          <div className="flex items-center gap-2 text-lg font-bold flex-wrap">
             <button
               onClick={view === 'collections' ? onClose : handleBackToCollections}
               className="hover:text-blue-500 cursor-pointer"
@@ -303,7 +326,54 @@ export default function ArenaModal({
             {view === 'blocks' && currentCollection && (
               <>
                 <span>/</span>
-                <span>{currentCollection.title}</span>
+                {editingCollectionId === currentCollection.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingCollectionTitle}
+                      onChange={(e) => setEditingCollectionTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateCollection(currentCollection.id, currentCollection.title);
+                        }
+                        if (e.key === 'Escape') {
+                          setEditingCollectionId(null);
+                          setEditingCollectionTitle('');
+                        }
+                      }}
+                      className="border-2 border-blue-500 px-2 py-0.5 focus:outline-none text-base"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleUpdateCollection(currentCollection.id, currentCollection.title)}
+                      className="bg-green-500 text-white px-2 py-1 text-sm hover:bg-green-600"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingCollectionId(null);
+                        setEditingCollectionTitle('');
+                      }}
+                      className="bg-gray-500 text-white px-2 py-1 text-sm hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    className={isEditMode ? 'hover:text-blue-500 cursor-pointer' : ''}
+                    onClick={(e) => {
+                      if (isEditMode) {
+                        e.stopPropagation();
+                        setEditingCollectionId(currentCollection.id);
+                        setEditingCollectionTitle(currentCollection.title);
+                      }
+                    }}
+                  >
+                    {currentCollection.title}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -380,30 +450,86 @@ export default function ArenaModal({
                     <div
                       key={collection.id}
                       className="relative aspect-square border-2 border-black p-2 hover:bg-gray-50 cursor-pointer group flex flex-col items-center justify-center text-center"
-                      onClick={() => handleOpenCollection(collection)}
+                      onClick={() => {
+                        if (editingCollectionId !== collection.id) {
+                          handleOpenCollection(collection);
+                        }
+                      }}
                     >
-                      <div className="flex-1 flex flex-col items-center justify-center">
-                        <h3 className="font-bold text-sm group-hover:text-blue-500 break-words line-clamp-2">
-                          {collection.title}
-                        </h3>
-                        <div className="text-xs text-gray-600 mt-1">
-                          {collection.block_count} block
-                          {collection.block_count !== 1 ? 's' : ''}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {formatTimeAgo(collection.updated_at)}
-                        </div>
+                      <div className="flex-1 flex flex-col items-center justify-center w-full px-1">
+                        {editingCollectionId === collection.id ? (
+                          <div className="w-full flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editingCollectionTitle}
+                              onChange={(e) => setEditingCollectionTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateCollection(collection.id, collection.title);
+                                }
+                                if (e.key === 'Escape') {
+                                  setEditingCollectionId(null);
+                                  setEditingCollectionTitle('');
+                                }
+                              }}
+                              className="font-bold text-sm border-2 border-blue-500 px-1 py-0.5 w-full text-center focus:outline-none"
+                              autoFocus
+                            />
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                onClick={() => handleUpdateCollection(collection.id, collection.title)}
+                                className="bg-green-500 text-white px-2 py-0.5 text-xs hover:bg-green-600"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingCollectionId(null);
+                                  setEditingCollectionTitle('');
+                                }}
+                                className="bg-gray-500 text-white px-2 py-0.5 text-xs hover:bg-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <h3 className="font-bold text-sm group-hover:text-blue-500 break-words line-clamp-2">
+                              {collection.title}
+                            </h3>
+                            <div className="text-xs text-gray-600 mt-1">
+                              {collection.block_count} block
+                              {collection.block_count !== 1 ? 's' : ''}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {formatTimeAgo(collection.updated_at)}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      {isEditMode && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCollection(collection.id, collection.title);
-                          }}
-                          className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          Del
-                        </button>
+                      {isEditMode && editingCollectionId !== collection.id && (
+                        <div className="absolute top-1 right-1 flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCollectionId(collection.id);
+                              setEditingCollectionTitle(collection.title);
+                            }}
+                            className="bg-blue-500 text-white px-1.5 py-0.5 text-xs hover:bg-blue-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCollection(collection.id, collection.title);
+                            }}
+                            className="bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                          >
+                            Del
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -491,7 +617,7 @@ export default function ArenaModal({
                           </div>
                         )}
                         {isEditMode && (
-                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute top-1 right-1 flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

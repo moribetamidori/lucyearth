@@ -61,6 +61,25 @@ export async function fetchCollections(): Promise<
   }
 }
 
+// Update collection title
+export async function updateCollection(
+  collectionId: string,
+  title: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('arena_collections')
+      .update({ title })
+      .eq('id', collectionId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating collection:', error);
+    return false;
+  }
+}
+
 // Delete a collection
 export async function deleteCollection(collectionId: string): Promise<boolean> {
   try {
