@@ -21,25 +21,10 @@ const Popup = dynamic(
   () => import('react-leaflet').then((mod) => mod.Popup),
   { ssr: false }
 );
-const useMapHook = dynamic(
-  () => import('react-leaflet').then((mod) => mod.useMap),
+const MapBoundsUpdater = dynamic(
+  () => import('./MapBoundsUpdater'),
   { ssr: false }
 );
-
-// Function to get icon - will only run on client
-const getIcon = () => {
-  if (typeof window === 'undefined') return null;
-  const L = require('leaflet');
-  return L.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
-  });
-};
 
 interface LocationPin {
   id: number;
@@ -57,39 +42,6 @@ interface LocationModalProps {
   anonId: string;
   isEditMode: boolean;
   onLogActivity: (action: string, details?: string) => void;
-}
-
-// Component to update map bounds when pins change
-function MapBoundsUpdater({ pins, focusedPinId }: { pins: LocationPin[]; focusedPinId: number | null }) {
-  const { useMap } = require('react-leaflet');
-  const map = useMap();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const L = require('leaflet');
-    const validPins = pins.filter(pin => pin.latitude !== null && pin.longitude !== null);
-    if (validPins.length > 0 && !focusedPinId) {
-      const bounds = L.latLngBounds(
-        validPins.map(pin => [pin.latitude!, pin.longitude!])
-      );
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [pins, map, focusedPinId]);
-
-  // Handle focused pin
-  useEffect(() => {
-    if (focusedPinId !== null) {
-      const pin = pins.find(p => p.id === focusedPinId);
-      if (pin && pin.latitude !== null && pin.longitude !== null) {
-        map.setView([pin.latitude, pin.longitude], 13, {
-          animate: true,
-          duration: 0.5
-        });
-      }
-    }
-  }, [focusedPinId, pins, map]);
-
-  return null;
 }
 
 interface LocationSuggestion {
@@ -113,12 +65,9 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [focusedPinId, setFocusedPinId] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Load leaflet CSS on mount
+  // Set mounted state
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== 'undefined') {
-      require('leaflet/dist/leaflet.css');
-    }
   }, []);
 
   // Fetch pins when modal opens
@@ -375,28 +324,10 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                 />
                 {pins.map((pin) => {
                   if (pin.latitude !== null && pin.longitude !== null) {
-                    // Create a highlighted icon for focused pin
-                    if (typeof window === 'undefined') return null;
-                    const L = require('leaflet');
-                    const defaultIcon = getIcon();
-                    const pinIcon = focusedPinId === pin.id
-                      ? L.icon({
-                          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                          iconSize: [35, 57],
-                          iconAnchor: [17, 57],
-                          popupAnchor: [1, -48],
-                          shadowSize: [57, 57],
-                          className: 'focused-marker'
-                        })
-                      : defaultIcon;
-
                     return (
                       <Marker
                         key={pin.id}
                         position={[pin.latitude, pin.longitude]}
-                        icon={pinIcon}
                         eventHandlers={{
                           click: () => {
                             setFocusedPinId(pin.id);
@@ -603,7 +534,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         </div>
                         {pin.note && (
                           <div className="text-xs text-gray-700 mt-1 italic">
-                            "{pin.note}"
+                            &ldquo;{pin.note}&rdquo;
                           </div>
                         )}
                         {pin.latitude !== null && pin.longitude !== null && (
