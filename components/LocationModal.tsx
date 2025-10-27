@@ -483,7 +483,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         {/* Content - Horizontal Layout */}
         <div className="flex-1 flex overflow-hidden max-sm:flex-col">
           {/* Map Section */}
-          <div className="flex-1 p-4 overflow-hidden max-sm:h-64">
+          <div className="flex-1 p-4 overflow-hidden max-sm:h-[50vh] max-sm:min-h-[50vh]">
             {/* World Map */}
             <div className="relative w-full h-full border-4 border-gray-900 overflow-hidden">
               {isMounted && <MapContainer
@@ -540,7 +540,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
           </div>
 
           {/* Right Sidebar - Pins List */}
-          <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:overflow-y-auto">
+          <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:flex-1 max-sm:overflow-y-auto">
             {/* Add Pin Section */}
             {isEditMode && !isAddingPin && (
               <div className="p-4 border-b-4 border-gray-900">
@@ -788,7 +788,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                     // Display Mode
                     <div
                       key={pin.id}
-                      className={`border-2 border-gray-900 p-3 flex justify-between items-start transition-colors ${
+                      className={`border-2 border-gray-900 flex transition-colors overflow-hidden ${
                         focusedPinId === pin.id
                           ? 'bg-pink-100 border-pink-500'
                           : 'hover:bg-gray-50 cursor-pointer'
@@ -800,52 +800,52 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         }
                       }}
                     >
-                      <div className="flex gap-3 flex-1">
-                        {pin.image_url && (
-                          <img
-                            src={pin.image_url}
-                            alt={pin.location}
-                            className="w-16 h-16 object-cover border-2 border-gray-900 flex-shrink-0"
-                          />
-                        )}
-                        <div className="flex-1">
+                      {pin.image_url && (
+                        <img
+                          src={pin.image_url}
+                          alt={pin.location}
+                          className="w-32 h-32 object-cover flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 p-3 flex flex-col">
+                        <div className="flex items-center gap-2 justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">📍</span>
                             <span className="font-bold text-sm">{getMainLocationName(pin.location)}</span>
                           </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            {new Date(pin.timestamp).toLocaleString()}
+                          {isEditMode && (
+                            <div className="flex gap-1">
+                              <ActionButton
+                                variant="edit"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditPin(pin);
+                                }}
+                              />
+                              <ActionButton
+                                variant="delete"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePin(pin.id);
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {new Date(pin.timestamp).toLocaleString()}
+                        </div>
+                        {pin.note && (
+                          <div className="text-xs text-gray-700 mt-1 italic">
+                            &ldquo;{pin.note}&rdquo;
                           </div>
-                          {pin.note && (
-                            <div className="text-xs text-gray-700 mt-1 italic">
-                              &ldquo;{pin.note}&rdquo;
-                            </div>
-                          )}
-                          {pin.latitude !== null && pin.longitude !== null && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
-                            </div>
-                          )}
-                        </div>
+                        )}
+                        {pin.latitude !== null && pin.longitude !== null && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
+                          </div>
+                        )}
                       </div>
-                      {isEditMode && (
-                        <div className="flex gap-1 ml-2">
-                          <ActionButton
-                            variant="edit"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditPin(pin);
-                            }}
-                          />
-                          <ActionButton
-                            variant="delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePin(pin.id);
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
                   )
                 ))}
