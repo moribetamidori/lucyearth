@@ -140,9 +140,9 @@ export default function Home() {
       )}
 
       {/* Left sidebar icons */}
-      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-cols-2 gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
+      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-cols-2 gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:flex-wrap max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
         {/* Poop Cal icon - first position on desktop */}
-        <div className="flex flex-col items-center gap-2 max-sm:flex-col max-sm:gap-2">
+        <div className="flex flex-col items-center gap-2 max-sm:flex-row max-sm:gap-4">
           {/* Poop Cal icon */}
           <div className="flex flex-col items-center gap-2 max-sm:gap-0">
             <div
@@ -162,7 +162,7 @@ export default function Home() {
             <div className="text-[15px] text-gray-900 max-sm:hidden">POOP.CAL</div>
           </div>
 
-          {/* Douban icon - only visible on mobile, appears below Poop Cal */}
+          {/* Douban icon - only visible on mobile, appears next to Poop Cal */}
           <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
             <div
               onClick={() => {
@@ -177,6 +177,24 @@ export default function Home() {
             >
               <span className="text-green-600 font-bold text-lg">豆</span>
               <span className="text-[8px] leading-none mt-0.5">DOUBAN</span>
+            </div>
+          </div>
+
+          {/* Location icon - only visible on mobile, appears next to Douban */}
+          <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
+            <div
+              onClick={() => {
+                setShowLocationModal(true);
+                logActivity('Opened Location', 'Viewed location map');
+              }}
+              className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 transition-all flex-col pt-1"
+              style={{
+                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+                imageRendering: 'pixelated',
+              }}
+            >
+              <span className="text-lg">📍</span>
+              <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
             </div>
           </div>
         </div>
@@ -216,24 +234,6 @@ export default function Home() {
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">ARE.NA</span>
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">ARE.NA</div>
-        </div>
-
-        {/* Location icon - only visible on mobile, appears to the right of Douban */}
-        <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
-          <div
-            onClick={() => {
-              setShowLocationModal(true);
-              logActivity('Opened Location', 'Viewed location map');
-            }}
-            className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 transition-all flex-col pt-1"
-            style={{
-              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
-              imageRendering: 'pixelated',
-            }}
-          >
-            <span className="text-lg">📍</span>
-            <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
-          </div>
         </div>
 
         {/* Location icon - fourth position on desktop (right of ARE.NA), below DOUBAN */}

@@ -64,6 +64,15 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [focusedPinId, setFocusedPinId] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [editingPinId, setEditingPinId] = useState<number | null>(null);
+  const [editLocation, setEditLocation] = useState('');
+  const [editTimestamp, setEditTimestamp] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editSelectedImage, setEditSelectedImage] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editSelectedCoords, setEditSelectedCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [editSuggestions, setEditSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showEditSuggestions, setShowEditSuggestions] = useState(false);
 
   // Set mounted state
   useEffect(() => {
@@ -112,12 +121,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`,
-        {
-          headers: {
-            'User-Agent': 'LucyEarth-LocationTracker/1.0'
-          }
-        }
+        `/api/geocode?q=${encodeURIComponent(query)}&limit=5`
       );
       const data = await response.json();
       setSuggestions(data);
@@ -139,6 +143,37 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     return () => clearTimeout(timer);
   }, [newLocation]);
 
+  // Handle edit location search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (editLocation && editingPinId) {
+        searchEditLocation(editLocation);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [editLocation, editingPinId]);
+
+  const searchEditLocation = async (query: string) => {
+    if (query.trim().length < 3) {
+      setEditSuggestions([]);
+      setShowEditSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/geocode?q=${encodeURIComponent(query)}&limit=5`
+      );
+      const data = await response.json();
+      setEditSuggestions(data);
+      setShowEditSuggestions(true);
+    } catch (error) {
+      console.error('Location search error:', error);
+      setEditSuggestions([]);
+    }
+  };
+
   const geocodeLocation = async (location: string): Promise<{ lat: number; lon: number } | null> => {
     try {
       // Check if input is coordinates (lat,lon format)
@@ -150,14 +185,9 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         };
       }
 
-      // Using Nominatim (OpenStreetMap) geocoding service
+      // Using Nominatim (OpenStreetMap) geocoding service via API route
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
-        {
-          headers: {
-            'User-Agent': 'LucyEarth-LocationTracker/1.0'
-          }
-        }
+        `/api/geocode?q=${encodeURIComponent(location)}&limit=1`
       );
       const data = await response.json();
 
@@ -281,6 +311,121 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setShowSuggestions(false);
   };
 
+  const handleEditPin = (pin: LocationPin) => {
+    setEditingPinId(pin.id);
+    setEditLocation(pin.location);
+    const localDateTime = new Date(new Date(pin.timestamp).getTime() - new Date().getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+    setEditTimestamp(localDateTime);
+    setEditNote(pin.note || '');
+    setEditImagePreview(pin.image_url);
+    setEditSelectedImage(null);
+    setEditSelectedCoords(pin.latitude && pin.longitude ? { lat: pin.latitude, lon: pin.longitude } : null);
+    setEditSuggestions([]);
+    setShowEditSuggestions(false);
+  };
+
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSelectEditSuggestion = (suggestion: LocationSuggestion) => {
+    setEditLocation(suggestion.display_name);
+    setEditSelectedCoords({
+      lat: parseFloat(suggestion.lat),
+      lon: parseFloat(suggestion.lon)
+    });
+    setShowEditSuggestions(false);
+    setEditSuggestions([]);
+  };
+
+  const handleUpdatePin = async () => {
+    if (!editLocation.trim() || !editTimestamp || !editingPinId) return;
+
+    setLoading(true);
+
+    // Use selected coordinates if available, otherwise geocode
+    let coords = editSelectedCoords;
+    if (!coords) {
+      coords = await geocodeLocation(editLocation);
+    }
+
+    // Find the existing pin to get its image URL
+    const existingPin = pins.find(p => p.id === editingPinId);
+    let imageUrl = existingPin?.image_url || null;
+
+    // Upload new image if selected
+    if (editSelectedImage) {
+      const fileExt = editSelectedImage.name.split('.').pop();
+      const fileName = `${anonId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('location-images')
+        .upload(fileName, editSelectedImage);
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('location-images')
+          .getPublicUrl(fileName);
+        imageUrl = urlData.publicUrl;
+
+        // Delete old image if it exists
+        if (existingPin?.image_url) {
+          const oldFileName = existingPin.image_url.split('/').pop();
+          if (oldFileName) {
+            await supabase.storage
+              .from('location-images')
+              .remove([`${anonId}/${oldFileName}`]);
+          }
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('location_pins')
+      .update({
+        location: editLocation.trim(),
+        latitude: coords?.lat || null,
+        longitude: coords?.lon || null,
+        timestamp: new Date(editTimestamp).toISOString(),
+        note: editNote.trim() || null,
+        image_url: imageUrl,
+      })
+      .eq('id', editingPinId)
+      .eq('anon_id', anonId)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setPins(pins.map(pin => pin.id === editingPinId ? data : pin));
+      handleCancelEdit();
+      onLogActivity('Updated location pin', `Updated pin at ${editLocation}`);
+    }
+
+    setLoading(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPinId(null);
+    setEditLocation('');
+    setEditTimestamp('');
+    setEditNote('');
+    setEditSelectedImage(null);
+    setEditImagePreview(null);
+    setEditSelectedCoords(null);
+    setEditSuggestions([]);
+    setShowEditSuggestions(false);
+  };
+
   // Extract main location name (before first comma)
   const getMainLocationName = (fullLocation: string): string => {
     const firstComma = fullLocation.indexOf(',');
@@ -366,7 +511,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
           </div>
 
           {/* Right Sidebar - Pins List */}
-          <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0">
+          <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:overflow-y-auto">
             {/* Add Pin Section */}
             {isEditMode && !isAddingPin && (
               <div className="p-4 border-b-4 border-gray-900">
@@ -502,60 +647,182 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
               )}
               <div className="space-y-2">
                 {pins.map((pin) => (
-                  <div
-                    key={pin.id}
-                    className={`border-2 border-gray-900 p-3 flex justify-between items-start transition-colors ${
-                      focusedPinId === pin.id
-                        ? 'bg-pink-100 border-pink-500'
-                        : 'hover:bg-gray-50 cursor-pointer'
-                    }`}
-                    onClick={() => {
-                      if (pin.latitude !== null && pin.longitude !== null) {
-                        setFocusedPinId(pin.id);
-                        onLogActivity('Viewed pin from list', `Selected ${getMainLocationName(pin.location)}`);
-                      }
-                    }}
-                  >
-                    <div className="flex gap-3 flex-1">
-                      {pin.image_url && (
-                        <img
-                          src={pin.image_url}
-                          alt={pin.location}
-                          className="w-16 h-16 object-cover border-2 border-gray-900 flex-shrink-0"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">📍</span>
-                          <span className="font-bold text-sm">{getMainLocationName(pin.location)}</span>
+                  editingPinId === pin.id ? (
+                    // Edit Form
+                    <div key={pin.id} className="border-2 border-blue-500 p-3 bg-blue-50">
+                      <h4 className="text-sm font-bold mb-3">EDIT PIN</h4>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <label className="block text-sm mb-1">Location</label>
+                          <input
+                            type="text"
+                            value={editLocation}
+                            onChange={(e) => {
+                              setEditLocation(e.target.value);
+                              setEditSelectedCoords(null);
+                            }}
+                            onFocus={() => {
+                              if (editSuggestions.length > 0) {
+                                setShowEditSuggestions(true);
+                              }
+                            }}
+                            placeholder="Search for a location..."
+                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                          />
+
+                          {/* Suggestions Dropdown */}
+                          {showEditSuggestions && editSuggestions.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border-4 border-gray-900 max-h-60 overflow-y-auto">
+                              {editSuggestions.map((suggestion, index) => (
+                                <div
+                                  key={index}
+                                  onClick={() => handleSelectEditSuggestion(suggestion)}
+                                  className="px-3 py-2 cursor-pointer hover:bg-blue-100 border-b-2 border-gray-900 last:border-b-0 text-sm"
+                                >
+                                  <div className="font-medium">{suggestion.display_name}</div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {parseFloat(suggestion.lat).toFixed(4)}, {parseFloat(suggestion.lon).toFixed(4)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="text-xs text-gray-600 mt-1">
+                            Start typing to search for a location
+                          </p>
                         </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          {new Date(pin.timestamp).toLocaleString()}
+                        <div>
+                          <label className="block text-sm mb-1">Time</label>
+                          <input
+                            type="datetime-local"
+                            value={editTimestamp}
+                            onChange={(e) => setEditTimestamp(e.target.value)}
+                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                          />
                         </div>
-                        {pin.note && (
-                          <div className="text-xs text-gray-700 mt-1 italic">
-                            &ldquo;{pin.note}&rdquo;
-                          </div>
-                        )}
-                        {pin.latitude !== null && pin.longitude !== null && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-sm mb-1">Note (optional)</label>
+                          <textarea
+                            value={editNote}
+                            onChange={(e) => setEditNote(e.target.value)}
+                            placeholder="Add a note about this location..."
+                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm resize-none"
+                            rows={3}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm mb-1">Image (optional)</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEditImageSelect}
+                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                          />
+                          {editImagePreview && (
+                            <div className="mt-2 relative">
+                              <img
+                                src={editImagePreview}
+                                alt="Preview"
+                                className="w-full h-32 object-cover border-2 border-gray-900"
+                              />
+                              <button
+                                onClick={() => {
+                                  setEditSelectedImage(null);
+                                  setEditImagePreview(null);
+                                }}
+                                className="absolute top-1 right-1 bg-red-500 text-white px-2 py-1 text-xs hover:bg-red-600"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleUpdatePin}
+                            disabled={loading || !editLocation.trim() || !editTimestamp}
+                            className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          >
+                            {loading ? 'UPDATING...' : 'UPDATE'}
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white transition-all"
+                          >
+                            CANCEL
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    {isEditMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePin(pin.id);
-                        }}
-                        className="text-red-500 hover:text-red-700 text-xl ml-2"
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
+                  ) : (
+                    // Display Mode
+                    <div
+                      key={pin.id}
+                      className={`border-2 border-gray-900 p-3 flex justify-between items-start transition-colors ${
+                        focusedPinId === pin.id
+                          ? 'bg-pink-100 border-pink-500'
+                          : 'hover:bg-gray-50 cursor-pointer'
+                      }`}
+                      onClick={() => {
+                        if (pin.latitude !== null && pin.longitude !== null) {
+                          setFocusedPinId(pin.id);
+                          onLogActivity('Viewed pin from list', `Selected ${getMainLocationName(pin.location)}`);
+                        }
+                      }}
+                    >
+                      <div className="flex gap-3 flex-1">
+                        {pin.image_url && (
+                          <img
+                            src={pin.image_url}
+                            alt={pin.location}
+                            className="w-16 h-16 object-cover border-2 border-gray-900 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">📍</span>
+                            <span className="font-bold text-sm">{getMainLocationName(pin.location)}</span>
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {new Date(pin.timestamp).toLocaleString()}
+                          </div>
+                          {pin.note && (
+                            <div className="text-xs text-gray-700 mt-1 italic">
+                              &ldquo;{pin.note}&rdquo;
+                            </div>
+                          )}
+                          {pin.latitude !== null && pin.longitude !== null && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {isEditMode && (
+                        <div className="flex gap-2 ml-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPin(pin);
+                            }}
+                            className="text-blue-500 hover:text-blue-700 text-xl"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePin(pin.id);
+                            }}
+                            className="text-red-500 hover:text-red-700 text-xl"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 ))}
               </div>
             </div>

@@ -136,6 +136,15 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
     });
   };
 
+  const formatDateMobile = (dateString: string) => {
+    const date = new Date(dateString);
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = (date.getMonth() + 1).toString();
+    const day = date.getDate().toString();
+    const year = date.getFullYear().toString().slice(-2);
+    return `${weekday}. ${month}/${day}/${year}`;
+  };
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', {
@@ -251,19 +260,20 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                   key={entry.id}
                   className="p-4 bg-white"
                   style={{
-                    border: '3px solid #000',
-                    boxShadow: '4px 4px 0 0 #000'
+                    border: '3px solid #000'
                   }}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-sm text-gray-600" style={{ fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
-                      <div>{formatDate(entry.created_at)}</div>
-                      <div>{formatTime(entry.created_at)}</div>
-                      {entry.updated_at !== entry.created_at && (
-                        <div className="text-xs italic mt-1">
-                          (edited {formatTime(entry.updated_at)})
-                        </div>
-                      )}
+                      <div className="hidden sm:block">
+                        {formatDate(entry.created_at)}, {formatTime(entry.created_at)}
+                        {entry.updated_at !== entry.created_at && (
+                          <span className="text-xs italic ml-2">
+                            (edited {formatTime(entry.updated_at)})
+                          </span>
+                        )}
+                      </div>
+                      <div className="sm:hidden">{formatDateMobile(entry.created_at)}</div>
                     </div>
                     {isEditMode && (
                       <div className="flex gap-2">
@@ -303,10 +313,9 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                                 setEditingEntryId(entry.id);
                                 setEditText(entry.entry_text);
                               }}
-                              className="px-3 py-1 bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold transition-colors"
+                              className="px-2 py-0.5 bg-gray-900 hover:bg-gray-700 text-white text-xs font-bold transition-colors"
                               style={{
-                                border: '2px solid #000',
-                                boxShadow: '2px 2px 0 0 #000',
+                                border: '1px solid #000',
                                 fontFamily: "'Courier Prime', 'Courier New', monospace"
                               }}
                             >
@@ -314,10 +323,9 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                             </button>
                             <button
                               onClick={() => handleDeleteEntry(entry.id)}
-                              className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors"
+                              className="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors"
                               style={{
-                                border: '2px solid #000',
-                                boxShadow: '2px 2px 0 0 #000',
+                                border: '1px solid #000',
                                 fontFamily: "'Courier Prime', 'Courier New', monospace"
                               }}
                             >
