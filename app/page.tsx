@@ -9,6 +9,7 @@ import Journal from '@/components/Journal';
 import Achievements from '@/components/Achievements';
 import DoubanModal from '@/components/DoubanModal';
 import LocationModal from '@/components/LocationModal';
+import MusicModal from '@/components/MusicModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -42,6 +43,7 @@ export default function Home() {
   const [showAchievements, setShowAchievements] = useState<boolean>(false);
   const [showDoubanModal, setShowDoubanModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
 
   // Helper function to log activities
   const logActivity = async (action: string, details?: string) => {
@@ -305,8 +307,27 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
         </div>
 
-        {/* Empty space */}
-        <div className="max-sm:hidden"></div>
+        {/* Music icon - Spotify player */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowMusicModal(true);
+              logActivity('Opened Music Player', 'Viewing music library');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 p-2"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <img
+              src="/spotify.png"
+              alt="Spotify"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">SPOTIFY</div>
+        </div>
 
         {/* Activity Log icon - always visible */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
@@ -571,6 +592,15 @@ export default function Home() {
       <LocationModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Music Modal */}
+      <MusicModal
+        isOpen={showMusicModal}
+        onClose={() => setShowMusicModal(false)}
         anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
