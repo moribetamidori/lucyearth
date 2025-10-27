@@ -85,7 +85,6 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
     const { data, error } = await supabase
       .from('songs')
       .select('*')
-      .eq('anon_id', anonId)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -508,7 +507,7 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
 
             {/* Songs List */}
             <div className="space-y-2">
-              <h3 className="text-lg font-bold mb-2">Your Library ({songs.length})</h3>
+              <h3 className="text-lg font-bold mb-2">Library ({songs.length})</h3>
               {loading && songs.length === 0 && (
                 <div className="text-center py-8 text-gray-400">Loading...</div>
               )}
