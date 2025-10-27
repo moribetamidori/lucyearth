@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, type DoubanRating } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { ActionButton } from './ActionButtons';
 
 type DoubanModalProps = {
   isOpen: boolean;
@@ -510,13 +511,11 @@ export default function DoubanModal({
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h4 className="font-bold text-lg break-words">{r.title}</h4>
                           {isEditMode && (
-                            <button
+                            <ActionButton
+                              variant="delete"
                               onClick={() => handleDelete(r.id, r.image_url)}
-                              className="text-red-500 hover:text-red-700 flex-shrink-0"
-                              title="Delete"
-                            >
-                              🗑️
-                            </button>
+                              className="flex-shrink-0"
+                            />
                           )}
                         </div>
                         <div className="text-sm mb-2">

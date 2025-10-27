@@ -55,6 +55,9 @@ export default function Home() {
   // Initialize anonymous user
   useEffect(() => {
     const initAnonUser = async () => {
+      // Check if we're in the browser
+      if (typeof window === 'undefined') return;
+
       // Get or create anonymous user ID
       let storedAnonId = localStorage.getItem('lucyearth_anon_id');
 
@@ -96,6 +99,9 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return;
 
     // Check if user is logged in
     const isLoggedIn = localStorage.getItem('lucyearth_edit_mode') === 'true';
@@ -330,7 +336,9 @@ export default function Home() {
             onClick={() => {
               if (isEditMode) {
                 // Logout
-                localStorage.removeItem('lucyearth_edit_mode');
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('lucyearth_edit_mode');
+                }
                 setIsEditMode(false);
               } else {
                 // Show login modal
@@ -497,7 +505,9 @@ export default function Home() {
       {showLoginModal && (
         <LoginModal
           onSuccess={() => {
-            localStorage.setItem('lucyearth_edit_mode', 'true');
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('lucyearth_edit_mode', 'true');
+            }
             setIsEditMode(true);
             setShowLoginModal(false);
             logActivity('Successful login', 'User logged in as admin');

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ActionButton } from './ActionButtons';
 
 interface JournalEntry {
   id: string;
@@ -308,29 +309,17 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                           </>
                         ) : (
                           <>
-                            <button
+                            <ActionButton
+                              variant="edit"
                               onClick={() => {
                                 setEditingEntryId(entry.id);
                                 setEditText(entry.entry_text);
                               }}
-                              className="px-2 py-0.5 bg-gray-900 hover:bg-gray-700 text-white text-xs font-bold transition-colors"
-                              style={{
-                                border: '1px solid #000',
-                                fontFamily: "'Courier Prime', 'Courier New', monospace"
-                              }}
-                            >
-                              EDIT
-                            </button>
-                            <button
+                            />
+                            <ActionButton
+                              variant="delete"
                               onClick={() => handleDeleteEntry(entry.id)}
-                              className="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors"
-                              style={{
-                                border: '1px solid #000',
-                                fontFamily: "'Courier Prime', 'Courier New', monospace"
-                              }}
-                            >
-                              DELETE
-                            </button>
+                            />
                           </>
                         )}
                       </div>

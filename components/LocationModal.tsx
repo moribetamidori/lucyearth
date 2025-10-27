@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
+import { ActionButton } from './ActionButtons';
 
 // Dynamically import react-leaflet components with no SSR
 const MapContainer = dynamic(
@@ -74,9 +75,37 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [editSuggestions, setEditSuggestions] = useState<LocationSuggestion[]>([]);
   const [showEditSuggestions, setShowEditSuggestions] = useState(false);
 
-  // Set mounted state
+  // Set mounted state and initialize Leaflet
   useEffect(() => {
     setIsMounted(true);
+
+    // Initialize Leaflet icons only on client side
+    if (typeof window !== 'undefined') {
+      // Load Leaflet CSS
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+
+      // Load Leaflet and configure icons
+      import('leaflet').then((L) => {
+        // Fix for default marker icons in Next.js
+        import('leaflet/dist/images/marker-icon.png').then((icon) => {
+          import('leaflet/dist/images/marker-shadow.png').then((iconShadow) => {
+            const DefaultIcon = L.default.icon({
+              iconUrl: icon.default.src,
+              shadowUrl: iconShadow.default.src,
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            });
+
+            L.default.Marker.prototype.options.icon = DefaultIcon;
+          });
+        });
+      });
+    }
   }, []);
 
   // Fetch pins when modal opens
@@ -800,25 +829,21 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         </div>
                       </div>
                       {isEditMode && (
-                        <div className="flex gap-2 ml-2">
-                          <button
+                        <div className="flex gap-1 ml-2">
+                          <ActionButton
+                            variant="edit"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditPin(pin);
                             }}
-                            className="text-blue-500 hover:text-blue-700 text-xl"
-                          >
-                            ✏️
-                          </button>
-                          <button
+                          />
+                          <ActionButton
+                            variant="delete"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeletePin(pin.id);
                             }}
-                            className="text-red-500 hover:text-red-700 text-xl"
-                          >
-                            🗑️
-                          </button>
+                          />
                         </div>
                       )}
                     </div>

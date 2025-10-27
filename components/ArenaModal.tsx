@@ -12,6 +12,7 @@ import {
   deleteBlock,
   moveBlock,
 } from '@/lib/arenaUtils';
+import { ActionButtonGroup } from './ActionButtons';
 
 interface ArenaModalProps {
   isOpen: boolean;
@@ -509,27 +510,25 @@ export default function ArenaModal({
                         )}
                       </div>
                       {isEditMode && editingCollectionId !== collection.id && (
-                        <div className="absolute top-1 right-1 flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingCollectionId(collection.id);
-                              setEditingCollectionTitle(collection.title);
-                            }}
-                            className="bg-blue-500 text-white px-1.5 py-0.5 text-xs hover:bg-blue-600"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCollection(collection.id, collection.title);
-                            }}
-                            className="bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
-                          >
-                            Del
-                          </button>
-                        </div>
+                        <ActionButtonGroup
+                          buttons={[
+                            {
+                              variant: 'edit',
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                setEditingCollectionId(collection.id);
+                                setEditingCollectionTitle(collection.title);
+                              }
+                            },
+                            {
+                              variant: 'delete',
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                handleDeleteCollection(collection.id, collection.title);
+                              }
+                            }
+                          ]}
+                        />
                       )}
                     </div>
                   ))}
@@ -617,26 +616,24 @@ export default function ArenaModal({
                           </div>
                         )}
                         {isEditMode && (
-                          <div className="absolute top-1 right-1 flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowMoveDropdown(showMoveDropdown === block.id ? null : block.id);
-                              }}
-                              className="bg-blue-500 text-white px-1.5 py-0.5 text-xs hover:bg-blue-600"
-                            >
-                              Move
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteBlock(block);
-                              }}
-                              className="bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
-                            >
-                              Del
-                            </button>
-                          </div>
+                          <ActionButtonGroup
+                            buttons={[
+                              {
+                                variant: 'move',
+                                onClick: (e) => {
+                                  e.stopPropagation();
+                                  setShowMoveDropdown(showMoveDropdown === block.id ? null : block.id);
+                                }
+                              },
+                              {
+                                variant: 'delete',
+                                onClick: (e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block);
+                                }
+                              }
+                            ]}
+                          />
                         )}
                         {/* Move dropdown */}
                         {isEditMode && showMoveDropdown === block.id && (
