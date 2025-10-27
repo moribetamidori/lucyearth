@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, RefObject } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 
@@ -22,9 +22,10 @@ interface MusicModalProps {
   anonId: string;
   isEditMode: boolean;
   onLogActivity: (action: string, details?: string) => void;
+  audioRef: RefObject<HTMLAudioElement | null>;
 }
 
-export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogActivity }: MusicModalProps) {
+export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogActivity, audioRef }: MusicModalProps) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,8 +53,6 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
   const [editAlbum, setEditAlbum] = useState('');
   const [editSelectedCoverFile, setEditSelectedCoverFile] = useState<File | null>(null);
   const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
-
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (isOpen && anonId) {
@@ -782,9 +781,6 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
           )}
         </div>
       </div>
-
-      {/* Hidden Audio Element */}
-      <audio ref={audioRef} />
 
       <style jsx>{`
         .slider::-webkit-slider-thumb {

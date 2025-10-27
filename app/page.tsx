@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
 import CatProfile from '@/components/CatProfile';
 import ActivityLog from '@/components/ActivityLog';
@@ -44,6 +44,9 @@ export default function Home() {
   const [showDoubanModal, setShowDoubanModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
+
+  // Audio player ref - persists across modal open/close
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Helper function to log activities
   const logActivity = async (action: string, details?: string) => {
@@ -283,9 +286,28 @@ export default function Home() {
           </div>
         )}
 
-        {/* Empty space - only when cats is showing */}
+        {/* Music icon - Spotify player - right next to CATS on desktop when cats is showing */}
         {showCatIcon && (
-          <div className="max-sm:hidden"></div>
+          <div className="flex flex-col items-center gap-2 max-sm:hidden">
+            <div
+              onClick={() => {
+                setShowMusicModal(true);
+                logActivity('Opened Music Player', 'Viewing music library');
+              }}
+              className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
+              style={{
+                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+                imageRendering: 'pixelated',
+              }}
+            >
+              <img
+                src="/spotify.png"
+                alt="Spotify"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="text-[15px] text-gray-900">SPOTIFY</div>
+          </div>
         )}
 
         {/* Journal icon - always visible */}
@@ -307,14 +329,38 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">JOURNAL</div>
         </div>
 
-        {/* Music icon - Spotify player */}
-        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+        {/* Music icon - Spotify player - shows here when cats is NOT showing */}
+        {!showCatIcon && (
+          <div className="flex flex-col items-center gap-2 max-sm:hidden">
+            <div
+              onClick={() => {
+                setShowMusicModal(true);
+                logActivity('Opened Music Player', 'Viewing music library');
+              }}
+              className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
+              style={{
+                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+                imageRendering: 'pixelated',
+              }}
+            >
+              <img
+                src="/spotify.png"
+                alt="Spotify"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="text-[15px] text-gray-900">SPOTIFY</div>
+          </div>
+        )}
+
+        {/* Spotify icon for mobile - always visible */}
+        <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
           <div
             onClick={() => {
               setShowMusicModal(true);
               logActivity('Opened Music Player', 'Viewing music library');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 p-2"
+            className="w-12 h-12 bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 transition-all p-2"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
@@ -326,7 +372,6 @@ export default function Home() {
               className="w-full h-full object-contain"
             />
           </div>
-          <div className="text-[15px] text-gray-900 max-sm:hidden">SPOTIFY</div>
         </div>
 
         {/* Activity Log icon - always visible */}
@@ -347,9 +392,6 @@ export default function Home() {
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
         </div>
-
-        {/* Empty space */}
-        <div className="max-sm:hidden"></div>
 
         {/* Lock icon */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
@@ -604,7 +646,11 @@ export default function Home() {
         anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
+        audioRef={audioRef}
       />
+
+      {/* Persistent Audio Element - remains when modal closes */}
+      <audio ref={audioRef} />
     </div>
   );
 }
