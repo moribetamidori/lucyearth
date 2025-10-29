@@ -167,7 +167,7 @@ export async function uploadBlockToCollection(
     }
 
     // Upload to Supabase storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('arena-blocks')
       .upload(fileName, uploadBlob, {
         contentType: contentType,

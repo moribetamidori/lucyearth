@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
+import ImageLightbox from './ImageLightbox';
 
 // Dynamically import react-leaflet components with no SSR
 const MapContainer = dynamic(
@@ -27,6 +28,13 @@ const MapBoundsUpdater = dynamic(
   { ssr: false }
 );
 
+interface LocationPinImage {
+  id: string;
+  pin_id: number;
+  image_url: string;
+  display_order: number;
+}
+
 interface LocationPin {
   id: number;
   name: string | null;
@@ -35,7 +43,7 @@ interface LocationPin {
   longitude: number | null;
   timestamp: string;
   note: string | null;
-  image_url: string | null;
+  images?: LocationPinImage[];
 }
 
 interface LocationModalProps {
@@ -58,8 +66,8 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [newLocation, setNewLocation] = useState('');
   const [newTimestamp, setNewTimestamp] = useState('');
   const [newNote, setNewNote] = useState('');
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isAddingPin, setIsAddingPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -72,11 +80,15 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [editLocation, setEditLocation] = useState('');
   const [editTimestamp, setEditTimestamp] = useState('');
   const [editNote, setEditNote] = useState('');
-  const [editSelectedImage, setEditSelectedImage] = useState<File | null>(null);
-  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editSelectedImages, setEditSelectedImages] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [editExistingImages, setEditExistingImages] = useState<LocationPinImage[]>([]);
   const [editSelectedCoords, setEditSelectedCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [editSuggestions, setEditSuggestions] = useState<LocationSuggestion[]>([]);
   const [showEditSuggestions, setShowEditSuggestions] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [showLightbox, setShowLightbox] = useState(false);
 
   // Set mounted state and initialize Leaflet
   useEffect(() => {
@@ -133,12 +145,20 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setLoading(true);
     const { data, error } = await supabase
       .from('location_pins')
-      .select('*')
+      .select(`
+        *,
+        images:location_pin_images(*)
+      `)
       .eq('anon_id', anonId)
       .order('timestamp', { ascending: false });
 
     if (!error && data) {
-      setPins(data);
+      // Sort images by display_order
+      const pinsWithSortedImages = data.map(pin => ({
+        ...pin,
+        images: pin.images?.sort((a: LocationPinImage, b: LocationPinImage) => a.display_order - b.display_order) || []
+      }));
+      setPins(pinsWithSortedImages);
     }
     setLoading(false);
   };
@@ -237,14 +257,26 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      setSelectedImages(fileArray);
+
+      // Generate previews for all files
+      const previews: string[] = [];
+      let loadedCount = 0;
+
+      fileArray.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          previews.push(reader.result as string);
+          loadedCount++;
+          if (loadedCount === fileArray.length) {
+            setImagePreviews(previews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -259,24 +291,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       coords = await geocodeLocation(newLocation);
     }
 
-    // Upload image if selected
-    let imageUrl = null;
-    if (selectedImage) {
-      const fileExt = selectedImage.name.split('.').pop();
-      const fileName = `${anonId}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('location-images')
-        .upload(fileName, selectedImage);
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from('location-images')
-          .getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
-      }
-    }
-
+    // First create the pin
     const { data, error } = await supabase
       .from('location_pins')
       .insert({
@@ -287,19 +302,48 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         longitude: coords?.lon || null,
         timestamp: new Date(newTimestamp).toISOString(),
         note: newNote.trim() || null,
-        image_url: imageUrl,
       })
       .select()
       .single();
 
     if (!error && data) {
-      setPins([data, ...pins]);
+      // Upload images if selected
+      if (selectedImages.length > 0) {
+        for (let i = 0; i < selectedImages.length; i++) {
+          const file = selectedImages[i];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${anonId}/${Date.now()}_${i}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('location-images')
+            .upload(fileName, file);
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from('location-images')
+              .getPublicUrl(fileName);
+
+            // Insert image record
+            await supabase
+              .from('location_pin_images')
+              .insert({
+                pin_id: data.id,
+                image_url: urlData.publicUrl,
+                display_order: i,
+              });
+          }
+        }
+      }
+
+      // Refetch pins to get the updated data with images
+      await fetchPins();
+
       setNewName('');
       setNewLocation('');
       setNewTimestamp('');
       setNewNote('');
-      setSelectedImage(null);
-      setImagePreview(null);
+      setSelectedImages([]);
+      setImagePreviews([]);
       setIsAddingPin(false);
       setSelectedCoords(null);
       setSuggestions([]);
@@ -339,8 +383,8 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setNewLocation('');
     setNewTimestamp('');
     setNewNote('');
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedImages([]);
+    setImagePreviews([]);
     setSelectedCoords(null);
     setSuggestions([]);
     setShowSuggestions(false);
@@ -355,22 +399,35 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       .slice(0, 16);
     setEditTimestamp(localDateTime);
     setEditNote(pin.note || '');
-    setEditImagePreview(pin.image_url);
-    setEditSelectedImage(null);
+    setEditExistingImages(pin.images || []);
+    setEditSelectedImages([]);
+    setEditImagePreviews([]);
     setEditSelectedCoords(pin.latitude && pin.longitude ? { lat: pin.latitude, lon: pin.longitude } : null);
     setEditSuggestions([]);
     setShowEditSuggestions(false);
   };
 
   const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setEditSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      setEditSelectedImages(fileArray);
+
+      // Generate previews for all files
+      const previews: string[] = [];
+      let loadedCount = 0;
+
+      fileArray.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          previews.push(reader.result as string);
+          loadedCount++;
+          if (loadedCount === fileArray.length) {
+            setEditImagePreviews(previews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -395,37 +452,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       coords = await geocodeLocation(editLocation);
     }
 
-    // Find the existing pin to get its image URL
-    const existingPin = pins.find(p => p.id === editingPinId);
-    let imageUrl = existingPin?.image_url || null;
-
-    // Upload new image if selected
-    if (editSelectedImage) {
-      const fileExt = editSelectedImage.name.split('.').pop();
-      const fileName = `${anonId}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('location-images')
-        .upload(fileName, editSelectedImage);
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from('location-images')
-          .getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
-
-        // Delete old image if it exists
-        if (existingPin?.image_url) {
-          const oldFileName = existingPin.image_url.split('/').pop();
-          if (oldFileName) {
-            await supabase.storage
-              .from('location-images')
-              .remove([`${anonId}/${oldFileName}`]);
-          }
-        }
-      }
-    }
-
+    // Update the pin
     const { data, error } = await supabase
       .from('location_pins')
       .update({
@@ -435,7 +462,6 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         longitude: coords?.lon || null,
         timestamp: new Date(editTimestamp).toISOString(),
         note: editNote.trim() || null,
-        image_url: imageUrl,
       })
       .eq('id', editingPinId)
       .eq('anon_id', anonId)
@@ -443,12 +469,63 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       .single();
 
     if (!error && data) {
-      setPins(pins.map(pin => pin.id === editingPinId ? data : pin));
+      // Upload new images if selected
+      if (editSelectedImages.length > 0) {
+        const currentImageCount = editExistingImages.length;
+        for (let i = 0; i < editSelectedImages.length; i++) {
+          const file = editSelectedImages[i];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${anonId}/${Date.now()}_${i}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('location-images')
+            .upload(fileName, file);
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from('location-images')
+              .getPublicUrl(fileName);
+
+            // Insert image record
+            await supabase
+              .from('location_pin_images')
+              .insert({
+                pin_id: editingPinId,
+                image_url: urlData.publicUrl,
+                display_order: currentImageCount + i,
+              });
+          }
+        }
+      }
+
+      // Refetch pins to get the updated data with images
+      await fetchPins();
       handleCancelEdit();
       onLogActivity('Updated location pin', `Updated pin at ${editName || editLocation}`);
     }
 
     setLoading(false);
+  };
+
+  const handleRemoveExistingImage = async (imageId: string, imageUrl: string) => {
+    // Delete from database
+    const { error } = await supabase
+      .from('location_pin_images')
+      .delete()
+      .eq('id', imageId);
+
+    if (!error) {
+      // Delete from storage
+      const fileName = imageUrl.split('/').pop();
+      if (fileName) {
+        await supabase.storage
+          .from('location-images')
+          .remove([`${anonId}/${fileName}`]);
+      }
+
+      // Update local state
+      setEditExistingImages(editExistingImages.filter(img => img.id !== imageId));
+    }
   };
 
   const handleCancelEdit = () => {
@@ -457,8 +534,9 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setEditLocation('');
     setEditTimestamp('');
     setEditNote('');
-    setEditSelectedImage(null);
-    setEditImagePreview(null);
+    setEditSelectedImages([]);
+    setEditImagePreviews([]);
+    setEditExistingImages([]);
     setEditSelectedCoords(null);
     setEditSuggestions([]);
     setShowEditSuggestions(false);
@@ -479,6 +557,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white/95 border-4 border-gray-900 w-full max-w-[95vw] h-[90vh] flex flex-col">
         {/* Header */}
@@ -537,12 +616,24 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                             <div className="text-xs text-gray-600 mt-1">
                               {new Date(pin.timestamp).toLocaleString()}
                             </div>
-                            {pin.image_url && (
-                              <img
-                                src={pin.image_url}
-                                alt={pin.location}
-                                className="w-full h-24 object-cover mt-2 border border-gray-300"
-                              />
+                            {pin.images && pin.images.length > 0 && (
+                              <div className="relative mt-2">
+                                <img
+                                  src={pin.images[0].image_url}
+                                  alt={pin.location}
+                                  className="w-full h-24 object-cover border border-gray-300 cursor-pointer hover:opacity-90"
+                                  onClick={() => {
+                                    setLightboxImages(pin.images!.map(img => img.image_url));
+                                    setLightboxIndex(0);
+                                    setShowLightbox(true);
+                                  }}
+                                />
+                                {pin.images.length > 1 && (
+                                  <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
+                                    +{pin.images.length - 1}
+                                  </div>
+                                )}
+                              </div>
                             )}
                             {pin.note && (
                               <div className="text-xs text-gray-700 mt-2 italic border-t border-gray-300 pt-1">
@@ -638,29 +729,34 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                     />
                   </div>
                   <div>
-                    <label className="block text-sm mb-1">Image (optional)</label>
+                    <label className="block text-sm mb-1">Images (optional)</label>
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleImageSelect}
                       className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
                     />
-                    {imagePreview && (
-                      <div className="mt-2 relative">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-32 object-cover border-2 border-gray-900"
-                        />
-                        <button
-                          onClick={() => {
-                            setSelectedImage(null);
-                            setImagePreview(null);
-                          }}
-                          className="absolute top-1 right-1 bg-red-500 text-white px-2 py-1 text-xs hover:bg-red-600"
-                        >
-                          Remove
-                        </button>
+                    {imagePreviews.length > 0 && (
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {imagePreviews.map((preview, index) => (
+                          <div key={index} className="relative">
+                            <img
+                              src={preview}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-20 object-cover border-2 border-gray-900"
+                            />
+                            <button
+                              onClick={() => {
+                                setSelectedImages(selectedImages.filter((_, i) => i !== index));
+                                setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+                              }}
+                              className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -771,29 +867,55 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                           />
                         </div>
                         <div>
-                          <label className="block text-sm mb-1">Image (optional)</label>
+                          <label className="block text-sm mb-1">Images (optional)</label>
+                          {/* Existing images */}
+                          {editExistingImages.length > 0 && (
+                            <div className="mb-2 grid grid-cols-3 gap-2">
+                              {editExistingImages.map((image) => (
+                                <div key={image.id} className="relative">
+                                  <img
+                                    src={image.image_url}
+                                    alt="Existing"
+                                    className="w-full h-20 object-cover border-2 border-gray-900"
+                                  />
+                                  <button
+                                    onClick={() => handleRemoveExistingImage(image.id, image.image_url)}
+                                    className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Add new images */}
                           <input
                             type="file"
                             accept="image/*"
+                            multiple
                             onChange={handleEditImageSelect}
                             className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
                           />
-                          {editImagePreview && (
-                            <div className="mt-2 relative">
-                              <img
-                                src={editImagePreview}
-                                alt="Preview"
-                                className="w-full h-32 object-cover border-2 border-gray-900"
-                              />
-                              <button
-                                onClick={() => {
-                                  setEditSelectedImage(null);
-                                  setEditImagePreview(null);
-                                }}
-                                className="absolute top-1 right-1 bg-red-500 text-white px-2 py-1 text-xs hover:bg-red-600"
-                              >
-                                Remove
-                              </button>
+                          {editImagePreviews.length > 0 && (
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                              {editImagePreviews.map((preview, index) => (
+                                <div key={index} className="relative">
+                                  <img
+                                    src={preview}
+                                    alt={`Preview ${index + 1}`}
+                                    className="w-full h-20 object-cover border-2 border-gray-900"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      setEditSelectedImages(editSelectedImages.filter((_, i) => i !== index));
+                                      setEditImagePreviews(editImagePreviews.filter((_, i) => i !== index));
+                                    }}
+                                    className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -822,7 +944,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         focusedPinId === pin.id
                           ? 'bg-pink-100 border-pink-500'
                           : 'hover:bg-gray-50 cursor-pointer'
-                      } ${pin.image_url ? 'h-32' : ''}`}
+                      } ${pin.images && pin.images.length > 0 ? 'h-32' : ''}`}
                       onClick={() => {
                         if (pin.latitude !== null && pin.longitude !== null) {
                           setFocusedPinId(pin.id);
@@ -830,12 +952,27 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         }
                       }}
                     >
-                      {pin.image_url && (
-                        <img
-                          src={pin.image_url}
-                          alt={pin.location}
-                          className="w-32 h-32 object-cover flex-shrink-0"
-                        />
+                      {pin.images && pin.images.length > 0 && (
+                        <div
+                          className="relative w-32 h-32 flex-shrink-0 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxImages(pin.images!.map(img => img.image_url));
+                            setLightboxIndex(0);
+                            setShowLightbox(true);
+                          }}
+                        >
+                          <img
+                            src={pin.images[0].image_url}
+                            alt={pin.location}
+                            className="w-full h-full object-cover"
+                          />
+                          {pin.images.length > 1 && (
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
+                              +{pin.images.length - 1}
+                            </div>
+                          )}
+                        </div>
                       )}
                       <div className="flex-1 p-3 flex flex-col min-h-0 overflow-y-auto">
                         <div className="flex items-center gap-2 justify-between flex-shrink-0">
@@ -885,5 +1022,13 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         </div>
       </div>
     </div>
+    {/* Image Lightbox - Rendered outside modal to avoid z-index issues */}
+    <ImageLightbox
+      images={lightboxImages}
+      initialIndex={lightboxIndex}
+      isOpen={showLightbox}
+      onClose={() => setShowLightbox(false)}
+    />
+    </>
   );
 }

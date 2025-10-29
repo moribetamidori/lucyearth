@@ -12,7 +12,6 @@ interface LocationPin {
   longitude: number | null;
   timestamp: string;
   note: string | null;
-  image_url: string | null;
 }
 
 interface MapBoundsUpdaterProps {

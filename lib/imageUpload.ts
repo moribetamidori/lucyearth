@@ -167,7 +167,7 @@ export async function uploadCatPicture(
     }
 
     // Upload to Supabase storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('cat-pictures')
       .upload(fileName, uploadBlob, {
         contentType: contentType,
