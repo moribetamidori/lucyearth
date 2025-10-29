@@ -29,6 +29,7 @@ const MapBoundsUpdater = dynamic(
 
 interface LocationPin {
   id: number;
+  name: string | null;
   location: string;
   latitude: number | null;
   longitude: number | null;
@@ -53,6 +54,7 @@ interface LocationSuggestion {
 
 export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onLogActivity }: LocationModalProps) {
   const [pins, setPins] = useState<LocationPin[]>([]);
+  const [newName, setNewName] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [newTimestamp, setNewTimestamp] = useState('');
   const [newNote, setNewNote] = useState('');
@@ -66,6 +68,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [focusedPinId, setFocusedPinId] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editTimestamp, setEditTimestamp] = useState('');
   const [editNote, setEditNote] = useState('');
@@ -278,6 +281,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       .from('location_pins')
       .insert({
         anon_id: anonId,
+        name: newName.trim() || null,
         location: newLocation.trim(),
         latitude: coords?.lat || null,
         longitude: coords?.lon || null,
@@ -290,6 +294,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
     if (!error && data) {
       setPins([data, ...pins]);
+      setNewName('');
       setNewLocation('');
       setNewTimestamp('');
       setNewNote('');
@@ -299,7 +304,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       setSelectedCoords(null);
       setSuggestions([]);
       setShowSuggestions(false);
-      onLogActivity('Added location pin', `Added pin at ${newLocation}`);
+      onLogActivity('Added location pin', `Added pin at ${newName || newLocation}`);
     }
 
     setLoading(false);
@@ -330,6 +335,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
   const handleCancelAdd = () => {
     setIsAddingPin(false);
+    setNewName('');
     setNewLocation('');
     setNewTimestamp('');
     setNewNote('');
@@ -342,6 +348,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
   const handleEditPin = (pin: LocationPin) => {
     setEditingPinId(pin.id);
+    setEditName(pin.name || '');
     setEditLocation(pin.location);
     const localDateTime = new Date(new Date(pin.timestamp).getTime() - new Date().getTimezoneOffset() * 60000)
       .toISOString()
@@ -422,6 +429,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     const { data, error } = await supabase
       .from('location_pins')
       .update({
+        name: editName.trim() || null,
         location: editLocation.trim(),
         latitude: coords?.lat || null,
         longitude: coords?.lon || null,
@@ -437,7 +445,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     if (!error && data) {
       setPins(pins.map(pin => pin.id === editingPinId ? data : pin));
       handleCancelEdit();
-      onLogActivity('Updated location pin', `Updated pin at ${editLocation}`);
+      onLogActivity('Updated location pin', `Updated pin at ${editName || editLocation}`);
     }
 
     setLoading(false);
@@ -445,6 +453,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
   const handleCancelEdit = () => {
     setEditingPinId(null);
+    setEditName('');
     setEditLocation('');
     setEditTimestamp('');
     setEditNote('');
@@ -455,13 +464,16 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setShowEditSuggestions(false);
   };
 
-  // Extract main location name (before first comma)
-  const getMainLocationName = (fullLocation: string): string => {
-    const firstComma = fullLocation.indexOf(',');
-    if (firstComma !== -1) {
-      return fullLocation.substring(0, firstComma).trim();
+  // Get display name - use name if available, otherwise extract from location
+  const getDisplayName = (pin: LocationPin): string => {
+    if (pin.name) {
+      return pin.name;
     }
-    return fullLocation;
+    const firstComma = pin.location.indexOf(',');
+    if (firstComma !== -1) {
+      return pin.location.substring(0, firstComma).trim();
+    }
+    return pin.location;
   };
 
   if (!isOpen) return null;
@@ -472,12 +484,22 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         {/* Header */}
         <div className="border-b-4 border-gray-900 p-4 flex justify-between items-center">
           <h2 className="text-xl font-bold">LOCATION MAP</h2>
-          <button
-            onClick={onClose}
-            className="text-2xl hover:text-red-500 transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-3">
+            {isEditMode && !isAddingPin && (
+              <button
+                onClick={() => setIsAddingPin(true)}
+                className="px-4 py-2 border-2 border-gray-900 hover:bg-pink-500 hover:text-white transition-all text-sm font-bold"
+              >
+                + ADD NEW PIN
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-2xl hover:text-red-500 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Content - Horizontal Layout */}
@@ -505,13 +527,13 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         eventHandlers={{
                           click: () => {
                             setFocusedPinId(pin.id);
-                            onLogActivity('Viewed pin on map', `Clicked on ${getMainLocationName(pin.location)}`);
+                            onLogActivity('Viewed pin on map', `Clicked on ${getDisplayName(pin)}`);
                           }
                         }}
                       >
                         <Popup>
                           <div className="text-sm">
-                            <div className="font-bold">{getMainLocationName(pin.location)}</div>
+                            <div className="font-bold">{getDisplayName(pin)}</div>
                             <div className="text-xs text-gray-600 mt-1">
                               {new Date(pin.timestamp).toLocaleString()}
                             </div>
@@ -541,22 +563,21 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
           {/* Right Sidebar - Pins List */}
           <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:flex-1 max-sm:overflow-y-auto">
-            {/* Add Pin Section */}
-            {isEditMode && !isAddingPin && (
-              <div className="p-4 border-b-4 border-gray-900">
-                <button
-                  onClick={() => setIsAddingPin(true)}
-                  className="w-full px-4 py-3 border-2 border-gray-900 hover:bg-pink-500 hover:text-white transition-all"
-                >
-                  + ADD NEW PIN
-                </button>
-              </div>
-            )}
-
             {isEditMode && isAddingPin && (
               <div className="p-4 border-b-4 border-gray-900 bg-pink-50">
                 <h3 className="text-lg font-bold mb-3">ADD NEW PIN</h3>
                 <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm mb-1">Name (optional)</label>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="e.g., Orlando"
+                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                      autoFocus
+                    />
+                  </div>
                   <div className="relative">
                     <label className="block text-sm mb-1">Location</label>
                     <input
@@ -573,7 +594,6 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                       }}
                       placeholder="Search for a location..."
                       className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                      autoFocus
                     />
 
                     {/* Suggestions Dropdown */}
@@ -681,6 +701,16 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                     <div key={pin.id} className="border-2 border-blue-500 p-3 bg-blue-50">
                       <h4 className="text-sm font-bold mb-3">EDIT PIN</h4>
                       <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm mb-1">Name (optional)</label>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="e.g., Orlando"
+                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                          />
+                        </div>
                         <div className="relative">
                           <label className="block text-sm mb-1">Location</label>
                           <input
@@ -792,11 +822,11 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         focusedPinId === pin.id
                           ? 'bg-pink-100 border-pink-500'
                           : 'hover:bg-gray-50 cursor-pointer'
-                      }`}
+                      } ${pin.image_url ? 'h-32' : ''}`}
                       onClick={() => {
                         if (pin.latitude !== null && pin.longitude !== null) {
                           setFocusedPinId(pin.id);
-                          onLogActivity('Viewed pin from list', `Selected ${getMainLocationName(pin.location)}`);
+                          onLogActivity('Viewed pin from list', `Selected ${getDisplayName(pin)}`);
                         }
                       }}
                     >
@@ -807,11 +837,11 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                           className="w-32 h-32 object-cover flex-shrink-0"
                         />
                       )}
-                      <div className="flex-1 p-3 flex flex-col">
-                        <div className="flex items-center gap-2 justify-between">
+                      <div className="flex-1 p-3 flex flex-col min-h-0 overflow-y-auto">
+                        <div className="flex items-center gap-2 justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">📍</span>
-                            <span className="font-bold text-sm">{getMainLocationName(pin.location)}</span>
+                            <span className="font-bold text-sm">{getDisplayName(pin)}</span>
                           </div>
                           {isEditMode && (
                             <div className="flex gap-1">
@@ -832,7 +862,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                             </div>
                           )}
                         </div>
-                        <div className="text-xs text-gray-600 mt-1">
+                        <div className="text-xs text-gray-600 mt-1 flex-shrink-0">
                           {new Date(pin.timestamp).toLocaleString()}
                         </div>
                         {pin.note && (
@@ -841,7 +871,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                           </div>
                         )}
                         {pin.latitude !== null && pin.longitude !== null && (
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-gray-500 mt-1 flex-shrink-0">
                             {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
                           </div>
                         )}
