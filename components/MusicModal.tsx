@@ -3,6 +3,7 @@
 import { useState, useEffect, RefObject } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
+import { convertToWebP } from '@/lib/imageUpload';
 
 interface Song {
   id: number;
@@ -223,12 +224,15 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
     // Upload cover if provided
     let coverUrl = null;
     if (selectedCoverFile) {
-      const coverExt = selectedCoverFile.name.split('.').pop();
-      const coverFileName = `${anonId}/${Date.now()}.${coverExt}`;
+      // Convert to WebP
+      const webpBlob = await convertToWebP(selectedCoverFile, 0.8);
+      const coverFileName = `${anonId}/${Date.now()}.webp`;
 
       const { error: coverError } = await supabase.storage
         .from('song-covers')
-        .upload(coverFileName, selectedCoverFile);
+        .upload(coverFileName, webpBlob, {
+          contentType: 'image/webp',
+        });
 
       if (!coverError) {
         const { data: coverUrlData } = supabase.storage
@@ -325,12 +329,15 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
 
     // Upload new cover if selected
     if (editSelectedCoverFile) {
-      const coverExt = editSelectedCoverFile.name.split('.').pop();
-      const coverFileName = `${anonId}/${Date.now()}.${coverExt}`;
+      // Convert to WebP
+      const webpBlob = await convertToWebP(editSelectedCoverFile, 0.8);
+      const coverFileName = `${anonId}/${Date.now()}.webp`;
 
       const { error: coverError } = await supabase.storage
         .from('song-covers')
-        .upload(coverFileName, editSelectedCoverFile);
+        .upload(coverFileName, webpBlob, {
+          contentType: 'image/webp',
+        });
 
       if (!coverError) {
         const { data: coverUrlData } = supabase.storage

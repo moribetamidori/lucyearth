@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import ImageLightbox from './ImageLightbox';
+import { convertToWebP } from '@/lib/imageUpload';
 
 // Dynamically import react-leaflet components with no SSR
 const MapContainer = dynamic(
@@ -311,12 +312,16 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       if (selectedImages.length > 0) {
         for (let i = 0; i < selectedImages.length; i++) {
           const file = selectedImages[i];
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${anonId}/${Date.now()}_${i}.${fileExt}`;
+
+          // Convert to WebP
+          const webpBlob = await convertToWebP(file, 0.8);
+          const fileName = `${anonId}/${Date.now()}_${i}.webp`;
 
           const { error: uploadError } = await supabase.storage
             .from('location-images')
-            .upload(fileName, file);
+            .upload(fileName, webpBlob, {
+              contentType: 'image/webp',
+            });
 
           if (!uploadError) {
             const { data: urlData } = supabase.storage
@@ -474,12 +479,16 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         const currentImageCount = editExistingImages.length;
         for (let i = 0; i < editSelectedImages.length; i++) {
           const file = editSelectedImages[i];
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${anonId}/${Date.now()}_${i}.${fileExt}`;
+
+          // Convert to WebP
+          const webpBlob = await convertToWebP(file, 0.8);
+          const fileName = `${anonId}/${Date.now()}_${i}.webp`;
 
           const { error: uploadError } = await supabase.storage
             .from('location-images')
-            .upload(fileName, file);
+            .upload(fileName, webpBlob, {
+              contentType: 'image/webp',
+            });
 
           if (!uploadError) {
             const { data: urlData } = supabase.storage
