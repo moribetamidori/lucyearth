@@ -40,6 +40,10 @@ export default function ArenaModal({
   const [blocks, setBlocks] = useState<ArenaBlock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMoreBlocks, setHasMoreBlocks] = useState(false);
+  const [totalBlocks, setTotalBlocks] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [newCollectionTitle, setNewCollectionTitle] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -48,7 +52,6 @@ export default function ArenaModal({
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [blockToMove, setBlockToMove] = useState<ArenaBlock | null>(null);
   const [showMoveDropdown, setShowMoveDropdown] = useState<string | null>(null);
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionTitle, setEditingCollectionTitle] = useState('');
@@ -159,11 +162,44 @@ export default function ArenaModal({
     setIsLoading(false);
   };
 
-  const loadBlocks = async (collectionId: string) => {
-    setIsLoading(true);
-    const data = await fetchBlocksForCollection(collectionId);
-    setBlocks(data);
+  const loadBlocks = async (collectionId: string, reset: boolean = true) => {
+    if (reset) {
+      setIsLoading(true);
+      setCurrentPage(0);
+      setBlocks([]);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    // Determine page size based on screen width
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const pageSize = isMobile ? 10 : 30;
+    const page = reset ? 0 : currentPage + 1;
+
+    const { blocks: newBlocks, hasMore, total } = await fetchBlocksForCollection(
+      collectionId,
+      page,
+      pageSize
+    );
+
+    if (reset) {
+      setBlocks(newBlocks);
+      setCurrentPage(0);
+    } else {
+      setBlocks((prev) => [...prev, ...newBlocks]);
+      setCurrentPage(page);
+    }
+
+    setHasMoreBlocks(hasMore);
+    setTotalBlocks(total);
     setIsLoading(false);
+    setIsLoadingMore(false);
+  };
+
+  const loadMoreBlocks = async () => {
+    if (currentCollection && !isLoadingMore && hasMoreBlocks) {
+      await loadBlocks(currentCollection.id, false);
+    }
   };
 
   const handleCreateCollection = async () => {
@@ -219,6 +255,9 @@ export default function ArenaModal({
     setView('collections');
     setCurrentCollection(null);
     setBlocks([]);
+    setCurrentPage(0);
+    setHasMoreBlocks(false);
+    setTotalBlocks(0);
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -250,7 +289,7 @@ export default function ArenaModal({
         'Uploaded blocks to Arena collection',
         `Collection: ${currentCollection.title}, Files: ${fileArray.length}`
       );
-      await loadBlocks(currentCollection.id);
+      await loadBlocks(currentCollection.id, true);
     } catch (error) {
       alert('Failed to upload one or more files.');
     } finally {
@@ -267,7 +306,7 @@ export default function ArenaModal({
     const success = await deleteBlock(block.id, block.image_url);
     if (success && currentCollection) {
       onLogActivity('Deleted Arena block', `Collection: ${currentCollection.title}`);
-      await loadBlocks(currentCollection.id);
+      await loadBlocks(currentCollection.id, true);
       await loadCollections(); // Update block count
     }
   };
@@ -285,7 +324,7 @@ export default function ArenaModal({
         `From: ${currentCollection.title} to ${targetCollection.title}`
       );
       setShowMoveDropdown(null);
-      await loadBlocks(currentCollection.id);
+      await loadBlocks(currentCollection.id, true);
       await loadCollections(); // Update block counts
     }
   };
@@ -569,8 +608,12 @@ export default function ArenaModal({
                   {isEditMode && ' Add some media!'}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-                  {blocks.map((block) => {
+                <>
+                  <div className="mb-4 text-sm text-gray-600">
+                    Showing {blocks.length} of {totalBlocks} blocks
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+                    {blocks.map((block) => {
                     const isVideo = block.media_type === 'video';
                     return (
                       <div
@@ -668,7 +711,21 @@ export default function ArenaModal({
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+
+                  {/* Load More Button */}
+                  {hasMoreBlocks && (
+                    <div className="mt-6 text-center">
+                      <button
+                        onClick={loadMoreBlocks}
+                        disabled={isLoadingMore}
+                        className="px-6 py-3 bg-black text-white hover:bg-blue-500 disabled:bg-gray-400 transition-colors cursor-pointer"
+                      >
+                        {isLoadingMore ? 'Loading...' : 'Load More'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

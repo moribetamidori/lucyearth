@@ -205,22 +205,40 @@ export async function uploadBlockToCollection(
   }
 }
 
-// Fetch blocks for a collection
+// Fetch blocks for a collection with pagination
 export async function fetchBlocksForCollection(
-  collectionId: string
-): Promise<ArenaBlock[]> {
+  collectionId: string,
+  page: number = 0,
+  pageSize: number = 20
+): Promise<{ blocks: ArenaBlock[]; hasMore: boolean; total: number }> {
   try {
+    // Get total count
+    const { count } = await supabase
+      .from('arena_blocks')
+      .select('*', { count: 'exact', head: true })
+      .eq('collection_id', collectionId);
+
+    const total = count || 0;
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    // Fetch paginated data
     const { data, error } = await supabase
       .from('arena_blocks')
       .select('*')
       .eq('collection_id', collectionId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) throw error;
-    return data || [];
+
+    const blocks = data || [];
+    const hasMore = from + blocks.length < total;
+
+    return { blocks, hasMore, total };
   } catch (error) {
     console.error('Error fetching blocks:', error);
-    return [];
+    return { blocks: [], hasMore: false, total: 0 };
   }
 }
 
