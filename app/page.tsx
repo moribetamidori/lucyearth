@@ -456,10 +456,21 @@ export default function Home() {
       {/* Main content */}
       <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl flex-grow flex items-center justify-center">
         <div className="relative flex flex-col items-center w-full">
+          {/* Tree background image */}
+          <img
+            src="/images/garden/jatree.webp"
+            alt="Tree"
+            className="absolute left-1/2 bottom-0 transform -translate-x-1/2 pointer-events-none"
+            style={{
+              imageRendering: 'pixelated',
+              width: '70%',
+              zIndex: -1
+            }}
+          />
           <img
             src="/gifs/oranges.gif"
             alt="Orange cats"
-            className="h-auto cursor-pointer hover:scale-105 transition-transform max-sm:w-[80%]"
+            className="h-auto cursor-pointer hover:scale-105 transition-transform max-sm:w-[80%] relative z-10"
             style={{ imageRendering: 'pixelated', width: '50%' }}
             onClick={async (e) => {
               const rect = e.currentTarget.getBoundingClientRect();
