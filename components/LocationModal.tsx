@@ -44,6 +44,7 @@ interface LocationPin {
   longitude: number | null;
   timestamp: string;
   note: string | null;
+  anon_id: string; // Track who created this pin
   images?: LocationPinImage[];
 }
 
@@ -150,7 +151,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         *,
         images:location_pin_images(*)
       `)
-      .eq('anon_id', anonId)
+      // Remove the anon_id filter to fetch all public pins
       .order('timestamp', { ascending: false });
 
     if (!error && data) {
