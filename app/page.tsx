@@ -10,6 +10,7 @@ import Achievements from '@/components/Achievements';
 import DoubanModal from '@/components/DoubanModal';
 import LocationModal from '@/components/LocationModal';
 import MusicModal from '@/components/MusicModal';
+import SubstackModal from '@/components/SubstackModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -44,6 +45,7 @@ export default function Home() {
   const [showDoubanModal, setShowDoubanModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
+  const [showSubstackModal, setShowSubstackModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -393,6 +395,25 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">LOG</div>
         </div>
 
+        {/* Substack icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowSubstackModal(true);
+              logActivity('Opened Substack', 'Viewed Substack links');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-orange-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📰</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">SUBSTACK</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">SUBSTACK</div>
+        </div>
+
         {/* Lock icon */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
@@ -658,6 +679,15 @@ export default function Home() {
         isEditMode={isEditMode}
         onLogActivity={logActivity}
         audioRef={audioRef}
+      />
+
+      {/* Substack Modal */}
+      <SubstackModal
+        isOpen={showSubstackModal}
+        onClose={() => setShowSubstackModal(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
       />
 
       {/* Persistent Audio Element - remains when modal closes */}
