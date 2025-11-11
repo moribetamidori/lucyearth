@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import ImageLightbox from './ImageLightbox';
 import { convertToWebP } from '@/lib/imageUpload';
+import 'leaflet/dist/leaflet.css';
 
 // Dynamically import react-leaflet components with no SSR
 const MapContainer = dynamic(
@@ -96,33 +97,27 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   useEffect(() => {
     setIsMounted(true);
 
-    // Initialize Leaflet icons only on client side
-    if (typeof window !== 'undefined') {
-      // Load Leaflet CSS
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-
-      // Load Leaflet and configure icons
-      import('leaflet').then((L) => {
-        // Fix for default marker icons in Next.js
-        import('leaflet/dist/images/marker-icon.png').then((icon) => {
-          import('leaflet/dist/images/marker-shadow.png').then((iconShadow) => {
-            const DefaultIcon = L.default.icon({
-              iconUrl: icon.default.src,
-              shadowUrl: iconShadow.default.src,
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41]
-            });
-
-            L.default.Marker.prototype.options.icon = DefaultIcon;
-          });
-        });
-      });
+    if (typeof window === 'undefined') {
+      return;
     }
+
+    // Configure default marker icons once the component mounts
+    (async () => {
+      const L = await import('leaflet');
+      const icon = await import('leaflet/dist/images/marker-icon.png');
+      const iconShadow = await import('leaflet/dist/images/marker-shadow.png');
+
+      const DefaultIcon = L.default.icon({
+        iconUrl: icon.default.src,
+        shadowUrl: iconShadow.default.src,
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+
+      L.default.Marker.prototype.options.icon = DefaultIcon;
+    })();
   }, []);
 
   // Fetch pins when modal opens
@@ -605,7 +600,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  url="/api/tiles/{z}/{x}/{y}.png"
                 />
                 {pins.map((pin) => {
                   if (pin.latitude !== null && pin.longitude !== null) {
