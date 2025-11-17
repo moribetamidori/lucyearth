@@ -30,6 +30,14 @@ export type CalendarEntry = {
   updated_at: string;
 };
 
+export type ChildCalendarEntry = {
+  id: string;
+  date: string;
+  status: 'none' | 'yes' | 'maybe' | 'no';
+  created_at: string;
+  updated_at: string;
+};
+
 export type AnonUser = {
   id: string;
   anon_id: string;

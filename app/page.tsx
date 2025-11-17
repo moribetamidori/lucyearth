@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
+import ChildCalendar from '@/components/ChildCalendar';
 import CatProfile from '@/components/CatProfile';
 import ActivityLog from '@/components/ActivityLog';
 import ArenaModal from '@/components/ArenaModal';
@@ -16,6 +17,7 @@ export default function Home() {
   const [score, setScore] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [showPoopCalendar, setShowPoopCalendar] = useState(false);
+  const [showChildCalendar, setShowChildCalendar] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [orbs, setOrbs] = useState<Array<{
@@ -208,6 +210,25 @@ export default function Home() {
               <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
             </div>
           </div>
+        </div>
+
+        {/* Child Cal icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowChildCalendar(true);
+              logActivity('Opened Child Calendar', 'Viewed child planning calendar');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-lg">👶</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CHILD.CAL</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">CHILD.CAL</div>
         </div>
 
         {/* Douban icon - second position on desktop (right of POOP.CAL) */}
@@ -572,6 +593,14 @@ export default function Home() {
         onClose={() => setShowPoopCalendar(false)}
         isEditMode={isEditMode}
         anonId={anonId}
+        onLogActivity={logActivity}
+      />
+
+      {/* Child Calendar Modal */}
+      <ChildCalendar
+        isOpen={showChildCalendar}
+        onClose={() => setShowChildCalendar(false)}
+        isEditMode={isEditMode}
         onLogActivity={logActivity}
       />
 
