@@ -4,14 +4,15 @@ export const dynamic = 'force-dynamic';
 
 const OSM_SUBDOMAINS = ['a', 'b', 'c'] as const;
 
-interface TileParams {
+interface TileParams extends Record<string, string | string[] | undefined> {
   tile?: string[];
 }
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: TileParams }
+  context: { params: Promise<TileParams> }
 ) {
+  const params = await context.params;
   const segments = params.tile;
 
   if (!segments || segments.length !== 3) {
