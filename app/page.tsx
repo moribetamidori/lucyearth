@@ -12,6 +12,7 @@ import DoubanModal from '@/components/DoubanModal';
 import SubstackModal from '@/components/SubstackModal';
 import LocationModal from '@/components/LocationModal';
 import MusicModal from '@/components/MusicModal';
+import GardenModal from '@/components/GardenModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -48,6 +49,7 @@ export default function Home() {
   const [showSubstackModal, setShowSubstackModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
+  const [showGardenModal, setShowGardenModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -312,6 +314,32 @@ export default function Home() {
             <span>📍</span>
           </div>
           <div className="text-[15px] text-gray-900">LOCATION</div>
+        </div>
+
+        {/* Garden icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowGardenModal(true);
+              logActivity('Opened Garden', 'Viewed backyard species catalog');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-emerald-200 hover:translate-x-1 hover:translate-y-1 transition-all p-1 max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <img
+              src="/images/garden/jatree.webp"
+              alt="Garden"
+              className="w-full h-full object-contain"
+              style={{ imageRendering: 'pixelated' }}
+            />
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              GARDEN
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">GARDEN</div>
         </div>
 
         {/* Hidden cat icon - only shows after 10+ clicks */}
@@ -723,6 +751,14 @@ export default function Home() {
         isEditMode={isEditMode}
         onLogActivity={logActivity}
         audioRef={audioRef}
+      />
+
+      {/* Garden Modal */}
+      <GardenModal
+        isOpen={showGardenModal}
+        onClose={() => setShowGardenModal(false)}
+        onLogActivity={logActivity}
+        isEditMode={isEditMode}
       />
 
       {/* Persistent Audio Element - remains when modal closes */}

@@ -107,3 +107,21 @@ export type SubstackArticle = {
   created_at: string;
   updated_at: string;
 };
+
+export type GardenSpecies = {
+  id: string;
+  common_name: string;
+  scientific_name: string | null;
+  image_url: string;
+  sunlight: string | null;
+  watering_schedule: string | null;
+  soil_type: string | null;
+  bloom_season: string | null;
+  planted_on: string | null;
+  last_pruned_on: string | null;
+  status: string | null;
+  location: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
