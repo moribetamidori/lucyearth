@@ -99,3 +99,11 @@ export type DoubanRating = {
   created_at: string;
   updated_at: string;
 };
+
+export type SubstackArticle = {
+  id: number;
+  title: string;
+  link: string;
+  created_at: string;
+  updated_at: string;
+};

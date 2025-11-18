@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import PoopCalendar from '@/components/PoopCalendar';
 import ChildCalendar from '@/components/ChildCalendar';
 import CatProfile from '@/components/CatProfile';
@@ -9,6 +9,7 @@ import ArenaModal from '@/components/ArenaModal';
 import Journal from '@/components/Journal';
 import Achievements from '@/components/Achievements';
 import DoubanModal from '@/components/DoubanModal';
+import SubstackModal from '@/components/SubstackModal';
 import LocationModal from '@/components/LocationModal';
 import MusicModal from '@/components/MusicModal';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +45,7 @@ export default function Home() {
   const [userNumber, setUserNumber] = useState<number>(0);
   const [showAchievements, setShowAchievements] = useState<boolean>(false);
   const [showDoubanModal, setShowDoubanModal] = useState<boolean>(false);
+  const [showSubstackModal, setShowSubstackModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
 
@@ -51,13 +53,16 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Helper function to log activities
-  const logActivity = async (action: string, details?: string) => {
-    if (anonId) {
-      await supabase
-        .from('activity_logs')
-        .insert({ anon_id: anonId, action, details: details || null });
-    }
-  };
+  const logActivity = useCallback(
+    async (action: string, details?: string) => {
+      if (anonId) {
+        await supabase
+          .from('activity_logs')
+          .insert({ anon_id: anonId, action, details: details || null });
+      }
+    },
+    [anonId]
+  );
 
   // Initialize anonymous user
   useEffect(() => {
@@ -247,6 +252,29 @@ export default function Home() {
             <span className="text-green-600 font-bold">豆</span>
           </div>
           <div className="text-[15px] text-gray-900">DOUBAN</div>
+        </div>
+
+        {/* Substack icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowSubstackModal(true);
+              logActivity('Opened Substack articles', 'Viewed Substack reading list');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <img
+              src="/substack.webp"
+              alt="Substack"
+              className="w-8 h-8 max-sm:w-7 max-sm:h-7 object-contain"
+            />
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">STACK</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">SUBSTACK</div>
         </div>
 
         {/* Are.na icon */}
@@ -666,6 +694,14 @@ export default function Home() {
         isOpen={showDoubanModal}
         onClose={() => setShowDoubanModal(false)}
         anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Substack Modal */}
+      <SubstackModal
+        isOpen={showSubstackModal}
+        onClose={() => setShowSubstackModal(false)}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
       />
