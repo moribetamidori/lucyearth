@@ -125,3 +125,12 @@ export type GardenSpecies = {
   created_at: string;
   updated_at: string;
 };
+
+export type GardenPlacement = {
+  id: string;
+  species_id: string;
+  cells: number[];
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+};
