@@ -493,7 +493,6 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
   const selectedStats: SpeciesStat[] = [];
   if (selectedSpecies) {
     selectedStats.push(
-      { label: 'Scientific Name', value: selectedSpecies.scientific_name },
       { label: 'Location', value: selectedSpecies.location },
       { label: 'Sunlight', value: selectedSpecies.sunlight },
       { label: 'Watering', value: selectedSpecies.watering_schedule },
@@ -542,17 +541,26 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
               alt="Garden"
               className="w-12 h-12 object-contain"
             />
-            <div>
-              <h2
-                className="text-2xl font-bold text-gray-900"
-                style={{ fontFamily: "var(--font-courier), 'Courier New', monospace" }}
+            {selectedSpecies ? (
+              <button
+                onClick={() => setSelectedSpecies(null)}
+                className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 text-sm font-semibold"
               >
-                GARDEN
-              </h2>
-              <p className="text-xs text-gray-500 -mt-1">
-                {gridCols} x {gridRows} grid — click blocks to explore plants
-              </p>
-            </div>
+                ← Back to garden
+              </button>
+            ) : (
+              <div>
+                <h2
+                  className="text-2xl font-bold text-gray-900"
+                  style={{ fontFamily: "var(--font-courier), 'Courier New', monospace" }}
+                >
+                  GARDEN
+                </h2>
+                <p className="text-xs text-gray-500 -mt-1">
+                  {gridCols} x {gridRows} grid — click blocks to explore plants
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {isEditMode && !selectedSpecies && (
@@ -944,41 +952,30 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
           )}
 
           {selectedSpecies && (
-            <div className="absolute inset-0 bg-white flex flex-col">
-              <div
-                className="p-4 flex items-center justify-between bg-green-50"
-                style={{ borderBottom: '3px solid #000' }}
-              >
-                <button
-                  onClick={() => setSelectedSpecies(null)}
-                  className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 text-sm font-semibold"
-                >
-                  ← Back to garden
-                </button>
-                <div className="text-right">
-                  <div className="text-2xl font-bold">{selectedSpecies.common_name}</div>
-                  {selectedSpecies.scientific_name && (
-                    <div className="text-xs uppercase text-gray-600">
-                      {selectedSpecies.scientific_name}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2">
-                <div className="relative bg-gray-900/5">
+            <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] overflow-hidden">
+                <div className="relative bg-gradient-to-b from-emerald-50 via-white to-amber-50 flex items-center justify-center px-6 py-10">
+                  <div
+                    className="absolute inset-4 border-4 border-gray-900 pointer-events-none"
+                    style={{ boxShadow: '8px 8px 0 0 #000' }}
+                  />
                   <img
                     src={selectedSpecies.image_url}
                     alt={selectedSpecies.common_name}
-                    className="w-full h-full object-cover"
+                    className="relative z-10 max-h-[55vh] lg:max-h-[75vh] w-auto object-contain drop-shadow-[12px_14px_0_#00000020]"
                   />
-                  {selectedPlacement && (
-                    <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm border border-gray-900 px-3 py-2 text-xs font-semibold">
-                      Grid blocks: {selectedPlacement.cells.length}
-                    </div>
-                  )}
                 </div>
-                <div className="p-6 flex flex-col gap-6 overflow-y-auto">
+                <div className="p-6 flex flex-col gap-6 overflow-y-auto bg-white">
+                  <div className="pb-4 border-b border-gray-200">
+                    <div className="text-xl font-bold text-gray-900">
+                      {selectedSpecies.common_name}
+                    </div>
+                    {selectedSpecies.scientific_name && (
+                      <div className="text-xs uppercase tracking-wider text-gray-600">
+                        {selectedSpecies.scientific_name}
+                      </div>
+                    )}
+                  </div>
                   {selectedStats.map((stat) => renderStat(stat.label, stat.value))}
                 </div>
               </div>
