@@ -159,3 +159,15 @@ export type BookshelfBook = {
   created_at: string;
   updated_at: string;
 };
+
+export type WomenProfile = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  intro: string | null;
+  accomplishments: string | null;
+  tags: string[];
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+};

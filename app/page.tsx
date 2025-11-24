@@ -14,10 +14,11 @@ import LocationModal from '@/components/LocationModal';
 import MusicModal from '@/components/MusicModal';
 import GardenModal from '@/components/GardenModal';
 import BookshelfModal from '@/components/BookshelfModal';
+import WomenModal from '@/components/WomenModal';
+import ScrollFeedModal from '@/components/ScrollFeedModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
-  const [score, setScore] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [showPoopCalendar, setShowPoopCalendar] = useState(false);
   const [showChildCalendar, setShowChildCalendar] = useState(false);
@@ -52,6 +53,8 @@ export default function Home() {
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
   const [showGardenModal, setShowGardenModal] = useState<boolean>(false);
   const [showBookshelfModal, setShowBookshelfModal] = useState<boolean>(false);
+  const [showWomenModal, setShowWomenModal] = useState<boolean>(false);
+  const [showScrollFeed, setShowScrollFeed] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -123,20 +126,6 @@ export default function Home() {
     const isLoggedIn = localStorage.getItem('lucyearth_edit_mode') === 'true';
     setIsEditMode(isLoggedIn);
 
-    // Generate stable orb positions once
-    const generatedOrbs = [...Array(8)].map(() => ({
-      size: 100 + Math.random() * 200,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      duration: 8 + Math.random() * 4,
-      delay: Math.random() * 2,
-    }));
-    setOrbs(generatedOrbs);
-
-    const interval = setInterval(() => {
-      setScore((s) => s + 1);
-    }, 1000);
-    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -363,6 +352,27 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">GARDEN</div>
         </div>
 
+        {/* Women network icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowWomenModal(true);
+              logActivity('Opened Women Network', 'Viewing women connections');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-violet-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="text-xl max-sm:text-lg">👩‍🚀</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              WOMEN
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">WOMEN</div>
+        </div>
+
         {/* Hidden cat icon - only shows after 10+ clicks */}
         {showCatIcon && (
           <div className="flex flex-col items-center gap-2 animate-fadeIn max-sm:gap-0">
@@ -404,15 +414,15 @@ export default function Home() {
                 className="w-full h-full object-contain"
               />
             </div>
-            <div className="text-[15px] text-gray-900">SPOTIFY</div>
-          </div>
-        )}
+          <div className="text-[15px] text-gray-900">SPOTIFY</div>
+        </div>
+      )}
 
-        {/* Journal icon - always visible */}
-        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-          <div
-            onClick={() => {
-              setShowJournal(true);
+      {/* Journal icon - always visible */}
+      <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+        <div
+          onClick={() => {
+            setShowJournal(true);
               logActivity('Opened Journal', 'Viewing journal entries');
             }}
             className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
@@ -535,7 +545,7 @@ export default function Home() {
           <div className="text-base">lucyearth.system</div>
         </div>
         <div className="flex gap-4 text-sm text-gray-500 items-center">
-          <button
+        <button
             onClick={() => {
               setShowAchievements(true);
               logActivity('Opened Achievements', 'Viewing achievements');
@@ -544,10 +554,18 @@ export default function Home() {
           >
             🏆
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-blue-500" />
-            <span>{String(score).padStart(4, '0')}</span>
-          </div>
+          <button
+            onClick={() => {
+              setShowScrollFeed(true);
+              logActivity('Opened Scroll Mode', 'Header quick open');
+            }}
+            className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-gray-900 shadow-[3px_3px_0_0_#000] hover:-translate-y-[1px] transition-transform max-sm:gap-1.5 max-sm:px-2 max-sm:py-1 max-sm:shadow-[2px_2px_0_0_#000]"
+          >
+            <span className="text-xl max-sm:text-lg">📱</span>
+            <span className="text-gray-900 font-semibold whitespace-nowrap max-sm:text-xs">Scroll Mode</span>
+          </button>
+   
+         
         </div>
       </header>
 
@@ -722,6 +740,14 @@ export default function Home() {
         onLogActivity={logActivity}
       />
 
+      {/* Scroll Feed Modal */}
+      <ScrollFeedModal
+        isOpen={showScrollFeed}
+        onClose={() => setShowScrollFeed(false)}
+        anonId={anonId}
+        onLogActivity={logActivity}
+      />
+
       {/* Journal Modal */}
       <Journal
         isOpen={showJournal}
@@ -780,6 +806,15 @@ export default function Home() {
         onClose={() => setShowGardenModal(false)}
         onLogActivity={logActivity}
         isEditMode={isEditMode}
+      />
+
+      {/* Women Modal */}
+      <WomenModal
+        isOpen={showWomenModal}
+        onClose={() => setShowWomenModal(false)}
+        isEditMode={isEditMode}
+        anonId={anonId}
+        onLogActivity={logActivity}
       />
 
       {/* Bookshelf Modal */}
