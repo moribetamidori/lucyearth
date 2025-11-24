@@ -532,7 +532,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
         }}
       >
         <div
-          className="p-4 flex items-center justify-between bg-white"
+          className="p-4 flex items-center justify-between gap-2 sm:gap-3 bg-white flex-nowrap"
           style={{ borderBottom: '4px solid #000' }}
         >
           <div className="flex items-center gap-3">
@@ -544,25 +544,25 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
             {selectedSpecies ? (
               <button
                 onClick={() => setSelectedSpecies(null)}
-                className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 text-sm font-semibold"
+                className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 text-xs sm:text-sm font-semibold"
               >
                 ← Back to garden
               </button>
             ) : (
-              <div>
+              <div className="min-w-0">
                 <h2
-                  className="text-2xl font-bold text-gray-900"
+                  className="text-xl sm:text-2xl font-bold text-gray-900"
                   style={{ fontFamily: "var(--font-courier), 'Courier New', monospace" }}
                 >
                   GARDEN
                 </h2>
-                <p className="text-xs text-gray-500 -mt-1">
+                <p className="hidden sm:block text-xs text-gray-500 -mt-1">
                   {gridCols} x {gridRows} grid — click blocks to explore plants
                 </p>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {isEditMode && !selectedSpecies && (
               <button
                 onClick={() => {
@@ -573,14 +573,14 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                     setIsAdding(true);
                   }
                 }}
-                className="px-4 py-2 border-2 border-gray-900 bg-emerald-200 hover:bg-emerald-300 text-sm font-semibold"
+                className="px-3 sm:px-4 py-2 border-2 border-gray-900 bg-emerald-200 hover:bg-emerald-300 text-xs sm:text-sm font-semibold whitespace-nowrap"
               >
                 {isAdding ? 'Cancel' : '+ Add Plant'}
               </button>
             )}
             <button
               onClick={closeModal}
-              className="w-10 h-10 bg-green-500 hover:bg-green-600 text-white font-bold text-xl transition-colors"
+              className="w-9 h-9 sm:w-10 sm:h-10 bg-green-500 hover:bg-green-600 text-white font-bold text-lg sm:text-xl transition-colors"
               style={{
                 border: '3px solid #000',
                 boxShadow: '3px 3px 0 0 #000',
@@ -593,9 +593,9 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
 
         <div className="flex-1 relative overflow-hidden">
           {!selectedSpecies && (
-            <div className="absolute inset-0 grid lg:grid-cols-[2fr_1fr] gap-4 p-4 bg-white">
-              <div className="flex flex-col overflow-hidden rounded-none lg:pr-2">
-                <div className="flex items-center justify-between mb-3">
+            <div className="absolute inset-0 grid lg:grid-cols-[2fr_1fr] lg:grid-rows-1 grid-rows-[minmax(45vh,1fr)_minmax(45vh,1fr)] sm:grid-rows-[minmax(55vh,1fr)_auto] gap-4 p-4 bg-white overflow-y-auto">
+              <div className="flex flex-col h-full overflow-hidden rounded-none lg:pr-2">
+                <div className="hidden sm:flex items-center justify-between mb-3">
                   <div className="flex flex-col gap-1">
                     <div className="text-sm font-semibold text-gray-900">Garden grid</div>
                     <div className="text-xs text-gray-500">
@@ -615,10 +615,13 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                 </div>
 
                 <div
-                  className="relative flex-1 border-4 border-gray-900 bg-gradient-to-br from-white to-emerald-50"
+                  className="relative flex-1 min-h-[45vh] max-h-[55vh] sm:min-h-[55vh] sm:max-h-none border-4 border-gray-900 bg-gradient-to-br from-white to-emerald-50"
                   style={{ boxShadow: '6px 6px 0 0 #000' }}
                 >
-                  <div className="absolute inset-0 overflow-auto flex items-center justify-center p-2" ref={gridAreaRef}>
+                  <div
+                    className="absolute inset-0 overflow-auto flex items-center justify-center p-2"
+                    ref={gridAreaRef}
+                  >
                     <div className="grid" style={gridStyle}>
                       {gridCells.map((cellIndex) => {
                         const placement = placementLookup.get(cellIndex);
@@ -676,9 +679,9 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                 </div>
 
                 {loading ? (
-                  <div className="mt-4 text-sm text-gray-500 text-center">Loading the backyard...</div>
+                  <div className="mt-4 text-sm text-gray-500 text-center sm:text-left">Loading the backyard...</div>
                 ) : (
-                  <div className="mt-4 text-xs text-gray-500">
+                  <div className="mt-4 text-xs text-gray-500 hidden sm:block">
                     Scroll to explore all {gridCols} x {gridRows} blocks. Colors mark planted blocks; blue highlights
                     the blocks you&apos;re selecting for a new plant.
                   </div>
@@ -686,8 +689,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
               </div>
 
               <div
-                className="flex flex-col bg-white border-l-4 border-gray-900 overflow-hidden"
-                style={{ boxShadow: '-4px 0 0 0 #000' }}
+                className="flex flex-col bg-white overflow-hidden border-gray-900 border-t-4 lg:border-t-0 lg:border-l-4 shadow-[0_-4px_0_0_#000] lg:shadow-[-4px_0_0_0_#000] min-h-[45vh] max-h-[55vh] sm:min-h-0 sm:max-h-none"
               >
                 <div className="p-3 border-b-4 border-gray-900 flex items-center justify-between">
                   <div>
@@ -700,17 +702,6 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                         : 'Tap a card or grid block'}
                     </div>
                   </div>
-                  {isEditMode && !isAdding && (
-                    <button
-                      onClick={() => {
-                        clearForm();
-                        setIsAdding(true);
-                      }}
-                      className="px-3 py-1 border-2 border-gray-900 bg-emerald-200 hover:bg-emerald-300 text-xs font-semibold"
-                    >
-                      + Place Plant
-                    </button>
-                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-4">
@@ -889,7 +880,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                   ) : speciesList.length === 0 ? (
                     <div className="text-sm text-gray-500 text-center py-4">
                       No species logged yet.{' '}
-                      {isEditMode ? 'Use PLACE PLANT to begin cataloging.' : 'Ask Lucy to log a few plants.'}
+                      {isEditMode ? 'Use ADD PLANT to begin cataloging.' : 'Ask Lucy to log a few plants.'}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-3">

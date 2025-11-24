@@ -13,6 +13,7 @@ import SubstackModal from '@/components/SubstackModal';
 import LocationModal from '@/components/LocationModal';
 import MusicModal from '@/components/MusicModal';
 import GardenModal from '@/components/GardenModal';
+import BookshelfModal from '@/components/BookshelfModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -50,6 +51,7 @@ export default function Home() {
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMusicModal, setShowMusicModal] = useState<boolean>(false);
   const [showGardenModal, setShowGardenModal] = useState<boolean>(false);
+  const [showBookshelfModal, setShowBookshelfModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -277,6 +279,25 @@ export default function Home() {
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">STACK</span>
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">SUBSTACK</div>
+        </div>
+
+        {/* Bookshelf icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowBookshelfModal(true);
+              logActivity('Opened Bookshelf', 'Viewed the pixel bookshelf');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">📚</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">SHELF</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">SHELF</div>
         </div>
 
         {/* Are.na icon */}
@@ -759,6 +780,14 @@ export default function Home() {
         onClose={() => setShowGardenModal(false)}
         onLogActivity={logActivity}
         isEditMode={isEditMode}
+      />
+
+      {/* Bookshelf Modal */}
+      <BookshelfModal
+        isOpen={showBookshelfModal}
+        onClose={() => setShowBookshelfModal(false)}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
       />
 
       {/* Persistent Audio Element - remains when modal closes */}

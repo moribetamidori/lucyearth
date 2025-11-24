@@ -79,6 +79,14 @@ export type JournalEntry = {
   entry_text: string;
   created_at: string;
   updated_at: string;
+  upvote_count?: number;
+};
+
+export type JournalEntryVote = {
+  id: string;
+  entry_id: string;
+  anon_id: string;
+  created_at: string;
 };
 
 export type ActivityLog = {
@@ -131,6 +139,23 @@ export type GardenPlacement = {
   species_id: string;
   cells: number[];
   color: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BookshelfBook = {
+  id: string;
+  title: string;
+  author: string | null;
+  spine_color: string;
+  height: number;
+  width: number;
+  length: number;
+  cover_url: string | null;
+  spine_texture: string | null;
+  order_index: number;
+  spine_font_color: string;
+  spine_font_size: number;
   created_at: string;
   updated_at: string;
 };
