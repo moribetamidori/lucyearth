@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -22,6 +23,73 @@ type ScrollFeedModalProps = {
   onClose: () => void;
   anonId?: string;
   onLogActivity?: (action: string, details?: string) => void;
+};
+
+type CatPictureRow = {
+  id: string;
+  created_at: string;
+  image_url: string;
+  media_type?: 'image' | 'video' | null;
+  thumbnail_url?: string | null;
+  anon_id?: string | null;
+};
+
+type ArenaBlockRow = {
+  id: string;
+  created_at: string;
+  image_url: string;
+  media_type?: 'image' | 'video' | null;
+  thumbnail_url?: string | null;
+  collection_id?: string | null;
+};
+
+type JournalEntryRow = {
+  id: string;
+  created_at: string;
+  entry_text: string | null;
+};
+
+type DoubanRatingRow = {
+  id: string;
+  created_at: string;
+  title?: string | null;
+  image_url?: string | null;
+  category?: string | null;
+  rating?: number | null;
+};
+
+type SubstackArticleRow = {
+  id: string;
+  created_at: string;
+  title?: string | null;
+  link?: string | null;
+};
+
+type GardenSpeciesRow = {
+  id: string;
+  created_at: string;
+  common_name: string;
+  image_url?: string | null;
+  scientific_name?: string | null;
+  status?: string | null;
+};
+
+type BookshelfBookRow = {
+  id: string;
+  created_at: string;
+  title: string;
+  cover_url?: string | null;
+  author?: string | null;
+};
+
+type WomenProfileRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  image_url?: string | null;
+  intro?: string | null;
+  accomplishments?: string | null;
+  tags?: string[] | null;
 };
 
 const INITIAL_BATCH = 10;
@@ -92,41 +160,6 @@ export default function ScrollFeedModal({
     }, 120);
   }, [allItems, cursor, loadingMore]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchFeed();
-      if (onLogActivity) {
-        onLogActivity('Opened Scroll Mode', 'Viewing randomized feed');
-      }
-    } else {
-      setVisibleItems([]);
-      setCursor(0);
-      setVoteCounts({});
-      setVotedIds(new Set());
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !loadingMore) {
-          appendMore();
-        }
-      },
-      { root: null, rootMargin: '300px' }
-    );
-
-    const target = sentinelRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [hasMore, loadingMore, appendMore, isOpen]);
-
   const toggleLike = async (item: FeedItem) => {
     if (!anonId) {
       alert('Please refresh so we can assign your anon ID before liking.');
@@ -180,7 +213,44 @@ export default function ScrollFeedModal({
     }
   };
 
-  const fetchFeed = async () => {
+  const loadVotesForItems = useCallback(
+    async (items: FeedItem[]) => {
+      if (!items.length) return;
+      const ids = items.map((i) => i.id);
+      try {
+        const { data: votesData, error: votesError } = await supabase
+          .from('scroll_feed_votes')
+          .select('item_id')
+          .in('item_id', ids);
+
+        if (votesError) throw votesError;
+
+        const counts: Record<string, number> = {};
+        (votesData || []).forEach((row: { item_id: string }) => {
+          counts[row.item_id] = (counts[row.item_id] || 0) + 1;
+        });
+        setVoteCounts(counts);
+
+        if (anonId) {
+          const { data: userVotes, error: userVotesError } = await supabase
+            .from('scroll_feed_votes')
+            .select('item_id')
+            .eq('anon_id', anonId)
+            .in('item_id', ids);
+
+          if (userVotesError) throw userVotesError;
+
+          const userSet = new Set((userVotes || []).map((v: { item_id: string }) => v.item_id));
+          setVotedIds(userSet);
+        }
+      } catch (err) {
+        console.error('Failed to load votes', err);
+      }
+    },
+    [anonId]
+  );
+
+  const fetchFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -237,14 +307,14 @@ export default function ScrollFeedModal({
           .limit(200),
       ]);
 
-      const cats = catRes.data ?? [];
-      const arena = arenaRes.data ?? [];
-      const journals = journalRes.data ?? [];
-      const douban = doubanRes.data ?? [];
-      const articles = articleRes.data ?? [];
-      const species = speciesRes.data ?? [];
-      const books = bookRes.data ?? [];
-      const women = womenRes.data ?? [];
+      const cats = (catRes.data ?? []) as CatPictureRow[];
+      const arena = (arenaRes.data ?? []) as ArenaBlockRow[];
+      const journals = (journalRes.data ?? []) as JournalEntryRow[];
+      const douban = (doubanRes.data ?? []) as DoubanRatingRow[];
+      const articles = (articleRes.data ?? []) as SubstackArticleRow[];
+      const species = (speciesRes.data ?? []) as GardenSpeciesRow[];
+      const books = (bookRes.data ?? []) as BookshelfBookRow[];
+      const women = (womenRes.data ?? []) as WomenProfileRow[];
 
       const merged: FeedItem[] = [];
       const seen = new Set<string>();
@@ -260,7 +330,7 @@ export default function ScrollFeedModal({
         merged.push({ id: finalId, reactKey: `${finalId}-${seq++}`, ...payload });
       };
 
-      cats.forEach((item: any) => {
+      cats.forEach((item) => {
         pushItem(`cat-${item.id}`, {
           type: 'CAT',
           created_at: item.created_at,
@@ -272,7 +342,7 @@ export default function ScrollFeedModal({
         });
       });
 
-      arena.forEach((item: any) => {
+      arena.forEach((item) => {
         pushItem(`arena-${item.id}`, {
           type: 'ARE.NA',
           created_at: item.created_at,
@@ -284,17 +354,17 @@ export default function ScrollFeedModal({
         });
       });
 
-      journals.forEach((item: any) => {
+      journals.forEach((item) => {
         pushItem(`journal-${item.id}`, {
           type: 'JOURNAL',
           created_at: item.created_at,
           title: 'Journal entry',
-          text: item.entry_text,
+          text: item.entry_text || undefined,
           meta: 'Text-only drop',
         });
       });
 
-      douban.forEach((item: any) => {
+      douban.forEach((item) => {
         pushItem(`douban-${item.id}`, {
           type: 'DOUBAN',
           created_at: item.created_at,
@@ -304,28 +374,28 @@ export default function ScrollFeedModal({
         });
       });
 
-      articles.forEach((item: any) => {
+      articles.forEach((item) => {
         pushItem(`substack-${item.id}`, {
           type: 'SUBSTACK',
           created_at: item.created_at,
           title: item.title || 'Reading',
-          text: item.link,
-          link: item.link,
+          text: item.link || undefined,
+          link: item.link || undefined,
           meta: 'Article link',
         });
       });
 
-      species.forEach((item: any) => {
+      species.forEach((item) => {
         pushItem(`garden-${item.id}`, {
           type: 'GARDEN',
           created_at: item.created_at,
           title: item.common_name,
-          mediaUrl: item.image_url,
+          mediaUrl: item.image_url || undefined,
           meta: item.scientific_name || item.status || 'Backyard notes',
         });
       });
 
-      books.forEach((item: any) => {
+      books.forEach((item) => {
         pushItem(`book-${item.id}`, {
           type: 'BOOKSHELF',
           created_at: item.created_at,
@@ -336,13 +406,13 @@ export default function ScrollFeedModal({
         });
       });
 
-      women.forEach((item: any) => {
+      women.forEach((item) => {
         pushItem(`women-${item.id}`, {
           type: 'WOMEN',
           created_at: item.created_at,
           title: item.name,
           mediaUrl: item.image_url || undefined,
-          text: item.intro || item.accomplishments,
+          text: item.intro || item.accomplishments || undefined,
           meta: item.tags && item.tags.length ? item.tags.join(', ') : 'Network',
         });
       });
@@ -361,48 +431,50 @@ export default function ScrollFeedModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadVotesForItems]);
 
-  const loadVotesForItems = async (items: FeedItem[]) => {
-    if (!items.length) return;
-    const ids = items.map((i) => i.id);
-    try {
-      const { data: votesData, error: votesError } = await supabase
-        .from('scroll_feed_votes')
-        .select('item_id')
-        .in('item_id', ids);
-
-      if (votesError) throw votesError;
-
-      const counts: Record<string, number> = {};
-      (votesData || []).forEach((row: { item_id: string }) => {
-        counts[row.item_id] = (counts[row.item_id] || 0) + 1;
-      });
-      setVoteCounts(counts);
-
-      if (anonId) {
-        const { data: userVotes, error: userVotesError } = await supabase
-          .from('scroll_feed_votes')
-          .select('item_id')
-          .eq('anon_id', anonId)
-          .in('item_id', ids);
-
-        if (userVotesError) throw userVotesError;
-
-        const userSet = new Set((userVotes || []).map((v: { item_id: string }) => v.item_id));
-        setVotedIds(userSet);
+  useEffect(() => {
+    if (isOpen) {
+      fetchFeed();
+      if (onLogActivity) {
+        onLogActivity('Opened Scroll Mode', 'Viewing randomized feed');
       }
-    } catch (err) {
-      console.error('Failed to load votes', err);
+    } else {
+      setVisibleItems([]);
+      setCursor(0);
+      setVoteCounts({});
+      setVotedIds(new Set());
     }
-  };
+  }, [fetchFeed, isOpen, onLogActivity]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !loadingMore) {
+          appendMore();
+        }
+      },
+      { root: null, rootMargin: '300px' }
+    );
+
+    const target = sentinelRef.current;
+    if (target) observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, loadingMore, appendMore, isOpen]);
 
   const likeCount = (item: FeedItem) =>
     voteCounts[item.id] || 0;
 
   const cards = visibleItems.map((item, idx) => {
     const liked = votedIds.has(item.id);
-    const hasMedia = Boolean(item.mediaUrl);
+    const mediaUrl = item.mediaUrl;
+    const hasMedia = Boolean(mediaUrl);
 
     return (
       <div
@@ -410,20 +482,22 @@ export default function ScrollFeedModal({
         className="bg-white border-4 border-gray-900 shadow-[8px_8px_0_0_#000] flex flex-col"
       >
         <div className="relative aspect-square bg-black/5 overflow-hidden">
-          {hasMedia ? (
+          {mediaUrl ? (
             item.mediaType === 'video' ? (
               <video
                 controls
                 poster={item.thumbnailUrl || undefined}
                 className="w-full h-full object-cover bg-black"
               >
-                <source src={item.mediaUrl} />
+                <source src={mediaUrl} />
               </video>
             ) : (
-              <img
-                src={item.mediaUrl}
+              <Image
+                src={mediaUrl}
                 alt={item.title || item.type}
-                className="w-full h-full object-cover"
+                fill
+                sizes="100vw"
+                className="object-cover"
                 style={{ imageRendering: 'pixelated' }}
               />
             )
