@@ -143,6 +143,9 @@ export default function ScrollFeedModal({
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [isToggling, setIsToggling] = useState<string | null>(null);
+  const [doomscrollLogged, setDoomscrollLogged] = useState(false);
+  const [doomscrollEverLogged, setDoomscrollEverLogged] = useState(false);
+  const [likeEverLogged, setLikeEverLogged] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const hasMore = cursor < allItems.length;
@@ -198,8 +201,9 @@ export default function ScrollFeedModal({
           ...prev,
           [item.id]: (prev[item.id] || 0) + 1,
         }));
-        if (onLogActivity) {
+        if (!likeEverLogged && onLogActivity) {
           onLogActivity('Liked feed post', `${item.type} ${item.id}`);
+          setLikeEverLogged(true);
         }
       }
     } catch (err) {
@@ -320,14 +324,10 @@ export default function ScrollFeedModal({
       const seen = new Set<string>();
       let seq = 0;
       const pushItem = (idBase: string, payload: Omit<FeedItem, 'id'>) => {
-        const safeBase = idBase || `item-${payload.type || 'unknown'}`;
-        let finalId = safeBase;
-        let suffix = 1;
-        while (seen.has(finalId)) {
-          finalId = `${safeBase}-${suffix++}`;
-        }
-        seen.add(finalId);
-        merged.push({ id: finalId, reactKey: `${finalId}-${seq++}`, ...payload });
+        const safeBase = idBase || `item-${payload.type || 'unknown'}-${seq++}`;
+        if (seen.has(safeBase)) return;
+        seen.add(safeBase);
+        merged.push({ id: safeBase, reactKey: safeBase, ...payload });
       };
 
       cats.forEach((item) => {
@@ -418,13 +418,18 @@ export default function ScrollFeedModal({
       });
 
       const randomized = shuffle(merged);
-      const deduped = randomized.filter((item, index, arr) => {
-        return arr.findIndex((x) => x.id === item.id) === index;
+      const dedupedItems: FeedItem[] = [];
+      const seenIds = new Set<string>();
+      randomized.forEach((item) => {
+        if (!item.id) return;
+        if (seenIds.has(item.id)) return;
+        seenIds.add(item.id);
+        dedupedItems.push(item);
       });
-      setAllItems(deduped);
-      setVisibleItems(deduped.slice(0, INITIAL_BATCH));
-      setCursor(Math.min(INITIAL_BATCH, deduped.length));
-      await loadVotesForItems(deduped);
+      setAllItems(dedupedItems);
+      setVisibleItems(dedupedItems.slice(0, INITIAL_BATCH));
+      setCursor(Math.min(INITIAL_BATCH, dedupedItems.length));
+      await loadVotesForItems(dedupedItems);
     } catch (err) {
       console.error('Failed to build feed', err);
       setError('Failed to load feed. Please try again.');
@@ -432,6 +437,11 @@ export default function ScrollFeedModal({
       setLoading(false);
     }
   }, [loadVotesForItems]);
+
+  useEffect(() => {
+    setDoomscrollEverLogged(false);
+    setLikeEverLogged(false);
+  }, [anonId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -444,8 +454,34 @@ export default function ScrollFeedModal({
       setCursor(0);
       setVoteCounts({});
       setVotedIds(new Set());
+      setDoomscrollLogged(false);
     }
   }, [fetchFeed, isOpen, onLogActivity]);
+
+  useEffect(() => {
+    if (!isOpen || !anonId) return;
+    let active = true;
+    const loadAchievementFlags = async () => {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('action')
+        .eq('anon_id', anonId)
+        .in('action', ['Achievement: Doomscroll', 'Liked feed post'])
+        .limit(200);
+      if (!active) return;
+      if (error) {
+        console.error('Failed to check existing Scroll Mode achievements', error);
+        return;
+      }
+      const actions = new Set((data || []).map((row) => row.action));
+      setDoomscrollEverLogged(actions.has('Achievement: Doomscroll'));
+      setLikeEverLogged(actions.has('Liked feed post'));
+    };
+    loadAchievementFlags();
+    return () => {
+      active = false;
+    };
+  }, [anonId, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -468,6 +504,20 @@ export default function ScrollFeedModal({
     };
   }, [hasMore, loadingMore, appendMore, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || doomscrollLogged || doomscrollEverLogged || !anonId) return;
+    if (cursor > 10) {
+      setDoomscrollLogged(true);
+      if (!doomscrollEverLogged && onLogActivity) {
+        onLogActivity(
+          'Achievement: Doomscroll',
+          'Unlocked Social Media Doomscroller (viewed 10+ posts)'
+        );
+        setDoomscrollEverLogged(true);
+      }
+    }
+  }, [anonId, cursor, doomscrollEverLogged, doomscrollLogged, isOpen, onLogActivity]);
+
   const likeCount = (item: FeedItem) =>
     voteCounts[item.id] || 0;
 
@@ -478,7 +528,7 @@ export default function ScrollFeedModal({
 
     return (
       <div
-        key={item.reactKey || `${item.id}-${idx}`}
+        key={item.id}
         className="bg-white border-4 border-gray-900 shadow-[8px_8px_0_0_#000] flex flex-col"
       >
         <div className="relative aspect-square bg-black/5 overflow-hidden">

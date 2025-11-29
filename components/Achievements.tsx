@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
 interface Achievement {
   id: string;
   title: string;
@@ -12,12 +15,55 @@ interface AchievementsProps {
   isOpen: boolean;
   onClose: () => void;
   catClicks: number;
+  anonId?: string;
 }
 
-export default function Achievements({ isOpen, onClose, catClicks }: AchievementsProps) {
+export default function Achievements({ isOpen, onClose, catClicks, anonId }: AchievementsProps) {
+  const [doomscrollUnlocked, setDoomscrollUnlocked] = useState(false);
+  const [likeUnlocked, setLikeUnlocked] = useState(false);
+  const [loadingSocial, setLoadingSocial] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDoomscrollUnlocked(false);
+    setLikeUnlocked(false);
+  }, [anonId]);
+
+  useEffect(() => {
+    if (!isOpen || !anonId) return;
+    let isMounted = true;
+    const fetchSocialAchievements = async () => {
+      setLoadingSocial(true);
+      setLoadError(null);
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('action')
+        .eq('anon_id', anonId)
+        .in('action', ['Achievement: Doomscroll', 'Liked feed post'])
+        .limit(200);
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error('Failed to load achievement actions', error);
+        setLoadError('Could not fetch activity-based achievements.');
+      } else {
+        const actions = new Set((data || []).map((row) => row.action));
+        setDoomscrollUnlocked(actions.has('Achievement: Doomscroll'));
+        setLikeUnlocked(actions.has('Liked feed post'));
+      }
+      setLoadingSocial(false);
+    };
+
+    fetchSocialAchievements();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [anonId, isOpen]);
+
   if (!isOpen) return null;
 
-  // Define achievements
   const achievements: Achievement[] = [
     {
       id: 'cat_lover',
@@ -25,6 +71,20 @@ export default function Achievements({ isOpen, onClose, catClicks }: Achievement
       description: 'Pet the cat 10+ times',
       emoji: '🐱',
       isUnlocked: catClicks >= 10,
+    },
+    {
+      id: 'doomscroll',
+      title: 'Social Media Doomscroller',
+      description: 'Scroll 10+ posts inside Scroll Mode',
+      emoji: '📱',
+      isUnlocked: doomscrollUnlocked,
+    },
+    {
+      id: 'feed_romantic',
+      title: 'Feed Romantic',
+      description: 'Like any Scroll Mode post',
+      emoji: '💖',
+      isUnlocked: likeUnlocked,
     },
   ];
 
@@ -92,6 +152,13 @@ export default function Achievements({ isOpen, onClose, catClicks }: Achievement
                 {achievements.filter((a) => a.isUnlocked).length} /{' '}
                 {achievements.length}
               </div>
+              {loadingSocial && <div>Checking Scroll Mode rituals...</div>}
+              {loadError && <div className="text-red-600">{loadError}</div>}
+              {!anonId && (
+                <div className="text-gray-600">
+                  Scroll achievements activate once your anon ID is ready.
+                </div>
+              )}
             </div>
           </div>
         </div>

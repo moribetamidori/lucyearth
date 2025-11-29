@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { uploadCatPicture, fetchCatPictures, deleteCatPicture } from "@/lib/imageUpload";
 import type { CatPicture } from "@/lib/supabase";
 
@@ -12,6 +12,8 @@ type CatProfileProps = {
 };
 
 type Tab = "cara" | "tangerine" | "pictures" | "backpack";
+
+const PICTURES_PER_PAGE = 9;
 
 export default function CatProfile({
   isOpen,
@@ -32,15 +34,101 @@ export default function CatProfile({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownSwipeHint = useRef(false);
+  const [totalPictures, setTotalPictures] = useState(0);
+  const [isLoadingPictures, setIsLoadingPictures] = useState(false);
 
-  const PICTURES_PER_PAGE = 9;
+  const loadCatPictures = useCallback(
+    async (page: number, options: { reset?: boolean } = {}) => {
+      const { reset = false } = options;
+      const safePage = Math.max(1, page);
+      setIsLoadingPictures(true);
+      try {
+        const { pictures, total } = await fetchCatPictures(safePage, PICTURES_PER_PAGE);
+        setTotalPictures(total);
+        setCatPictures((prev) => {
+          if (reset || safePage === 1) {
+            return pictures;
+          }
+          return [...prev, ...pictures];
+        });
+        return pictures;
+      } catch (error) {
+        console.error("Failed to load cat pictures:", error);
+        return [];
+      } finally {
+        setIsLoadingPictures(false);
+      }
+    },
+    []
+  );
 
   // Fetch cat pictures when component mounts or tab changes to pictures
   useEffect(() => {
     if (isOpen && activeTab === "pictures") {
-      loadCatPictures();
+      setCurrentPage(1);
+      loadCatPictures(1, { reset: true });
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, loadCatPictures]);
+
+  // Reset lightbox selection when changing pages
+  useEffect(() => {
+    setSelectedImage(null);
+    setSelectedImageIndex(-1);
+  }, [currentPage]);
+
+  const handlePageChange = (page: number) => {
+    const maxPage = Math.max(1, Math.ceil(totalPictures / PICTURES_PER_PAGE));
+    const safePage = Math.min(Math.max(1, page), maxPage);
+    const loadedPages = Math.ceil(catPictures.length / PICTURES_PER_PAGE) || 0;
+    if (safePage > loadedPages && catPictures.length < totalPictures) {
+      void loadCatPictures(safePage);
+    }
+    setCurrentPage(safePage);
+  };
+
+  const goToNextPicture = useCallback(async () => {
+    if (selectedImageIndex < 0) return;
+
+    if (selectedImageIndex < catPictures.length - 1) {
+      const newIndex = selectedImageIndex + 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(catPictures[newIndex].image_url);
+      return;
+    }
+
+    const loadedPages = Math.ceil(catPictures.length / PICTURES_PER_PAGE);
+    const totalPages = Math.ceil(totalPictures / PICTURES_PER_PAGE);
+    if (
+      catPictures.length >= totalPictures ||
+      loadedPages >= totalPages ||
+      isLoadingPictures
+    ) {
+      return;
+    }
+
+    const newPage = loadedPages + 1;
+    const previousLength = catPictures.length;
+    const newPictures = await loadCatPictures(newPage);
+    if (newPictures.length > 0) {
+      const newIndex = previousLength;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(newPictures[0].image_url);
+    }
+  }, [
+    catPictures,
+    isLoadingPictures,
+    loadCatPictures,
+    selectedImageIndex,
+    totalPictures,
+  ]);
+
+  const goToPreviousPicture = useCallback(() => {
+    if (selectedImageIndex > 0) {
+      const newIndex = selectedImageIndex - 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(catPictures[newIndex].image_url);
+    }
+  }, [catPictures, selectedImageIndex]);
 
   // Auto-hide controls after 2 seconds of inactivity
   const resetHideControlsTimer = () => {
@@ -101,22 +189,12 @@ export default function CatProfile({
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe && selectedImageIndex < catPictures.length - 1) {
-      const newIndex = selectedImageIndex + 1;
-      setSelectedImageIndex(newIndex);
-      setSelectedImage(catPictures[newIndex].image_url);
+    if (isLeftSwipe) {
+      void goToNextPicture();
     }
-    if (isRightSwipe && selectedImageIndex > 0) {
-      const newIndex = selectedImageIndex - 1;
-      setSelectedImageIndex(newIndex);
-      setSelectedImage(catPictures[newIndex].image_url);
+    if (isRightSwipe) {
+      goToPreviousPicture();
     }
-  };
-
-  const loadCatPictures = async () => {
-    const pictures = await fetchCatPictures();
-    setCatPictures(pictures);
-    setCurrentPage(1); // Reset to first page when pictures reload
   };
 
   const handleFileSelect = async (
@@ -151,7 +229,8 @@ export default function CatProfile({
       for (const file of fileArray) {
         await uploadCatPicture(file, anonId);
       }
-      await loadCatPictures();
+      setCurrentPage(1);
+      await loadCatPictures(1, { reset: true });
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -168,12 +247,10 @@ export default function CatProfile({
 
     try {
       await deleteCatPicture(pic.id, pic.image_url);
-      await loadCatPictures();
-      // Adjust current page if needed
-      const totalPages = Math.ceil((catPictures.length - 1) / PICTURES_PER_PAGE);
-      if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(totalPages);
-      }
+      setCurrentPage(1);
+      setSelectedImage(null);
+      setSelectedImageIndex(-1);
+      await loadCatPictures(1, { reset: true });
     } catch (error) {
       console.error("Failed to delete picture:", error);
       alert("Failed to delete picture. Please try again.");
@@ -210,9 +287,8 @@ export default function CatProfile({
     } else if (months === 0) {
       return `${years} year${years !== 1 ? "s" : ""}`;
     } else {
-      return `${years} year${years !== 1 ? "s" : ""}, ${months} month${
-        months !== 1 ? "s" : ""
-      }`;
+      return `${years} year${years !== 1 ? "s" : ""}, ${months} month${months !== 1 ? "s" : ""
+        }`;
     }
   };
 
@@ -341,8 +417,7 @@ export default function CatProfile({
   };
 
   const renderPictures = () => {
-    // Calculate pagination
-    const totalPages = Math.ceil(catPictures.length / PICTURES_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(totalPictures / PICTURES_PER_PAGE));
     const startIndex = (currentPage - 1) * PICTURES_PER_PAGE;
     const endIndex = startIndex + PICTURES_PER_PAGE;
     const currentPictures = catPictures.slice(startIndex, endIndex);
@@ -370,10 +445,15 @@ export default function CatProfile({
           </div>
         )}
 
+        {isLoadingPictures && !selectedImage && (
+          <div className="text-center text-xs text-gray-500">Loading pictures...</div>
+        )}
+
         {/* Pictures grid */}
         <div className="grid grid-cols-3 gap-4">
-          {currentPictures.map((pic) => {
+          {currentPictures.map((pic, idx) => {
             const isVideo = pic.media_type === 'video';
+            const globalIndex = startIndex + idx;
             return (
               <div
                 key={pic.id}
@@ -385,9 +465,8 @@ export default function CatProfile({
                     poster={pic.thumbnail_url || undefined}
                     className="w-full h-full object-cover"
                     onClick={() => {
-                      const index = catPictures.findIndex(p => p.id === pic.id);
                       setSelectedImage(pic.image_url);
-                      setSelectedImageIndex(index);
+                      setSelectedImageIndex(globalIndex);
                     }}
                     muted
                     playsInline
@@ -399,9 +478,8 @@ export default function CatProfile({
                     className="w-full h-full object-cover"
                     style={{ imageRendering: "pixelated" }}
                     onClick={() => {
-                      const index = catPictures.findIndex(p => p.id === pic.id);
                       setSelectedImage(pic.image_url);
-                      setSelectedImageIndex(index);
+                      setSelectedImageIndex(globalIndex);
                     }}
                   />
                 )}
@@ -426,7 +504,7 @@ export default function CatProfile({
             );
           })}
 
-          {catPictures.length === 0 && !isUploading && (
+          {currentPictures.length === 0 && !isUploading && !isLoadingPictures && totalPictures === 0 && (
             <div className="col-span-3 text-center py-12 text-gray-400 border-2 border-dashed border-gray-300">
               No media yet. Upload your first cat picture or video!
             </div>
@@ -434,10 +512,10 @@ export default function CatProfile({
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {totalPictures > 0 && totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 pt-4">
             <button
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="px-4 py-2 border-2 border-gray-900 hover:bg-orange-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm"
             >
@@ -447,9 +525,7 @@ export default function CatProfile({
               Page {currentPage} of {totalPages}
             </div>
             <button
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-              }
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="px-4 py-2 border-2 border-gray-900 hover:bg-orange-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm"
             >
@@ -507,43 +583,39 @@ export default function CatProfile({
         <div className="flex border-b-2 border-gray-900">
           <button
             onClick={() => setActiveTab("cara")}
-            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${
-              activeTab === "cara"
+            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${activeTab === "cara"
                 ? "bg-orange-400 text-white"
                 : "hover:bg-gray-100"
-            }`}
+              }`}
           >
             CARA
           </button>
           <button
             onClick={() => setActiveTab("tangerine")}
-            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${
-              activeTab === "tangerine"
+            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${activeTab === "tangerine"
                 ? "bg-orange-400 text-white"
                 : "hover:bg-gray-100"
-            }`}
+              }`}
           >
             TANGERINE
           </button>
           <button
-            onClick={() => setActiveTab("pictures")}
-            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${
-              activeTab === "pictures"
-                ? "bg-orange-400 text-white"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            PICTURES
-          </button>
-          <button
             onClick={() => setActiveTab("backpack")}
-            className={`flex-1 px-4 py-3 transition-colors text-sm ${
-              activeTab === "backpack"
+            className={`flex-1 px-4 py-3 border-r-2 border-gray-900 transition-colors text-sm ${activeTab === "backpack"
                 ? "bg-orange-400 text-white"
                 : "hover:bg-gray-100"
-            }`}
+              }`}
           >
             BACKPACK
+          </button>
+          <button
+            onClick={() => setActiveTab("pictures")}
+            className={`flex-1 px-4 py-3 transition-colors text-sm ${activeTab === "pictures"
+                ? "bg-orange-400 text-white"
+                : "hover:bg-gray-100"
+              }`}
+          >
+            PICTURES
           </button>
         </div>
 
@@ -551,8 +623,8 @@ export default function CatProfile({
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === "cara" && renderCatStats("cara")}
           {activeTab === "tangerine" && renderCatStats("tangerine")}
-          {activeTab === "pictures" && renderPictures()}
           {activeTab === "backpack" && renderBackpack()}
+          {activeTab === "pictures" && renderPictures()}
         </div>
       </div>
 
@@ -576,35 +648,28 @@ export default function CatProfile({
               setSelectedImage(null);
               setSelectedImageIndex(-1);
             }}
-            className={`fixed top-4 right-4 text-gray-900 text-4xl hover:text-orange-400 transition-all duration-300 z-50 bg-white/80 w-12 h-12 flex items-center justify-center border-2 border-gray-900 ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`fixed top-4 right-4 text-gray-900 text-4xl hover:text-orange-400 transition-all duration-300 z-50 bg-white/80 w-12 h-12 flex items-center justify-center border-2 border-gray-900 ${showControls ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             ×
           </button>
 
           {/* Image counter - Fixed bottom center */}
           <div
-            className={`fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 text-sm border-2 border-gray-900 transition-all duration-300 z-50 ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 text-sm border-2 border-gray-900 transition-all duration-300 z-50 ${showControls ? 'opacity-100' : 'opacity-0'
+              }`}
           >
-            {selectedImageIndex + 1} / {catPictures.length}
+            {selectedImageIndex + 1} / {Math.max(totalPictures, catPictures.length)}
           </div>
           {/* Previous button - Desktop only */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (selectedImageIndex > 0) {
-                const newIndex = selectedImageIndex - 1;
-                setSelectedImageIndex(newIndex);
-                setSelectedImage(catPictures[newIndex].image_url);
-              }
+              goToPreviousPicture();
             }}
             disabled={selectedImageIndex === 0}
-            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${showControls ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             ←
           </button>
@@ -656,16 +721,14 @@ export default function CatProfile({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (selectedImageIndex < catPictures.length - 1) {
-                const newIndex = selectedImageIndex + 1;
-                setSelectedImageIndex(newIndex);
-                setSelectedImage(catPictures[newIndex].image_url);
-              }
+              void goToNextPicture();
             }}
-            disabled={selectedImageIndex === catPictures.length - 1}
-            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}
+            disabled={
+              selectedImageIndex === catPictures.length - 1 &&
+              catPictures.length >= totalPictures
+            }
+            className={`hidden md:flex bg-gray-900 text-white px-3 py-2 text-2xl hover:bg-orange-400 transition-all duration-300 border-2 border-gray-900 disabled:opacity-30 disabled:cursor-not-allowed self-center ${showControls ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             →
           </button>

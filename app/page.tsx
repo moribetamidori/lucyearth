@@ -762,6 +762,7 @@ export default function Home() {
         isOpen={showAchievements}
         onClose={() => setShowAchievements(false)}
         catClicks={catClicks}
+        anonId={anonId}
       />
 
       {/* Douban Modal */}

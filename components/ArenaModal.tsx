@@ -143,15 +143,11 @@ export default function ArenaModal({
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe && selectedImageIndex < blocks.length - 1) {
-      const newIndex = selectedImageIndex + 1;
-      setSelectedImageIndex(newIndex);
-      setSelectedImage(blocks[newIndex].image_url);
+    if (isLeftSwipe) {
+      void goToNextBlock();
     }
-    if (isRightSwipe && selectedImageIndex > 0) {
-      const newIndex = selectedImageIndex - 1;
-      setSelectedImageIndex(newIndex);
-      setSelectedImage(blocks[newIndex].image_url);
+    if (isRightSwipe) {
+      goToPreviousBlock();
     }
   };
 
@@ -162,7 +158,10 @@ export default function ArenaModal({
     setIsLoading(false);
   };
 
-  const loadBlocks = async (collectionId: string, reset: boolean = true) => {
+  const loadBlocks = async (
+    collectionId: string,
+    reset: boolean = true
+  ): Promise<ArenaBlock[]> => {
     if (reset) {
       setIsLoading(true);
       setCurrentPage(0);
@@ -194,11 +193,41 @@ export default function ArenaModal({
     setTotalBlocks(total);
     setIsLoading(false);
     setIsLoadingMore(false);
+    return newBlocks;
   };
 
   const loadMoreBlocks = async () => {
     if (currentCollection && !isLoadingMore && hasMoreBlocks) {
       await loadBlocks(currentCollection.id, false);
+    }
+  };
+
+  const goToNextBlock = async () => {
+    if (!selectedImage || selectedImageIndex < 0) return;
+
+    if (selectedImageIndex < blocks.length - 1) {
+      const newIndex = selectedImageIndex + 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(blocks[newIndex].image_url);
+      return;
+    }
+
+    if (currentCollection && hasMoreBlocks && !isLoadingMore) {
+      const previousLength = blocks.length;
+      const newBlocks = await loadBlocks(currentCollection.id, false);
+      if (newBlocks.length > 0) {
+        const newIndex = previousLength;
+        setSelectedImageIndex(newIndex);
+        setSelectedImage(newBlocks[0].image_url);
+      }
+    }
+  };
+
+  const goToPreviousBlock = () => {
+    if (selectedImageIndex > 0) {
+      const newIndex = selectedImageIndex - 1;
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(blocks[newIndex].image_url);
     }
   };
 
@@ -765,17 +794,13 @@ export default function ArenaModal({
               showControls ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {selectedImageIndex + 1} / {blocks.length}
+            {selectedImageIndex + 1} / {totalBlocks}
           </div>
           {/* Previous button - Desktop only */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (selectedImageIndex > 0) {
-                const newIndex = selectedImageIndex - 1;
-                setSelectedImageIndex(newIndex);
-                setSelectedImage(blocks[newIndex].image_url);
-              }
+              goToPreviousBlock();
             }}
             disabled={selectedImageIndex === 0}
             className={`hidden md:flex bg-black text-white px-3 py-2 text-2xl hover:bg-blue-500 transition-all duration-300 border-2 border-black disabled:opacity-30 disabled:cursor-not-allowed self-center ${
@@ -831,13 +856,9 @@ export default function ArenaModal({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (selectedImageIndex < blocks.length - 1) {
-                const newIndex = selectedImageIndex + 1;
-                setSelectedImageIndex(newIndex);
-                setSelectedImage(blocks[newIndex].image_url);
-              }
+              void goToNextBlock();
             }}
-            disabled={selectedImageIndex === blocks.length - 1}
+            disabled={!hasMoreBlocks && selectedImageIndex === blocks.length - 1}
             className={`hidden md:flex bg-black text-white px-3 py-2 text-2xl hover:bg-blue-500 transition-all duration-300 border-2 border-black disabled:opacity-30 disabled:cursor-not-allowed self-center ${
               showControls ? 'opacity-100' : 'opacity-0'
             }`}

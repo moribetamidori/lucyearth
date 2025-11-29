@@ -12,8 +12,13 @@ type PoopCalendarProps = {
   onLogActivity: (action: string, details?: string) => void;
 };
 
+const getStartOfCurrentMonth = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
 export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLogActivity }: PoopCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 9, 1)); // Oct 2025
+  const [currentMonth, setCurrentMonth] = useState(() => getStartOfCurrentMonth());
   const [poopImages, setPoopImages] = useState<PoopImage[]>([]);
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -29,6 +34,12 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
     fetchPoopImages();
     fetchCalendarEntries();
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentMonth(getStartOfCurrentMonth());
+    }
+  }, [isOpen]);
 
   const fetchPoopImages = async () => {
     const { data, error } = await supabase

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { CatPicture } from './supabase';
 import { generateVideoThumbnail } from './videoThumbnail';
 
 /**
@@ -209,21 +210,30 @@ export async function uploadCatPicture(
 }
 
 /**
- * Fetches all cat pictures from the database
- * @returns Promise<CatPicture[]>
+ * Fetch cat pictures with pagination from the database
  */
-export async function fetchCatPictures() {
-  const { data, error } = await supabase
+export async function fetchCatPictures(
+  page: number = 1,
+  pageSize: number = 9
+): Promise<{ pictures: CatPicture[]; total: number }> {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await supabase
     .from('cat_pictures')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (error) {
     console.error('Error fetching cat pictures:', error);
-    return [];
+    return { pictures: [], total: 0 };
   }
 
-  return data || [];
+  return {
+    pictures: data || [],
+    total: count || 0,
+  };
 }
 
 /**

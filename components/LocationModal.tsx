@@ -30,6 +30,9 @@ const MapBoundsUpdater = dynamic(
   { ssr: false }
 );
 
+const PINS_PER_PAGE = 10;
+const PIN_LOAD_STEP = 5;
+
 interface LocationPinImage {
   id: string;
   pin_id: number;
@@ -92,6 +95,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showLightbox, setShowLightbox] = useState(false);
+  const [totalPins, setTotalPins] = useState(0);
 
   // Set mounted state and initialize Leaflet
   useEffect(() => {
@@ -138,24 +142,33 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     }
   }, [isAddingPin]);
 
-  const fetchPins = async () => {
+  const fetchPins = async ({ start = 0, limit = PINS_PER_PAGE, append = false }: { start?: number; limit?: number; append?: boolean } = {}) => {
     setLoading(true);
-    const { data, error } = await supabase
+    const normalizedStart = Math.max(0, start);
+    const normalizedLimit = Math.max(1, limit);
+    const rangeEnd = normalizedStart + normalizedLimit - 1;
+    const { data, error, count } = await supabase
       .from('location_pins')
       .select(`
         *,
         images:location_pin_images(*)
-      `)
-      // Remove the anon_id filter to fetch all public pins
-      .order('timestamp', { ascending: false });
+      `, { count: 'exact' })
+      .order('timestamp', { ascending: false })
+      .range(normalizedStart, rangeEnd);
 
     if (!error && data) {
-      // Sort images by display_order
       const pinsWithSortedImages = data.map(pin => ({
         ...pin,
         images: pin.images?.sort((a: LocationPinImage, b: LocationPinImage) => a.display_order - b.display_order) || []
       }));
-      setPins(pinsWithSortedImages);
+
+      setPins((prev) => (append ? [...prev, ...pinsWithSortedImages] : pinsWithSortedImages));
+
+      if (typeof count === 'number') {
+        setTotalPins(count);
+      } else if (!append) {
+        setTotalPins(pinsWithSortedImages.length);
+      }
     }
     setLoading(false);
   };
@@ -337,7 +350,10 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       }
 
       // Refetch pins to get the updated data with images
-      await fetchPins();
+      await fetchPins({
+        start: 0,
+        limit: Math.max(PINS_PER_PAGE, pins.length + 1),
+      });
 
       setNewName('');
       setNewLocation('');
@@ -369,11 +385,11 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     const { error } = await supabase
       .from('location_pins')
       .delete()
-      .eq('id', id)
-      .eq('anon_id', anonId);
+      .eq('id', id);
 
     if (!error) {
-      setPins(pins.filter(pin => pin.id !== id));
+      const desiredCount = Math.max(PINS_PER_PAGE, pins.length - 1);
+      await fetchPins({ start: 0, limit: desiredCount });
       onLogActivity('Deleted location pin', 'Removed a location pin');
     }
   };
@@ -465,7 +481,6 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
         note: editNote.trim() || null,
       })
       .eq('id', editingPinId)
-      .eq('anon_id', anonId)
       .select()
       .single();
 
@@ -504,7 +519,10 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       }
 
       // Refetch pins to get the updated data with images
-      await fetchPins();
+      await fetchPins({
+        start: 0,
+        limit: Math.max(PINS_PER_PAGE, pins.length),
+      });
       handleCancelEdit();
       onLogActivity('Updated location pin', `Updated pin at ${editName || editLocation}`);
     }
@@ -547,6 +565,15 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     setShowEditSuggestions(false);
   };
 
+  const handleLoadMorePins = () => {
+    if (loading || pins.length >= totalPins) return;
+    fetchPins({
+      start: pins.length,
+      limit: PIN_LOAD_STEP,
+      append: true,
+    });
+  };
+
   // Get display name - use name if available, otherwise extract from location
   const getDisplayName = (pin: LocationPin): string => {
     if (pin.name) {
@@ -558,6 +585,11 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     }
     return pin.location;
   };
+
+  const displayedPins = pins;
+  const displayRangeStart = totalPins === 0 ? 0 : 1;
+  const displayRangeEnd = pins.length;
+  const canLoadMorePins = pins.length < totalPins;
 
   if (!isOpen) return null;
 
@@ -786,7 +818,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
             {/* Pins List */}
             <div className="flex-1 overflow-y-auto p-4">
-              <h3 className="text-lg font-bold mb-2">PINS ({pins.length})</h3>
+              <h3 className="text-lg font-bold mb-2">PINS ({totalPins || pins.length})</h3>
               {loading && pins.length === 0 && (
                 <div className="text-center py-8 text-gray-500">Loading...</div>
               )}
@@ -796,8 +828,11 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                 </div>
               )}
               <div className="space-y-2">
-                {pins.map((pin) => (
-                  editingPinId === pin.id ? (
+                {displayedPins.map((pin) => {
+                  const canModifyPin = isEditMode;
+                  const isEditingCurrentPin = canModifyPin && editingPinId === pin.id;
+
+                  return isEditingCurrentPin ? (
                     // Edit Form
                     <div key={pin.id} className="border-2 border-blue-500 p-3 bg-blue-50">
                       <h4 className="text-sm font-bold mb-3">EDIT PIN</h4>
@@ -985,7 +1020,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                             <span className="text-lg">📍</span>
                             <span className="font-bold text-sm">{getDisplayName(pin)}</span>
                           </div>
-                          {isEditMode && (
+                          {canModifyPin && (
                             <div className="flex gap-1">
                               <ActionButton
                                 variant="edit"
@@ -1019,9 +1054,23 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         )}
                       </div>
                     </div>
-                  )
-                ))}
+                  );
+                })}
               </div>
+              {totalPins > 0 && (
+                <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
+                  <span>
+                    Showing {displayRangeStart}-{displayRangeEnd} of {totalPins}
+                  </span>
+                  <button
+                    onClick={handleLoadMorePins}
+                    disabled={!canLoadMorePins}
+                    className="px-4 py-1 border border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    LOAD MORE
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

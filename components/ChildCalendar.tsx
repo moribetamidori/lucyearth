@@ -65,15 +65,26 @@ const getDaysInMonth = (date: Date) => {
   return { daysInMonth, startingDayOfWeek };
 };
 
+const getStartOfCurrentMonth = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
 export default function ChildCalendar({
   isOpen,
   onClose,
   isEditMode,
   onLogActivity,
 }: ChildCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 9, 1));
+  const [currentMonth, setCurrentMonth] = useState(() => getStartOfCurrentMonth());
   const [entries, setEntries] = useState<ChildCalendarEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentMonth(getStartOfCurrentMonth());
+    }
+  }, [isOpen]);
 
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
