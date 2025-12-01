@@ -18,6 +18,7 @@ import WomenModal from '@/components/WomenModal';
 import ScrollFeedModal from '@/components/ScrollFeedModal';
 import TimelineModal from '@/components/TimelineModal';
 import SlotMachineModal from '@/components/SlotMachineModal';
+import FindMeModal from '@/components/FindMeModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -59,6 +60,7 @@ export default function Home() {
   const [showScrollFeed, setShowScrollFeed] = useState<boolean>(false);
   const [showTimelineModal, setShowTimelineModal] = useState<boolean>(false);
   const [showSlotMachineModal, setShowSlotMachineModal] = useState<boolean>(false);
+  const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -155,7 +157,10 @@ export default function Home() {
       )}
 
       {/* Left sidebar icons */}
-      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-cols-2 gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:flex-wrap max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4">
+      <div
+        className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-flow-col gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:flex-wrap max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4"
+        style={{ gridTemplateRows: 'repeat(8, max-content)' }}
+      >
         {/* Poop Cal icon - first position on desktop */}
         <div className="flex flex-col items-center gap-2 max-sm:flex-row max-sm:gap-4">
           {/* Poop Cal icon */}
@@ -210,6 +215,24 @@ export default function Home() {
             >
               <span className="text-lg">📍</span>
               <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
+            </div>
+          </div>
+
+          {/* FindMe icon - only visible on mobile */}
+          <div className="hidden max-sm:flex max-sm:flex-col max-sm:items-center max-sm:gap-0">
+            <div
+              onClick={() => {
+                setShowFindMeModal(true);
+                logActivity('Opened FindMe', 'Planning a highlighted stay');
+              }}
+              className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 transition-all flex-col pt-1"
+              style={{
+                boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+                imageRendering: 'pixelated',
+              }}
+            >
+              <span className="text-lg">🧭</span>
+              <span className="text-[8px] leading-none mt-0.5">FINDME</span>
             </div>
           </div>
         </div>
@@ -328,6 +351,25 @@ export default function Home() {
             <span>📍</span>
           </div>
           <div className="text-[15px] text-gray-900">LOCATION</div>
+        </div>
+
+        {/* FindMe icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:hidden">
+          <div
+            onClick={() => {
+              setShowFindMeModal(true);
+              logActivity('Opened FindMe', 'Planning a highlighted stay');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-lg">🧭</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">FINDME</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">FINDME</div>
         </div>
 
         {/* Garden icon */}
@@ -849,6 +891,14 @@ export default function Home() {
         onClose={() => setShowLocationModal(false)}
         anonId={anonId}
         isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* FindMe Modal */}
+      <FindMeModal
+        isOpen={showFindMeModal}
+        onClose={() => setShowFindMeModal(false)}
+        anonId={anonId}
         onLogActivity={logActivity}
       />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
@@ -23,6 +23,10 @@ const Marker = dynamic(
 );
 const Popup = dynamic(
   () => import('react-leaflet').then((mod) => mod.Popup),
+  { ssr: false }
+);
+const Polyline = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Polyline),
   { ssr: false }
 );
 const MapBoundsUpdater = dynamic(
@@ -586,6 +590,14 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
     return pin.location;
   };
 
+  const pathCoordinates = useMemo(() => {
+    const pinsWithCoords = pins.filter((pin) => pin.latitude !== null && pin.longitude !== null);
+    const sortedPins = [...pinsWithCoords].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    return sortedPins.map((pin) => [pin.latitude as number, pin.longitude as number] as [number, number]);
+  }, [pins]);
+
   const displayedPins = pins;
   const displayRangeStart = totalPins === 0 ? 0 : 1;
   const displayRangeEnd = pins.length;
@@ -595,494 +607,499 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
 
   return (
     <>
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white/95 border-4 border-gray-900 w-full max-w-[95vw] h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="border-b-4 border-gray-900 p-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold">LOCATION MAP</h2>
-          <div className="flex items-center gap-3">
-            {isEditMode && !isAddingPin && (
+      <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white/95 border-4 border-gray-900 w-full max-w-[95vw] h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="border-b-4 border-gray-900 p-4 flex justify-between items-center">
+            <h2 className="text-xl font-bold">LOCATION MAP</h2>
+            <div className="flex items-center gap-3">
+              {isEditMode && !isAddingPin && (
+                <button
+                  onClick={() => setIsAddingPin(true)}
+                  className="px-4 py-2 border-2 border-gray-900 hover:bg-pink-500 hover:text-white transition-all text-sm font-bold"
+                >
+                  + ADD NEW PIN
+                </button>
+              )}
               <button
-                onClick={() => setIsAddingPin(true)}
-                className="px-4 py-2 border-2 border-gray-900 hover:bg-pink-500 hover:text-white transition-all text-sm font-bold"
+                onClick={onClose}
+                className="text-2xl hover:text-red-500 transition-colors"
               >
-                + ADD NEW PIN
+                ✕
               </button>
-            )}
-            <button
-              onClick={onClose}
-              className="text-2xl hover:text-red-500 transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* Content - Horizontal Layout */}
-        <div className="flex-1 flex overflow-hidden max-sm:flex-col">
-          {/* Map Section */}
-          <div className="flex-1 p-4 overflow-hidden max-sm:h-[50vh] max-sm:min-h-[50vh]">
-            {/* World Map */}
-            <div className="relative w-full h-full border-4 border-gray-900 overflow-hidden">
-              {isMounted && <MapContainer
-                center={[20, 0]}
-                zoom={2}
-                className="h-full w-full"
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="/api/tiles/{z}/{x}/{y}.png"
-                />
-                {pins.map((pin) => {
-                  if (pin.latitude !== null && pin.longitude !== null) {
-                    return (
-                      <Marker
-                        key={pin.id}
-                        position={[pin.latitude, pin.longitude]}
-                        eventHandlers={{
-                          click: () => {
-                            setFocusedPinId(pin.id);
-                            onLogActivity('Viewed pin on map', `Clicked on ${getDisplayName(pin)}`);
-                          }
-                        }}
-                      >
-                        <Popup>
-                          <div className="text-sm">
-                            <div className="font-bold">{getDisplayName(pin)}</div>
-                            <div className="text-xs text-gray-600 mt-1">
-                              {new Date(pin.timestamp).toLocaleString()}
-                            </div>
-                            {pin.images && pin.images.length > 0 && (
-                              <div className="relative mt-2">
-                                <img
-                                  src={pin.images[0].image_url}
-                                  alt={pin.location}
-                                  className="w-full h-24 object-cover border border-gray-300 cursor-pointer hover:opacity-90"
-                                  onClick={() => {
-                                    setLightboxImages(pin.images!.map(img => img.image_url));
-                                    setLightboxIndex(0);
-                                    setShowLightbox(true);
-                                  }}
-                                />
-                                {pin.images.length > 1 && (
-                                  <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
-                                    +{pin.images.length - 1}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {pin.note && (
-                              <div className="text-xs text-gray-700 mt-2 italic border-t border-gray-300 pt-1">
-                                {pin.note}
-                              </div>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  }
-                  return null;
-                })}
-                <MapBoundsUpdater pins={pins} focusedPinId={focusedPinId} />
-              </MapContainer>}
             </div>
           </div>
 
-          {/* Right Sidebar - Pins List */}
-          <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:flex-1 max-sm:overflow-y-auto">
-            {isEditMode && isAddingPin && (
-              <div className="p-4 border-b-4 border-gray-900 bg-pink-50">
-                <h3 className="text-lg font-bold mb-3">ADD NEW PIN</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm mb-1">Name (optional)</label>
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g., Orlando"
-                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm mb-1">Location</label>
-                    <input
-                      type="text"
-                      value={newLocation}
-                      onChange={(e) => {
-                        setNewLocation(e.target.value);
-                        setSelectedCoords(null);
-                      }}
-                      onFocus={() => {
-                        if (suggestions.length > 0) {
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      placeholder="Search for a location..."
-                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                    />
-
-                    {/* Suggestions Dropdown */}
-                    {showSuggestions && suggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border-4 border-gray-900 max-h-60 overflow-y-auto">
-                        {suggestions.map((suggestion, index) => (
-                          <div
-                            key={index}
-                            onClick={() => handleSelectSuggestion(suggestion)}
-                            className="px-3 py-2 cursor-pointer hover:bg-pink-100 border-b-2 border-gray-900 last:border-b-0 text-sm"
-                          >
-                            <div className="font-medium">{suggestion.display_name}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {parseFloat(suggestion.lat).toFixed(4)}, {parseFloat(suggestion.lon).toFixed(4)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <p className="text-xs text-gray-600 mt-1">
-                      Start typing to search for a location
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Time</label>
-                    <input
-                      type="datetime-local"
-                      value={newTimestamp}
-                      onChange={(e) => setNewTimestamp(e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Note (optional)</label>
-                    <textarea
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="Add a note about this location..."
-                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm resize-none"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Images (optional)</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageSelect}
-                      className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                    />
-                    {imagePreviews.length > 0 && (
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {imagePreviews.map((preview, index) => (
-                          <div key={index} className="relative">
-                            <img
-                              src={preview}
-                              alt={`Preview ${index + 1}`}
-                              className="w-full h-20 object-cover border-2 border-gray-900"
-                            />
-                            <button
-                              onClick={() => {
-                                setSelectedImages(selectedImages.filter((_, i) => i !== index));
-                                setImagePreviews(imagePreviews.filter((_, i) => i !== index));
-                              }}
-                              className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAddPin}
-                      disabled={loading || !newLocation.trim() || !newTimestamp}
-                      className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      {loading ? 'ADDING...' : 'ADD PIN'}
-                    </button>
-                    <button
-                      onClick={handleCancelAdd}
-                      className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white transition-all"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Pins List */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <h3 className="text-lg font-bold mb-2">PINS ({totalPins || pins.length})</h3>
-              {loading && pins.length === 0 && (
-                <div className="text-center py-8 text-gray-500">Loading...</div>
-              )}
-              {!loading && pins.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No pins yet. {isEditMode ? 'Add your first location!' : ''}
-                </div>
-              )}
-              <div className="space-y-2">
-                {displayedPins.map((pin) => {
-                  const canModifyPin = isEditMode;
-                  const isEditingCurrentPin = canModifyPin && editingPinId === pin.id;
-
-                  return isEditingCurrentPin ? (
-                    // Edit Form
-                    <div key={pin.id} className="border-2 border-blue-500 p-3 bg-blue-50">
-                      <h4 className="text-sm font-bold mb-3">EDIT PIN</h4>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm mb-1">Name (optional)</label>
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            placeholder="e.g., Orlando"
-                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                          />
-                        </div>
-                        <div className="relative">
-                          <label className="block text-sm mb-1">Location</label>
-                          <input
-                            type="text"
-                            value={editLocation}
-                            onChange={(e) => {
-                              setEditLocation(e.target.value);
-                              setEditSelectedCoords(null);
-                            }}
-                            onFocus={() => {
-                              if (editSuggestions.length > 0) {
-                                setShowEditSuggestions(true);
-                              }
-                            }}
-                            placeholder="Search for a location..."
-                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                          />
-
-                          {/* Suggestions Dropdown */}
-                          {showEditSuggestions && editSuggestions.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border-4 border-gray-900 max-h-60 overflow-y-auto">
-                              {editSuggestions.map((suggestion, index) => (
-                                <div
-                                  key={index}
-                                  onClick={() => handleSelectEditSuggestion(suggestion)}
-                                  className="px-3 py-2 cursor-pointer hover:bg-blue-100 border-b-2 border-gray-900 last:border-b-0 text-sm"
-                                >
-                                  <div className="font-medium">{suggestion.display_name}</div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {parseFloat(suggestion.lat).toFixed(4)}, {parseFloat(suggestion.lon).toFixed(4)}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          <p className="text-xs text-gray-600 mt-1">
-                            Start typing to search for a location
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm mb-1">Time</label>
-                          <input
-                            type="datetime-local"
-                            value={editTimestamp}
-                            onChange={(e) => setEditTimestamp(e.target.value)}
-                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm mb-1">Note (optional)</label>
-                          <textarea
-                            value={editNote}
-                            onChange={(e) => setEditNote(e.target.value)}
-                            placeholder="Add a note about this location..."
-                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm resize-none"
-                            rows={3}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm mb-1">Images (optional)</label>
-                          {/* Existing images */}
-                          {editExistingImages.length > 0 && (
-                            <div className="mb-2 grid grid-cols-3 gap-2">
-                              {editExistingImages.map((image) => (
-                                <div key={image.id} className="relative">
-                                  <img
-                                    src={image.image_url}
-                                    alt="Existing"
-                                    className="w-full h-20 object-cover border-2 border-gray-900"
-                                  />
-                                  <button
-                                    onClick={() => handleRemoveExistingImage(image.id, image.image_url)}
-                                    className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {/* Add new images */}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={handleEditImageSelect}
-                            className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
-                          />
-                          {editImagePreviews.length > 0 && (
-                            <div className="mt-2 grid grid-cols-3 gap-2">
-                              {editImagePreviews.map((preview, index) => (
-                                <div key={index} className="relative">
-                                  <img
-                                    src={preview}
-                                    alt={`Preview ${index + 1}`}
-                                    className="w-full h-20 object-cover border-2 border-gray-900"
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      setEditSelectedImages(editSelectedImages.filter((_, i) => i !== index));
-                                      setEditImagePreviews(editImagePreviews.filter((_, i) => i !== index));
-                                    }}
-                                    className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleUpdatePin}
-                            disabled={loading || !editLocation.trim() || !editTimestamp}
-                            className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          >
-                            {loading ? 'UPDATING...' : 'UPDATE'}
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white transition-all"
-                          >
-                            CANCEL
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // Display Mode
-                    <div
-                      key={pin.id}
-                      className={`border-2 border-gray-900 flex transition-colors overflow-hidden ${
-                        focusedPinId === pin.id
-                          ? 'bg-pink-100 border-pink-500'
-                          : 'hover:bg-gray-50 cursor-pointer'
-                      } ${pin.images && pin.images.length > 0 ? 'h-32' : ''}`}
-                      onClick={() => {
-                        if (pin.latitude !== null && pin.longitude !== null) {
-                          setFocusedPinId(pin.id);
-                          onLogActivity('Viewed pin from list', `Selected ${getDisplayName(pin)}`);
-                        }
-                      }}
-                    >
-                      {pin.images && pin.images.length > 0 && (
-                        <div
-                          className="relative w-32 h-32 flex-shrink-0 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLightboxImages(pin.images!.map(img => img.image_url));
-                            setLightboxIndex(0);
-                            setShowLightbox(true);
+          {/* Content - Horizontal Layout */}
+          <div className="flex-1 flex overflow-hidden max-sm:flex-col">
+            {/* Map Section */}
+            <div className="flex-1 p-4 overflow-hidden max-sm:h-[50vh] max-sm:min-h-[50vh]">
+              {/* World Map */}
+              <div className="relative w-full h-full border-4 border-gray-900 overflow-hidden">
+                {isMounted && <MapContainer
+                  center={[20, 0]}
+                  zoom={2}
+                  className="h-full w-full"
+                  scrollWheelZoom={true}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="/api/tiles/{z}/{x}/{y}.png"
+                  />
+                  {pins.map((pin) => {
+                    if (pin.latitude !== null && pin.longitude !== null) {
+                      return (
+                        <Marker
+                          key={pin.id}
+                          position={[pin.latitude, pin.longitude]}
+                          eventHandlers={{
+                            click: () => {
+                              setFocusedPinId(pin.id);
+                              onLogActivity('Viewed pin on map', `Clicked on ${getDisplayName(pin)}`);
+                            }
                           }}
                         >
-                          <img
-                            src={pin.images[0].image_url}
-                            alt={pin.location}
-                            className="w-full h-full object-cover"
-                          />
-                          {pin.images.length > 1 && (
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
-                              +{pin.images.length - 1}
+                          <Popup>
+                            <div className="text-sm">
+                              <div className="font-bold">{getDisplayName(pin)}</div>
+                              <div className="text-xs text-gray-600 mt-1">
+                                {new Date(pin.timestamp).toLocaleString()}
+                              </div>
+                              {pin.images && pin.images.length > 0 && (
+                                <div className="relative mt-2">
+                                  <img
+                                    src={pin.images[0].image_url}
+                                    alt={pin.location}
+                                    className="w-full h-24 object-cover border border-gray-300 cursor-pointer hover:opacity-90"
+                                    onClick={() => {
+                                      setLightboxImages(pin.images!.map(img => img.image_url));
+                                      setLightboxIndex(0);
+                                      setShowLightbox(true);
+                                    }}
+                                  />
+                                  {pin.images.length > 1 && (
+                                    <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
+                                      +{pin.images.length - 1}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {pin.note && (
+                                <div className="text-xs text-gray-700 mt-2 italic border-t border-gray-300 pt-1">
+                                  {pin.note}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </Popup>
+                        </Marker>
+                      );
+                    }
+                    return null;
+                  })}
+                  <MapBoundsUpdater pins={pins} focusedPinId={focusedPinId} />
+                  {pathCoordinates.length > 1 && (
+                    <Polyline
+                      positions={pathCoordinates}
+                      pathOptions={{ color: '#ec4899', weight: 3, opacity: 0.8 }}
+                    />
+                  )}
+                </MapContainer>}
+              </div>
+            </div>
+
+            {/* Right Sidebar - Pins List */}
+            <div className="w-[400px] border-l-4 border-gray-900 flex flex-col max-sm:w-full max-sm:border-l-0 max-sm:border-t-4 min-h-0 max-sm:flex-1 max-sm:overflow-y-auto">
+              {isEditMode && isAddingPin && (
+                <div className="p-4 border-b-4 border-gray-900 bg-pink-50">
+                  <h3 className="text-lg font-bold mb-3">ADD NEW PIN</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm mb-1">Name (optional)</label>
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder="e.g., Orlando"
+                        className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="relative">
+                      <label className="block text-sm mb-1">Location</label>
+                      <input
+                        type="text"
+                        value={newLocation}
+                        onChange={(e) => {
+                          setNewLocation(e.target.value);
+                          setSelectedCoords(null);
+                        }}
+                        onFocus={() => {
+                          if (suggestions.length > 0) {
+                            setShowSuggestions(true);
+                          }
+                        }}
+                        placeholder="Search for a location..."
+                        className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                      />
+
+                      {/* Suggestions Dropdown */}
+                      {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border-4 border-gray-900 max-h-60 overflow-y-auto">
+                          {suggestions.map((suggestion, index) => (
+                            <div
+                              key={index}
+                              onClick={() => handleSelectSuggestion(suggestion)}
+                              className="px-3 py-2 cursor-pointer hover:bg-pink-100 border-b-2 border-gray-900 last:border-b-0 text-sm"
+                            >
+                              <div className="font-medium">{suggestion.display_name}</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {parseFloat(suggestion.lat).toFixed(4)}, {parseFloat(suggestion.lon).toFixed(4)}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      <div className="flex-1 p-3 flex flex-col min-h-0 overflow-y-auto">
-                        <div className="flex items-center gap-2 justify-between flex-shrink-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">📍</span>
-                            <span className="font-bold text-sm">{getDisplayName(pin)}</span>
+
+                      <p className="text-xs text-gray-600 mt-1">
+                        Start typing to search for a location
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Time</label>
+                      <input
+                        type="datetime-local"
+                        value={newTimestamp}
+                        onChange={(e) => setNewTimestamp(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Note (optional)</label>
+                      <textarea
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Add a note about this location..."
+                        className="w-full px-3 py-2 border-2 border-gray-900 text-sm resize-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Images (optional)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageSelect}
+                        className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                      />
+                      {imagePreviews.length > 0 && (
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {imagePreviews.map((preview, index) => (
+                            <div key={index} className="relative">
+                              <img
+                                src={preview}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-20 object-cover border-2 border-gray-900"
+                              />
+                              <button
+                                onClick={() => {
+                                  setSelectedImages(selectedImages.filter((_, i) => i !== index));
+                                  setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+                                }}
+                                className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddPin}
+                        disabled={loading || !newLocation.trim() || !newTimestamp}
+                        className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {loading ? 'ADDING...' : 'ADD PIN'}
+                      </button>
+                      <button
+                        onClick={handleCancelAdd}
+                        className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white transition-all"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pins List */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <h3 className="text-lg font-bold mb-2">PINS ({totalPins || pins.length})</h3>
+                {loading && pins.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">Loading...</div>
+                )}
+                {!loading && pins.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No pins yet. {isEditMode ? 'Add your first location!' : ''}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {displayedPins.map((pin) => {
+                    const canModifyPin = isEditMode;
+                    const isEditingCurrentPin = canModifyPin && editingPinId === pin.id;
+
+                    return isEditingCurrentPin ? (
+                      // Edit Form
+                      <div key={pin.id} className="border-2 border-blue-500 p-3 bg-blue-50">
+                        <h4 className="text-sm font-bold mb-3">EDIT PIN</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm mb-1">Name (optional)</label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="e.g., Orlando"
+                              className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                            />
                           </div>
-                          {canModifyPin && (
-                            <div className="flex gap-1">
-                              <ActionButton
-                                variant="edit"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditPin(pin);
-                                }}
-                              />
-                              <ActionButton
-                                variant="delete"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeletePin(pin.id);
-                                }}
-                              />
+                          <div className="relative">
+                            <label className="block text-sm mb-1">Location</label>
+                            <input
+                              type="text"
+                              value={editLocation}
+                              onChange={(e) => {
+                                setEditLocation(e.target.value);
+                                setEditSelectedCoords(null);
+                              }}
+                              onFocus={() => {
+                                if (editSuggestions.length > 0) {
+                                  setShowEditSuggestions(true);
+                                }
+                              }}
+                              placeholder="Search for a location..."
+                              className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                            />
+
+                            {/* Suggestions Dropdown */}
+                            {showEditSuggestions && editSuggestions.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-white border-4 border-gray-900 max-h-60 overflow-y-auto">
+                                {editSuggestions.map((suggestion, index) => (
+                                  <div
+                                    key={index}
+                                    onClick={() => handleSelectEditSuggestion(suggestion)}
+                                    className="px-3 py-2 cursor-pointer hover:bg-blue-100 border-b-2 border-gray-900 last:border-b-0 text-sm"
+                                  >
+                                    <div className="font-medium">{suggestion.display_name}</div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {parseFloat(suggestion.lat).toFixed(4)}, {parseFloat(suggestion.lon).toFixed(4)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <p className="text-xs text-gray-600 mt-1">
+                              Start typing to search for a location
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-sm mb-1">Time</label>
+                            <input
+                              type="datetime-local"
+                              value={editTimestamp}
+                              onChange={(e) => setEditTimestamp(e.target.value)}
+                              className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm mb-1">Note (optional)</label>
+                            <textarea
+                              value={editNote}
+                              onChange={(e) => setEditNote(e.target.value)}
+                              placeholder="Add a note about this location..."
+                              className="w-full px-3 py-2 border-2 border-gray-900 text-sm resize-none"
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm mb-1">Images (optional)</label>
+                            {/* Existing images */}
+                            {editExistingImages.length > 0 && (
+                              <div className="mb-2 grid grid-cols-3 gap-2">
+                                {editExistingImages.map((image) => (
+                                  <div key={image.id} className="relative">
+                                    <img
+                                      src={image.image_url}
+                                      alt="Existing"
+                                      className="w-full h-20 object-cover border-2 border-gray-900"
+                                    />
+                                    <button
+                                      onClick={() => handleRemoveExistingImage(image.id, image.image_url)}
+                                      className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Add new images */}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handleEditImageSelect}
+                              className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                            />
+                            {editImagePreviews.length > 0 && (
+                              <div className="mt-2 grid grid-cols-3 gap-2">
+                                {editImagePreviews.map((preview, index) => (
+                                  <div key={index} className="relative">
+                                    <img
+                                      src={preview}
+                                      alt={`Preview ${index + 1}`}
+                                      className="w-full h-20 object-cover border-2 border-gray-900"
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        setEditSelectedImages(editSelectedImages.filter((_, i) => i !== index));
+                                        setEditImagePreviews(editImagePreviews.filter((_, i) => i !== index));
+                                      }}
+                                      className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1.5 py-0.5 text-xs hover:bg-red-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleUpdatePin}
+                              disabled={loading || !editLocation.trim() || !editTimestamp}
+                              className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                              {loading ? 'UPDATING...' : 'UPDATE'}
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="flex-1 px-4 py-2 border-2 border-gray-900 hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              CANCEL
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // Display Mode
+                      <div
+                        key={pin.id}
+                        className={`border-2 border-gray-900 flex transition-colors overflow-hidden ${focusedPinId === pin.id
+                            ? 'bg-pink-100 border-pink-500'
+                            : 'hover:bg-gray-50 cursor-pointer'
+                          } ${pin.images && pin.images.length > 0 ? 'h-32' : ''}`}
+                        onClick={() => {
+                          if (pin.latitude !== null && pin.longitude !== null) {
+                            setFocusedPinId(pin.id);
+                            onLogActivity('Viewed pin from list', `Selected ${getDisplayName(pin)}`);
+                          }
+                        }}
+                      >
+                        {pin.images && pin.images.length > 0 && (
+                          <div
+                            className="relative w-32 h-32 flex-shrink-0 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLightboxImages(pin.images!.map(img => img.image_url));
+                              setLightboxIndex(0);
+                              setShowLightbox(true);
+                            }}
+                          >
+                            <img
+                              src={pin.images[0].image_url}
+                              alt={pin.location}
+                              className="w-full h-full object-cover"
+                            />
+                            {pin.images.length > 1 && (
+                              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
+                                +{pin.images.length - 1}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-1 p-3 flex flex-col min-h-0 overflow-y-auto">
+                          <div className="flex items-center gap-2 justify-between flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">📍</span>
+                              <span className="font-bold text-sm">{getDisplayName(pin)}</span>
+                            </div>
+                            {canModifyPin && (
+                              <div className="flex gap-1">
+                                <ActionButton
+                                  variant="edit"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditPin(pin);
+                                  }}
+                                />
+                                <ActionButton
+                                  variant="delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePin(pin.id);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1 flex-shrink-0">
+                            {new Date(pin.timestamp).toLocaleString()}
+                          </div>
+                          {pin.note && (
+                            <div className="text-xs text-gray-700 mt-1 italic">
+                              &ldquo;{pin.note}&rdquo;
+                            </div>
+                          )}
+                          {pin.latitude !== null && pin.longitude !== null && (
+                            <div className="text-xs text-gray-500 mt-1 flex-shrink-0">
+                              {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
                             </div>
                           )}
                         </div>
-                        <div className="text-xs text-gray-600 mt-1 flex-shrink-0">
-                          {new Date(pin.timestamp).toLocaleString()}
-                        </div>
-                        {pin.note && (
-                          <div className="text-xs text-gray-700 mt-1 italic">
-                            &ldquo;{pin.note}&rdquo;
-                          </div>
-                        )}
-                        {pin.latitude !== null && pin.longitude !== null && (
-                          <div className="text-xs text-gray-500 mt-1 flex-shrink-0">
-                            {pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {totalPins > 0 && (
-                <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
-                  <span>
-                    Showing {displayRangeStart}-{displayRangeEnd} of {totalPins}
-                  </span>
-                  <button
-                    onClick={handleLoadMorePins}
-                    disabled={!canLoadMorePins}
-                    className="px-4 py-1 border border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    LOAD MORE
-                  </button>
+                    );
+                  })}
                 </div>
-              )}
+                {totalPins > 0 && (
+                  <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
+                    <span>
+                      Showing {displayRangeStart}-{displayRangeEnd} of {totalPins}
+                    </span>
+                    <button
+                      onClick={handleLoadMorePins}
+                      disabled={!canLoadMorePins}
+                      className="px-4 py-1 border border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      LOAD MORE
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    {/* Image Lightbox - Rendered outside modal to avoid z-index issues */}
-    <ImageLightbox
-      images={lightboxImages}
-      initialIndex={lightboxIndex}
-      isOpen={showLightbox}
-      onClose={() => setShowLightbox(false)}
-    />
+      {/* Image Lightbox - Rendered outside modal to avoid z-index issues */}
+      <ImageLightbox
+        images={lightboxImages}
+        initialIndex={lightboxIndex}
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+      />
     </>
   );
 }

@@ -4,14 +4,16 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
   const limit = searchParams.get('limit') || '5';
+  const includePolygon = searchParams.get('polygon') === '1';
 
   if (!query) {
     return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 });
   }
 
   try {
+    const polygonParam = includePolygon ? '&polygon_geojson=1' : '';
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=${limit}`,
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=${limit}${polygonParam}`,
       {
         headers: {
           'User-Agent': 'LucyEarth-LocationTracker/1.0'
