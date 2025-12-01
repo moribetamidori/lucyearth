@@ -51,6 +51,7 @@ interface FindMeEntry {
   place: string;
   latitude: number;
   longitude: number;
+  ownerAnonId: string;
   startTime: string;
   endTime: string;
   rating: number;
@@ -68,6 +69,7 @@ type FindMeEntryRow = {
   place: string;
   latitude: number;
   longitude: number;
+  anon_id: string;
   start_time: string;
   end_time: string;
   rating: number;
@@ -130,12 +132,10 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
   }, []);
 
   const fetchEntries = useCallback(async () => {
-    if (!anonId) return;
     setLoadingEntries(true);
     const { data, error } = await supabase
       .from('findme_entries')
       .select('*')
-      .eq('anon_id', anonId)
       .order('start_time', { ascending: false });
 
     if (error) {
@@ -147,6 +147,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
         place: entry.place,
         latitude: entry.latitude,
         longitude: entry.longitude,
+        ownerAnonId: entry.anon_id,
         startTime: entry.start_time,
         endTime: entry.end_time,
         rating: entry.rating,
@@ -166,7 +167,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
       }
     }
     setLoadingEntries(false);
-  }, [anonId]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -175,7 +176,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
   }, [isOpen, resetForm]);
 
   useEffect(() => {
-    if (isOpen && anonId) {
+    if (isOpen) {
       fetchEntries();
     }
   }, [isOpen, anonId, fetchEntries]);
@@ -335,6 +336,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
           place: updated.place,
           latitude: updated.latitude,
           longitude: updated.longitude,
+          ownerAnonId: updated.anon_id,
           startTime: updated.start_time,
           endTime: updated.end_time,
           rating: updated.rating,
@@ -377,6 +379,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
           place: inserted.place,
           latitude: inserted.latitude,
           longitude: inserted.longitude,
+          ownerAnonId: inserted.anon_id,
           startTime: inserted.start_time,
           endTime: inserted.end_time,
           rating: inserted.rating,
@@ -411,6 +414,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
   };
 
   const handleStartEdit = (entry: FindMeEntry) => {
+    if (entry.ownerAnonId !== anonId) return;
     setEditingEntryId(entry.id);
     setSelectedEntryId(entry.id);
     setSearchQuery(entry.place);
@@ -433,11 +437,14 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
   };
 
   const handleDeleteEntry = async (entryId: string) => {
-    setEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry || entry.ownerAnonId !== anonId) {
+      return;
+    }
+    setEntries((prev) => prev.filter((item) => item.id !== entryId));
     if (selectedEntryId === entryId) {
       setSelectedEntryId(null);
     }
-    const entry = entries.find((item) => item.id === entryId);
 
     const { error } = await supabase
       .from('findme_entries')
@@ -771,77 +778,82 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
               )}
 
               <div className="mt-3 space-y-3">
-                {entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={`relative border-2 border-gray-900 bg-white p-3 transition cursor-pointer ${entry.id === selectedEntryId ? 'shadow-[4px_4px_0_0_#000]' : ''
-                      }`}
-                    onClick={() => setSelectedEntryId(entry.id)}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-gray-900">{entry.place}</p>
-                            {editingEntryId === entry.id && (
-                              <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-600">
-                                Editing
-                              </span>
-                            )}
+                {entries.map((entry) => {
+                  const isOwnEntry = entry.ownerAnonId === anonId;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`relative border-2 border-gray-900 bg-white p-3 transition cursor-pointer ${entry.id === selectedEntryId ? 'shadow-[4px_4px_0_0_#000]' : ''
+                        }`}
+                      onClick={() => setSelectedEntryId(entry.id)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-900">{entry.place}</p>
+                              {editingEntryId === entry.id && (
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-600">
+                                  Editing
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500">
+                              <span>Color</span>
+                              <span
+                                className="inline-block w-3 h-3 rounded-full border border-gray-900"
+                                style={{ backgroundColor: entry.highlightColor }}
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500">
-                            <span>Color</span>
-                            <span
-                              className="inline-block w-3 h-3 rounded-full border border-gray-900"
-                              style={{ backgroundColor: entry.highlightColor }}
+                          <p className="text-xs text-gray-500">
+                            {formatDisplayDate(entry.startTime)} → {formatDisplayDate(entry.endTime)}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Duration: {formatDuration(entry.startTime, entry.endTime)}
+                          </p>
+                          <div className="flex items-center gap-1 text-lg">
+                            {renderStaticStars(entry.rating)}
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            {[
+                              { label: 'Food', value: entry.foodRating },
+                              { label: 'Culture', value: entry.cultureRating },
+                              { label: 'Livability', value: entry.livabilityRating },
+                            ].map((metric) => (
+                              <div key={`${entry.id}-${metric.label}`} className="flex items-center gap-2">
+                                <span className="w-16 uppercase tracking-wide text-[10px] text-gray-500">
+                                  {metric.label}
+                                </span>
+                                <span className="flex text-sm">
+                                  {renderStaticStars(metric.value, 'text-amber-500')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {isOwnEntry && (
+                          <div className="flex flex-col gap-1">
+                            <ActionButton
+                              variant="edit"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleStartEdit(entry);
+                              }}
+                            />
+                            <ActionButton
+                              variant="delete"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteEntry(entry.id);
+                              }}
                             />
                           </div>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          {formatDisplayDate(entry.startTime)} → {formatDisplayDate(entry.endTime)}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Duration: {formatDuration(entry.startTime, entry.endTime)}
-                        </p>
-                        <div className="flex items-center gap-1 text-lg">
-                          {renderStaticStars(entry.rating)}
-                        </div>
-                        <div className="mt-2 space-y-1 text-xs text-gray-600">
-                          {[
-                            { label: 'Food', value: entry.foodRating },
-                            { label: 'Culture', value: entry.cultureRating },
-                            { label: 'Livability', value: entry.livabilityRating },
-                          ].map((metric) => (
-                            <div key={`${entry.id}-${metric.label}`} className="flex items-center gap-2">
-                              <span className="w-16 uppercase tracking-wide text-[10px] text-gray-500">
-                                {metric.label}
-                              </span>
-                              <span className="flex text-sm">
-                                {renderStaticStars(metric.value, 'text-amber-500')}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <ActionButton
-                          variant="edit"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleStartEdit(entry);
-                          }}
-                        />
-                        <ActionButton
-                          variant="delete"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteEntry(entry.id);
-                          }}
-                        />
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
