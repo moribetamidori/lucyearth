@@ -105,10 +105,28 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingColor, setPendingColor] = useState<string>(() => generateRandomColor());
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  const resetForm = useCallback(() => {
+    const now = new Date();
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    setStartTime(formatDateTimeLocal(now));
+    setEndTime(formatDateTimeLocal(twoHoursLater));
+    setFormError('');
+    setSearchQuery('');
+    setSelectedCoords(null);
+    setSelectedBoundary(null);
+    setRating(3);
+    setFoodRating(3);
+    setCultureRating(3);
+    setLivabilityRating(3);
+    setPendingColor(generateRandomColor());
+    setEditingEntryId(null);
   }, []);
 
   const fetchEntries = useCallback(async () => {
@@ -152,21 +170,9 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
 
   useEffect(() => {
     if (isOpen) {
-      const now = new Date();
-      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      setStartTime(formatDateTimeLocal(now));
-      setEndTime(formatDateTimeLocal(twoHoursLater));
-      setFormError('');
-      setSearchQuery('');
-      setSelectedCoords(null);
-      setSelectedBoundary(null);
-      setRating(3);
-      setFoodRating(3);
-      setCultureRating(3);
-      setLivabilityRating(3);
-      setPendingColor(generateRandomColor());
+      resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, resetForm]);
 
   useEffect(() => {
     if (isOpen && anonId) {
@@ -233,6 +239,11 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
     return getRadiusFromDuration(start, end);
   }, [selectedCoords, startTime, endTime, selectedBoundary]);
 
+  const editingEntry = useMemo(
+    () => (editingEntryId ? entries.find((entry) => entry.id === editingEntryId) ?? null : null),
+    [entries, editingEntryId]
+  );
+
   const handleSuggestionSelect = (suggestion: LocationSuggestion) => {
     setSearchQuery(suggestion.display_name);
     setSuggestions([]);
@@ -247,14 +258,15 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
     });
   };
 
-  const handleAddEntry = async (e: React.FormEvent) => {
+  const handleSubmitEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!anonId) {
       setFormError('Need an anonymous ID before saving.');
       return;
     }
 
-    if (!searchQuery.trim()) {
+    const trimmedPlace = searchQuery.trim();
+    if (!trimmedPlace) {
       setFormError('Type a place to highlight.');
       return;
     }
@@ -278,7 +290,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
       let coords = selectedCoords;
       let boundary = selectedBoundary;
       if (!coords || !boundary) {
-        const lookup = await fetchBoundaryForQuery(searchQuery);
+        const lookup = await fetchBoundaryForQuery(trimmedPlace);
         if (!lookup) {
           setFormError('Could not find that location. Try a more specific name.');
           setIsSaving(false);
@@ -289,67 +301,135 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
       }
 
       const radius = Math.round(getRadiusFromDuration(start, end));
-
-      const { data, error } = await supabase
-        .from('findme_entries')
-        .insert({
-          anon_id: anonId,
-          place: searchQuery.trim(),
-          latitude: coords.lat,
-          longitude: coords.lon,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          rating,
-          food_rating: foodRating,
-          culture_rating: cultureRating,
-          livability_rating: livabilityRating,
-          radius_m: radius,
-          boundary_geojson: boundary,
-          highlight_color: pendingColor,
-        })
-        .select()
-        .single();
-
-      if (error || !data) {
-        throw error || new Error('No entry returned');
-      }
-
-      const inserted = data as FindMeEntryRow;
-      const normalized: FindMeEntry = {
-        id: inserted.id,
-        place: inserted.place,
-        latitude: inserted.latitude,
-        longitude: inserted.longitude,
-        startTime: inserted.start_time,
-        endTime: inserted.end_time,
-        rating: inserted.rating,
-        foodRating: inserted.food_rating ?? foodRating,
-        cultureRating: inserted.culture_rating ?? cultureRating,
-        livabilityRating: inserted.livability_rating ?? livabilityRating,
-        radius: inserted.radius_m,
-        createdAt: inserted.created_at,
-        highlightColor: inserted.highlight_color || pendingColor,
-        boundary: inserted.boundary_geojson ?? null,
+      const basePayload = {
+        place: trimmedPlace,
+        latitude: coords.lat,
+        longitude: coords.lon,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        rating,
+        food_rating: foodRating,
+        culture_rating: cultureRating,
+        livability_rating: livabilityRating,
+        radius_m: radius,
+        boundary_geojson: boundary,
+        highlight_color: pendingColor,
       };
 
-      setEntries((prev) => [normalized, ...prev]);
-      setSelectedEntryId(normalized.id);
-      setSelectedCoords(null);
-      setSelectedBoundary(null);
-      setSuggestions([]);
-      setSearchQuery('');
-      setRating(3);
-      setFoodRating(3);
-      setCultureRating(3);
-      setLivabilityRating(3);
-      setPendingColor(generateRandomColor());
-      onLogActivity('Added FindMe spot', `${normalized.place} (${normalized.rating} stars)`);
+      if (editingEntryId) {
+        const { data, error } = await supabase
+          .from('findme_entries')
+          .update(basePayload)
+          .eq('id', editingEntryId)
+          .eq('anon_id', anonId)
+          .select()
+          .single();
+
+        if (error || !data) {
+          throw error || new Error('No entry returned');
+        }
+
+        const updated = data as FindMeEntryRow;
+        const normalized: FindMeEntry = {
+          id: updated.id,
+          place: updated.place,
+          latitude: updated.latitude,
+          longitude: updated.longitude,
+          startTime: updated.start_time,
+          endTime: updated.end_time,
+          rating: updated.rating,
+          foodRating: updated.food_rating ?? foodRating,
+          cultureRating: updated.culture_rating ?? cultureRating,
+          livabilityRating: updated.livability_rating ?? livabilityRating,
+          radius: updated.radius_m,
+          createdAt: updated.created_at,
+          highlightColor: updated.highlight_color || pendingColor,
+          boundary: updated.boundary_geojson ?? null,
+        };
+
+        setEntries((prev) => {
+          const mapped = prev.map((entry) => (entry.id === normalized.id ? normalized : entry));
+          return mapped.sort(
+            (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+          );
+        });
+        setSelectedEntryId(normalized.id);
+        onLogActivity('Updated FindMe spot', `${normalized.place} (${normalized.rating} stars)`);
+        resetForm();
+        setSuggestions([]);
+      } else {
+        const { data, error } = await supabase
+          .from('findme_entries')
+          .insert({
+            ...basePayload,
+            anon_id: anonId,
+          })
+          .select()
+          .single();
+
+        if (error || !data) {
+          throw error || new Error('No entry returned');
+        }
+
+        const inserted = data as FindMeEntryRow;
+        const normalized: FindMeEntry = {
+          id: inserted.id,
+          place: inserted.place,
+          latitude: inserted.latitude,
+          longitude: inserted.longitude,
+          startTime: inserted.start_time,
+          endTime: inserted.end_time,
+          rating: inserted.rating,
+          foodRating: inserted.food_rating ?? foodRating,
+          cultureRating: inserted.culture_rating ?? cultureRating,
+          livabilityRating: inserted.livability_rating ?? livabilityRating,
+          radius: inserted.radius_m,
+          createdAt: inserted.created_at,
+          highlightColor: inserted.highlight_color || pendingColor,
+          boundary: inserted.boundary_geojson ?? null,
+        };
+
+        setEntries((prev) => [normalized, ...prev]);
+        setSelectedEntryId(normalized.id);
+        setSelectedCoords(null);
+        setSelectedBoundary(null);
+        setSuggestions([]);
+        setSearchQuery('');
+        setRating(3);
+        setFoodRating(3);
+        setCultureRating(3);
+        setLivabilityRating(3);
+        setPendingColor(generateRandomColor());
+        onLogActivity('Added FindMe spot', `${normalized.place} (${normalized.rating} stars)`);
+      }
     } catch (error) {
       console.error('Failed to save FindMe entry:', error);
       setFormError('Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleStartEdit = (entry: FindMeEntry) => {
+    setEditingEntryId(entry.id);
+    setSelectedEntryId(entry.id);
+    setSearchQuery(entry.place);
+    setStartTime(formatDateTimeLocal(new Date(entry.startTime)));
+    setEndTime(formatDateTimeLocal(new Date(entry.endTime)));
+    setRating(entry.rating);
+    setFoodRating(entry.foodRating);
+    setCultureRating(entry.cultureRating);
+    setLivabilityRating(entry.livabilityRating);
+    setPendingColor(entry.highlightColor || '#6366f1');
+    setSelectedCoords({ lat: entry.latitude, lon: entry.longitude });
+    setSelectedBoundary(entry.boundary ?? null);
+    setFormError('');
+    setSuggestions([]);
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+    setSuggestions([]);
   };
 
   const handleDeleteEntry = async (entryId: string) => {
@@ -362,7 +442,8 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
     const { error } = await supabase
       .from('findme_entries')
       .delete()
-      .eq('id', entryId);
+      .eq('id', entryId)
+      .eq('anon_id', anonId);
 
     if (error) {
       console.error('Failed to delete FindMe entry:', error);
@@ -378,13 +459,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
 
   const handleClose = () => {
     setSuggestions([]);
-    setSelectedCoords(null);
-    setSelectedBoundary(null);
-    setRating(3);
-    setFoodRating(3);
-    setCultureRating(3);
-    setLivabilityRating(3);
-    setPendingColor(generateRandomColor());
+    resetForm();
     onClose();
   };
 
@@ -513,7 +588,26 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
           </div>
 
           <div className="lg:w-1/2 flex-1 overflow-y-auto p-5 space-y-6 bg-gray-50">
-            <form onSubmit={handleAddEntry} className="space-y-3">
+            <form onSubmit={handleSubmitEntry} className="space-y-3">
+              {editingEntryId && (
+                <div className="flex items-center justify-between border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-blue-500 font-semibold">
+                      Editing
+                    </p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {editingEntry?.place ?? 'Selected place'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="text-blue-700 font-semibold uppercase tracking-wider hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                   Location
@@ -650,7 +744,13 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
                 className="w-full px-4 py-2 border-2 border-gray-900 bg-white hover:bg-sky-200 transition-colors text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={isSaving}
               >
-                {isSaving ? 'Saving...' : 'Highlight this place'}
+                {isSaving
+                  ? editingEntryId
+                    ? 'Updating...'
+                    : 'Saving...'
+                  : editingEntryId
+                  ? 'Update this place'
+                  : 'Highlight this place'}
               </button>
             </form>
 
@@ -680,8 +780,15 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-semibold text-gray-900">{entry.place}</p>
+                      <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-gray-900">{entry.place}</p>
+                            {editingEntryId === entry.id && (
+                              <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-600">
+                                Editing
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500">
                             <span>Color</span>
                             <span
@@ -716,13 +823,22 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
                           ))}
                         </div>
                       </div>
-                      <ActionButton
-                        variant="delete"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteEntry(entry.id);
-                        }}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <ActionButton
+                          variant="edit"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleStartEdit(entry);
+                          }}
+                        />
+                        <ActionButton
+                          variant="delete"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteEntry(entry.id);
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -22,6 +22,7 @@ type TimelineModalProps = {
 };
 
 const timelineColors = ['#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#ef4444'];
+const weekdayLabels = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const PAGE_SIZE = 10;
 
 type TimelineImage = {
@@ -31,6 +32,43 @@ type TimelineImage = {
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const getCurrentTime = () => new Date().toISOString().slice(11, 16);
+const getStartOfMonth = (baseDate = new Date()) =>
+  new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+const formatDateKeyFromParts = (year: number, monthIndex: number, day: number) =>
+  `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+const parseDateKey = (dateKey: string) => {
+  const [yearStr, monthStr, dayStr] = dateKey.split('-');
+  return {
+    year: Number(yearStr),
+    month: Number(monthStr) - 1,
+    day: Number(dayStr),
+  };
+};
+const isDateKeyInMonth = (dateKey: string | null, monthDate: Date) => {
+  if (!dateKey) return false;
+  const parsed = parseDateKey(dateKey);
+  return parsed.year === monthDate.getFullYear() && parsed.month === monthDate.getMonth();
+};
+const getMonthMetadata = (monthDate: Date) => {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return {
+    daysInMonth,
+    startingDayOfWeek: firstDay.getDay(),
+  };
+};
+const getDisplayLabelForDateKey = (dateKey: string) => {
+  const parsed = parseDateKey(dateKey);
+  const dateObj = new Date(parsed.year, parsed.month, parsed.day);
+  return dateObj.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
 
 const sortEntries = (items: TimelineEntry[]) =>
   [...items].sort(
@@ -86,7 +124,16 @@ export default function TimelineModal({
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'timeline' | 'calendar'>('timeline');
+  const [calendarMonth, setCalendarMonth] = useState(() => getStartOfMonth());
+  const [calendarEntries, setCalendarEntries] = useState<TimelineEntry[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const refreshCalendarView = useCallback(() => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth(), 1));
+  }, []);
   const revokeObjectUrls = useCallback((urls: string[]) => {
     urls.forEach((url) => {
       if (url.startsWith('blob:')) {
@@ -172,6 +219,12 @@ export default function TimelineModal({
       }
     } else {
       resetForm();
+      setViewMode('timeline');
+      setCalendarEntries([]);
+      setCalendarError(null);
+      setCalendarLoading(false);
+      setSelectedCalendarDate(null);
+      setCalendarMonth(getStartOfMonth());
     }
   }, [isOpen, loadEntries, onLogActivity, resetForm]);
 
@@ -186,6 +239,51 @@ export default function TimelineModal({
       revokeObjectUrls(newImagePreviews);
     };
   }, [newImagePreviews, revokeObjectUrls]);
+
+  useEffect(() => {
+    if (!isOpen || viewMode !== 'calendar') return;
+    let active = true;
+
+    const fetchMonthEntries = async () => {
+      setCalendarLoading(true);
+      setCalendarError(null);
+      const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+      const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+      const { data, error } = await supabase
+        .from('timeline_entries')
+        .select('*')
+        .gte('event_time', start.toISOString())
+        .lt('event_time', end.toISOString())
+        .order('event_time', { ascending: true });
+
+      if (!active) return;
+
+      if (error) {
+        console.error('Failed to load calendar entries:', error);
+        setCalendarEntries([]);
+        setCalendarError('Failed to load calendar data. Please try again.');
+      } else {
+        const fetched = data || [];
+        setCalendarEntries(fetched);
+        setSelectedCalendarDate((prev) => {
+          if (prev && isDateKeyInMonth(prev, calendarMonth)) {
+            return prev;
+          }
+          const todayKey = getToday();
+          if (isDateKeyInMonth(todayKey, calendarMonth)) {
+            return todayKey;
+          }
+          return fetched.length > 0 ? fetched[0].event_time.slice(0, 10) : null;
+        });
+      }
+      setCalendarLoading(false);
+    };
+
+    fetchMonthEntries();
+    return () => {
+      active = false;
+    };
+  }, [calendarMonth, isOpen, viewMode]);
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files;
@@ -301,6 +399,9 @@ export default function TimelineModal({
       }
 
       setEntries((prev) => prev.filter((item) => item.id !== entry.id));
+      if (viewMode === 'calendar') {
+        refreshCalendarView();
+      }
       if (editingEntry?.id === entry.id) {
         resetForm();
       }
@@ -383,6 +484,9 @@ export default function TimelineModal({
         setEntries((prev) =>
           sortEntries(prev.map((item) => (item.id === data.id ? data : item)))
         );
+        if (viewMode === 'calendar') {
+          refreshCalendarView();
+        }
         if (onLogActivity) {
           onLogActivity('Updated Timeline Entry', data.title);
         }
@@ -396,6 +500,9 @@ export default function TimelineModal({
         if (error) throw error;
 
         setEntries((prev) => sortEntries([data, ...prev]));
+        if (viewMode === 'calendar') {
+          refreshCalendarView();
+        }
         if (onLogActivity) {
           onLogActivity('Added Timeline Entry', data.title);
         }
@@ -440,11 +547,361 @@ export default function TimelineModal({
     return `Tracking ${timelineStats.total} entries across ${displayYears} year${plural}`;
   }, [entries.length, timelineStats]);
 
+  const calendarEntriesByDate = useMemo(() => {
+    const grouped: Record<string, TimelineEntry[]> = {};
+    calendarEntries.forEach((entry) => {
+      const dateKey = entry.event_time.slice(0, 10);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(entry);
+    });
+    Object.keys(grouped).forEach((key) => {
+      grouped[key].sort(
+        (a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime()
+      );
+    });
+    return grouped;
+  }, [calendarEntries]);
+
+  const selectedCalendarEntries = useMemo(() => {
+    if (!selectedCalendarDate) return [];
+    return calendarEntriesByDate[selectedCalendarDate] || [];
+  }, [calendarEntriesByDate, selectedCalendarDate]);
+
+  const calendarMonthMeta = useMemo(() => getMonthMetadata(calendarMonth), [calendarMonth]);
+
+  const calendarMonthLabel = useMemo(
+    () =>
+      calendarMonth.toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+      }),
+    [calendarMonth]
+  );
+  const { daysInMonth, startingDayOfWeek } = calendarMonthMeta;
+
   const handleOpenLightbox = (images: string[], initialIndex = 0) => {
     setLightboxImages(images);
     setLightboxIndex(initialIndex);
     setShowLightbox(true);
   };
+
+  const handleCalendarDayClick = (day: number) => {
+    const dateKey = formatDateKeyFromParts(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth(),
+      day
+    );
+    setSelectedCalendarDate(dateKey);
+  };
+
+  const goToPrevMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const renderTimelineView = () => (
+    <>
+      <div className="absolute left-10 top-4 bottom-4 border-l-2 border-dashed border-gray-300 pointer-events-none" />
+      {loading ? (
+        <div className="text-center text-gray-500 mt-20">Loading timeline...</div>
+      ) : error ? (
+        <div className="text-center text-red-500 mt-20">{error}</div>
+      ) : entries.length === 0 ? (
+        <div className="text-center text-gray-500 mt-20">
+          No entries yet. {isEditMode ? 'Log your first moment!' : 'Ask Lucy to log a few highlights.'}
+        </div>
+      ) : (
+        <div className="space-y-6 relative">
+          {entries.map((entry, index) => {
+            const color = getMarkerColor(entry.id, index);
+            const entryDate = new Date(entry.event_time);
+            const dateLabel = entryDate.toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            });
+            const timeLabel = entryDate.toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+            });
+            const entryImages = getEntryImageUrls(entry);
+            return (
+              <div key={entry.id} className="relative pl-12 group">
+                <div
+                  className="absolute left-5 top-5 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-gray-900"
+                  style={{ backgroundColor: color }}
+                />
+                <div
+                  className="bg-white border-2 border-gray-900 p-4 shadow-[4px_4px_0_0_#000] relative"
+                  style={{ minHeight: '120px' }}
+                >
+                  {isEditMode && (
+                    <ActionButtonGroup
+                      buttons={[
+                        {
+                          variant: 'edit',
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            handleEditEntry(entry);
+                          },
+                        },
+                        {
+                          variant: 'delete',
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            handleDeleteEntry(entry);
+                          },
+                        },
+                      ]}
+                    />
+                  )}
+                  <div className="flex flex-wrap justify-between gap-2 pr-12">
+                    <div>
+                      <div className="text-sm font-semibold tracking-wide uppercase text-gray-600">
+                        {dateLabel}
+                      </div>
+                      <div className="text-xs text-gray-500">{timeLabel}</div>
+                    </div>
+                    <div className="text-xs text-gray-500">#{entries.length - index}</div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-lg font-bold">{entry.title}</div>
+                    {entry.details && (
+                      <div className="text-sm text-gray-700 mt-1 whitespace-pre-line">
+                        {entry.details}
+                      </div>
+                    )}
+                  </div>
+                  {entryImages.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {entryImages.map((imageUrl, imageIndex) => (
+                        <div
+                          key={`${entry.id}-${imageIndex}`}
+                          className="w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                          onClick={() => handleOpenLightbox(entryImages, imageIndex)}
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={`${entry.title} image ${imageIndex + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {hasMore && (
+            <div className="pt-2 text-center space-y-2">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-4 py-2 border-2 border-gray-900 bg-white text-sm font-semibold hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? 'Loading...' : 'Load more entries'}
+              </button>
+              {loadMoreError && <div className="text-xs text-red-500">{loadMoreError}</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const renderCalendarView = () => (
+    <div className="h-full flex flex-col">
+      {calendarLoading ? (
+        <div className="text-center text-gray-500 mt-20">Loading calendar...</div>
+      ) : calendarError ? (
+        <div className="text-center text-red-500 mt-20">{calendarError}</div>
+      ) : (
+        <div className="border-2 border-gray-900 bg-white shadow-[4px_4px_0_0_#000] p-4">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={goToPrevMonth}
+              className="px-3 py-1 border-2 border-gray-900 text-xs font-semibold hover:bg-blue-100"
+              aria-label="Previous month"
+            >
+              {'<'}
+            </button>
+            <div className="text-base font-bold tracking-wide">
+              {calendarMonthLabel.toUpperCase()}
+            </div>
+            <button
+              type="button"
+              onClick={goToNextMonth}
+              className="px-3 py-1 border-2 border-gray-900 text-xs font-semibold hover:bg-blue-100"
+              aria-label="Next month"
+            >
+              {'>'}
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-2 text-[10px] text-gray-500 mb-2">
+            {weekdayLabels.map((day) => (
+              <div key={day} className="text-center tracking-wide">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: startingDayOfWeek }).map((_, idx) => (
+              <div key={`empty-${idx}`} className="aspect-square" />
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, idx) => {
+              const day = idx + 1;
+              const dateKey = formatDateKeyFromParts(
+                calendarMonth.getFullYear(),
+                calendarMonth.getMonth(),
+                day
+              );
+              const entryCount = calendarEntriesByDate[dateKey]?.length || 0;
+              const isSelected = selectedCalendarDate === dateKey;
+              const isToday = dateKey === getToday();
+              const dotsToShow = Math.min(entryCount, 4);
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => handleCalendarDayClick(day)}
+                  className={`aspect-square border-2 border-gray-900 flex flex-col items-center justify-center transition-colors p-1 cursor-pointer ${
+                    isSelected
+                      ? 'bg-yellow-100'
+                      : entryCount > 0
+                        ? 'bg-white hover:bg-gray-100'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="text-xs font-semibold">
+                    {day}
+                    {isToday && <span className="ml-1 text-[10px] text-blue-600">•</span>}
+                  </div>
+                  {entryCount > 0 && (
+                    <div className="flex flex-wrap items-center justify-center gap-[2px] mt-1">
+                      {Array.from({ length: dotsToShow }).map((_, dotIdx) => (
+                        <span
+                          key={`${dateKey}-dot-${dotIdx}`}
+                          className="w-2 h-2 rounded-full border border-gray-900"
+                          style={{
+                            backgroundColor:
+                              timelineColors[(dotIdx + entryCount) % timelineColors.length],
+                          }}
+                        />
+                      ))}
+                      {entryCount > dotsToShow && (
+                        <span className="text-[10px] font-semibold text-blue-600">
+                          +{entryCount - dotsToShow}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCalendarEntriesPanel = () => (
+    <div className="lg:w-[360px] border-t-4 border-gray-900 lg:border-t-0 lg:border-l-4 p-4 flex flex-col bg-white">
+      <div className="text-xs text-gray-500 tracking-[0.2em] uppercase">
+        {selectedCalendarDate
+          ? `Entries for ${getDisplayLabelForDateKey(selectedCalendarDate)}`
+          : 'Select a day to view entries'}
+      </div>
+      {selectedCalendarDate ? (
+        selectedCalendarEntries.length > 0 ? (
+          <div className="mt-4 space-y-4 overflow-y-auto pr-1">
+            {selectedCalendarEntries.map((entry) => {
+              const entryImages = getEntryImageUrls(entry);
+              const entryDate = new Date(entry.event_time);
+              const timeLabel = entryDate.toLocaleTimeString(undefined, {
+                hour: 'numeric',
+                minute: '2-digit',
+              });
+              return (
+                <div
+                  key={entry.id}
+                  className="border-2 border-gray-900 p-3 shadow-[3px_3px_0_0_#000] bg-white relative"
+                >
+                  {isEditMode && (
+                    <ActionButtonGroup
+                      buttons={[
+                        {
+                          variant: 'edit',
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            handleEditEntry(entry);
+                          },
+                        },
+                        {
+                          variant: 'delete',
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            handleDeleteEntry(entry);
+                          },
+                        },
+                      ]}
+                    />
+                  )}
+                  <div className="flex items-center justify-between text-xs text-gray-500 pr-12">
+                    <span>{timeLabel}</span>
+                    {entryImages.length > 0 && (
+                      <span>
+                        {entryImages.length} photo
+                        {entryImages.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-base font-semibold">{entry.title}</div>
+                  {entry.details && (
+                    <div className="text-sm text-gray-700 mt-1 whitespace-pre-line">
+                      {entry.details}
+                    </div>
+                  )}
+                  {entryImages.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {entryImages.map((imageUrl, imageIndex) => (
+                        <div
+                          key={`${entry.id}-calendar-${imageIndex}`}
+                          className="w-24 h-24 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                          onClick={() => handleOpenLightbox(entryImages, imageIndex)}
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={`${entry.title} image ${imageIndex + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-6 text-sm text-gray-500">
+            {`No entries logged on ${getDisplayLabelForDateKey(selectedCalendarDate)}.`}
+          </div>
+        )
+      ) : (
+        <div className="mt-6 text-sm text-gray-500">
+          Choose a date on the calendar to preview your notes.
+        </div>
+      )}
+    </div>
+  );
 
   if (!isOpen) return null;
 
@@ -457,12 +914,36 @@ export default function TimelineModal({
           style={{ boxShadow: '8px 8px 0 0 #000' }}
         >
           {/* Header */}
-          <div className="p-4 border-b-4 border-gray-900 flex items-center justify-between gap-4">
+          <div className="p-4 border-b-4 border-gray-900 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-2xl font-bold tracking-wider">TIMELINE</div>
               <div className="text-xs text-gray-500 mt-1">{timelineSummary}</div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-end">
+              <div className="flex border-2 border-gray-900 divide-x-2 divide-gray-900 text-xs font-semibold bg-white shadow-[4px_4px_0_0_#000]">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('timeline')}
+                  aria-pressed={viewMode === 'timeline'}
+                  className={`px-3 py-1 tracking-wide ${viewMode === 'timeline'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                >
+                  TIMELINE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('calendar')}
+                  aria-pressed={viewMode === 'calendar'}
+                  className={`px-3 py-1 tracking-wide ${viewMode === 'calendar'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                >
+                  CALENDAR
+                </button>
+              </div>
               <span
                 className={`text-xs px-3 py-1 border-2 border-gray-900 ${isEditMode ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}
@@ -480,289 +961,182 @@ export default function TimelineModal({
 
           {/* Content */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            {/* Timeline column */}
+            {/* Timeline / Calendar column */}
             <div className="flex-1 overflow-y-auto p-4 relative">
-              <div className="absolute left-10 top-4 bottom-4 border-l-2 border-dashed border-gray-300 pointer-events-none" />
-              {loading ? (
-                <div className="text-center text-gray-500 mt-20">Loading timeline...</div>
-              ) : error ? (
-                <div className="text-center text-red-500 mt-20">{error}</div>
-              ) : entries.length === 0 ? (
-                <div className="text-center text-gray-500 mt-20">
-                  No entries yet. {isEditMode ? 'Log your first moment!' : 'Ask Lucy to log a few highlights.'}
-                </div>
-              ) : (
-                <div className="space-y-6 relative">
-                  {entries.map((entry, index) => {
-                    const color = getMarkerColor(entry.id, index);
-                    const entryDate = new Date(entry.event_time);
-                    const dateLabel = entryDate.toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-                    const timeLabel = entryDate.toLocaleTimeString(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                    const entryImages = getEntryImageUrls(entry);
-                    return (
-                      <div key={entry.id} className="relative pl-12 group">
-                        <div
-                          className="absolute left-5 top-5 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-gray-900"
-                          style={{ backgroundColor: color }}
-                        />
-                        <div
-                          className="bg-white border-2 border-gray-900 p-4 shadow-[4px_4px_0_0_#000] relative"
-                          style={{ minHeight: '120px' }}
-                        >
-                          {isEditMode && (
-                            <ActionButtonGroup
-                              buttons={[
-                                {
-                                  variant: 'edit',
-                                  onClick: (e) => {
-                                    e.stopPropagation();
-                                    handleEditEntry(entry);
-                                  },
-                                },
-                                {
-                                  variant: 'delete',
-                                  onClick: (e) => {
-                                    e.stopPropagation();
-                                    handleDeleteEntry(entry);
-                                  },
-                                },
-                              ]}
-                            />
-                          )}
-                          <div className="flex flex-wrap justify-between gap-2 pr-12">
-                            <div>
-                              <div className="text-sm font-semibold tracking-wide uppercase text-gray-600">
-                                {dateLabel}
-                              </div>
-                              <div className="text-xs text-gray-500">{timeLabel}</div>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              #{entries.length - index}
-                            </div>
-                          </div>
-                          <div className="mt-3">
-                            <div className="text-lg font-bold">{entry.title}</div>
-                            {entry.details && (
-                              <div className="text-sm text-gray-700 mt-1 whitespace-pre-line">
-                                {entry.details}
-                              </div>
-                            )}
-                          </div>
-                          {entryImages.length > 0 && (
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {entryImages.map((imageUrl, imageIndex) => (
-                                <div
-                                  key={`${entry.id}-${imageIndex}`}
-                                  className="w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
-                                  onClick={() => handleOpenLightbox(entryImages, imageIndex)}
-                                >
-                                  <img
-                                    src={imageUrl}
-                                    alt={`${entry.title} image ${imageIndex + 1}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {hasMore && (
-                    <div className="pt-2 text-center space-y-2">
-                      <button
-                        type="button"
-                        onClick={handleLoadMore}
-                        disabled={loadingMore}
-                        className="px-4 py-2 border-2 border-gray-900 bg-white text-sm font-semibold hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {loadingMore ? 'Loading...' : 'Load more entries'}
-                      </button>
-                      {loadMoreError && (
-                        <div className="text-xs text-red-500">{loadMoreError}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+              {viewMode === 'timeline' ? renderTimelineView() : renderCalendarView()}
             </div>
 
-            {/* Form column */}
-            <div className="lg:w-[340px] border-t-4 border-gray-900 lg:border-t-0 lg:border-l-4 p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-bold">
-                  {editingEntry ? 'Edit Entry' : 'New Entry'}
-                </h3>
-                {editingEntry && (
-                  <button
-                    onClick={resetForm}
-                    className="text-sm underline text-gray-500 hover:text-gray-800"
-                  >
-                    Cancel edit
-                  </button>
+            {viewMode === 'timeline' ? (
+              <div className="lg:w-[340px] border-t-4 border-gray-900 lg:border-t-0 lg:border-l-4 p-4 flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-bold">
+                    {editingEntry ? 'Edit Entry' : 'New Entry'}
+                  </h3>
+                  {editingEntry && (
+                    <button
+                      onClick={resetForm}
+                      className="text-sm underline text-gray-500 hover:text-gray-800"
+                    >
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+                {isEditMode ? (
+                  <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Date</label>
+                      <input
+                        type="date"
+                        value={eventDate}
+                        onChange={(e) => setEventDate(e.target.value)}
+                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Time</label>
+                      <input
+                        type="time"
+                        value={eventTime}
+                        onChange={(e) => setEventTime(e.target.value)}
+                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Headline</label>
+                      <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="What happened?"
+                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                        maxLength={120}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">
+                        Notes <span className="text-gray-400">(optional)</span>
+                      </label>
+                      <textarea
+                        value={details}
+                        onChange={(e) => setDetails(e.target.value)}
+                        placeholder="Add a few details..."
+                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm h-24"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">
+                        Images <span className="text-gray-400">(optional)</span>
+                      </label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,.heic,.heif"
+                        multiple
+                        onChange={handleImageChange}
+                        className="mt-1 w-full text-xs"
+                      />
+                      {existingImages.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                            Existing
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {existingImages.map((image, index) => (
+                              <div
+                                key={`${image.filename ?? image.url}-${index}`}
+                                className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                              >
+                                <img
+                                  src={image.url}
+                                  alt={`Existing upload ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveExistingImage(index)}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                  aria-label="Remove existing image"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {newImagePreviews.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                            New uploads
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {newImagePreviews.map((preview, index) => (
+                              <div
+                                key={`new-${index}`}
+                                className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                              >
+                                <img
+                                  src={preview}
+                                  alt={`New upload ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveNewImage(index)}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                  aria-label="Remove new image"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {imagesMarkedForRemoval.length > 0 && editingEntry && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Removed images will be deleted once you save.
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-gray-900 text-white py-2 text-sm hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {saving
+                          ? 'Saving...'
+                          : editingEntry
+                            ? 'Save Changes'
+                            : 'Add Entry'}
+                      </button>
+                      {!editingEntry && (
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="text-xs text-gray-500 underline"
+                        >
+                          Reset form
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 px-4">
+                    <div className="text-4xl mb-3">🕒</div>
+                    <p className="text-sm">
+                      Enter edit mode to log new timeline moments and attach optional images.
+                    </p>
+                  </div>
                 )}
               </div>
-              {isEditMode ? (
-                <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Date</label>
-                    <input
-                      type="date"
-                      value={eventDate}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Time</label>
-                    <input
-                      type="time"
-                      value={eventTime}
-                      onChange={(e) => setEventTime(e.target.value)}
-                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Headline</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="What happened?"
-                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                      maxLength={120}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">
-                      Notes <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <textarea
-                      value={details}
-                      onChange={(e) => setDetails(e.target.value)}
-                      placeholder="Add a few details..."
-                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm h-24"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">
-                      Images <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.heic,.heif"
-                      multiple
-                      onChange={handleImageChange}
-                      className="mt-1 w-full text-xs"
-                    />
-                    {existingImages.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
-                          Existing
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {existingImages.map((image, index) => (
-                            <div
-                              key={`${image.filename ?? image.url}-${index}`}
-                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
-                            >
-                              <img
-                                src={image.url}
-                                alt={`Existing upload ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExistingImage(index)}
-                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                                aria-label="Remove existing image"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {newImagePreviews.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
-                          New uploads
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {newImagePreviews.map((preview, index) => (
-                            <div
-                              key={`new-${index}`}
-                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
-                            >
-                              <img
-                                src={preview}
-                                alt={`New upload ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveNewImage(index)}
-                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                                aria-label="Remove new image"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {imagesMarkedForRemoval.length > 0 && editingEntry && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Removed images will be deleted once you save.
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="bg-gray-900 text-white py-2 text-sm hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {saving
-                        ? 'Saving...'
-                        : editingEntry
-                          ? 'Save Changes'
-                          : 'Add Entry'}
-                    </button>
-                    {!editingEntry && (
-                      <button
-                        type="button"
-                        onClick={resetForm}
-                        className="text-xs text-gray-500 underline"
-                      >
-                        Reset form
-                      </button>
-                    )}
-                  </div>
-                </form>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 px-4">
-                  <div className="text-4xl mb-3">🕒</div>
-                  <p className="text-sm">
-                    Enter edit mode to log new timeline moments and attach optional images.
-                  </p>
-                </div>
-              )}
-            </div>
+            ) : (
+              renderCalendarEntriesPanel()
+            )}
           </div>
         </div>
       </div>
