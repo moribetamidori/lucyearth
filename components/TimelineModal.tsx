@@ -22,6 +22,12 @@ type TimelineModalProps = {
 };
 
 const timelineColors = ['#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#ef4444'];
+const PAGE_SIZE = 10;
+
+type TimelineImage = {
+  url: string;
+  filename: string | null;
+};
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const getCurrentTime = () => new Date().toISOString().slice(11, 16);
@@ -30,6 +36,30 @@ const sortEntries = (items: TimelineEntry[]) =>
   [...items].sort(
     (a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime()
   );
+
+const mapEntryImages = (entry: TimelineEntry): TimelineImage[] => {
+  if (entry.image_urls && entry.image_urls.length > 0) {
+    return entry.image_urls
+      .map((url, index) => ({
+        url,
+        filename: entry.image_filenames?.[index] ?? null,
+      }))
+      .filter((item): item is TimelineImage => Boolean(item.url));
+  }
+
+  if (entry.image_url) {
+    return [
+      {
+        url: entry.image_url,
+        filename: entry.image_filename || null,
+      },
+    ];
+  }
+
+  return [];
+};
+
+const getEntryImageUrls = (entry: TimelineEntry) => mapEntryImages(entry).map((image) => image.url);
 
 export default function TimelineModal({
   isOpen,
@@ -44,46 +74,95 @@ export default function TimelineModal({
   const [details, setDetails] = useState('');
   const [eventDate, setEventDate] = useState(getToday());
   const [eventTime, setEventTime] = useState(getCurrentTime());
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<TimelineImage[]>([]);
   const [editingEntry, setEditingEntry] = useState<TimelineEntry | null>(null);
   const [saving, setSaving] = useState(false);
-  const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showLightbox, setShowLightbox] = useState(false);
+  const [imagesMarkedForRemoval, setImagesMarkedForRemoval] = useState<string[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const revokeObjectUrls = useCallback((urls: string[]) => {
+    urls.forEach((url) => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, []);
 
   const resetForm = useCallback(() => {
     setTitle('');
     setDetails('');
     setEventDate(getToday());
     setEventTime(getCurrentTime());
-    setImageFile(null);
-    setImagePreview(null);
+    setNewImageFiles([]);
+    setExistingImages([]);
+    setImagesMarkedForRemoval([]);
     setEditingEntry(null);
-    setRemoveExistingImage(false);
+    setNewImagePreviews((prev) => {
+      revokeObjectUrls(prev);
+      return [];
+    });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, []);
+  }, [revokeObjectUrls]);
 
-  const loadEntries = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const { data, error } = await supabase
-      .from('timeline_entries')
-      .select('*')
-      .order('event_time', { ascending: false });
+  const loadEntries = useCallback(
+    async (options?: { offset?: number; append?: boolean }) => {
+      const { offset = 0, append = false } = options || {};
+      if (append) {
+        setLoadingMore(true);
+        setLoadMoreError(null);
+      } else {
+        setLoading(true);
+        setError(null);
+        setLoadMoreError(null);
+      }
+      const { data, error } = await supabase
+        .from('timeline_entries')
+        .select('*')
+        .order('event_time', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
 
-    if (error) {
-      console.error('Failed to load timeline entries:', error);
-      setError('Failed to load timeline. Please try again later.');
-    } else {
-      setEntries(data || []);
-    }
-    setLoading(false);
-  }, []);
+      if (error) {
+        console.error('Failed to load timeline entries:', error);
+        if (append) {
+          setLoadMoreError('Failed to load more entries. Please try again.');
+        } else {
+          setError('Failed to load timeline. Please try again later.');
+        }
+      } else {
+        const fetched = data || [];
+        if (append) {
+          setEntries((prev) => {
+            const existingIds = new Set(prev.map((item) => item.id));
+            const deduped = fetched.filter((item) => !existingIds.has(item.id));
+            return [...prev, ...deduped];
+          });
+        } else {
+          setEntries(fetched);
+        }
+        setHasMore(fetched.length === PAGE_SIZE);
+      }
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore) return;
+    loadEntries({ offset: entries.length, append: true });
+  }, [entries.length, loadEntries, loadingMore]);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,43 +183,60 @@ export default function TimelineModal({
 
   useEffect(() => {
     return () => {
-      if (imagePreview && imagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreview);
-      }
+      revokeObjectUrls(newImagePreviews);
     };
-  }, [imagePreview]);
+  }, [newImagePreviews, revokeObjectUrls]);
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
+    const selectedFiles = Array.from(fileList);
+    const imageFiles = selectedFiles.filter((file) => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) {
+      alert('Please select image files only.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
+    if (imageFiles.length !== selectedFiles.length) {
+      alert('Some files were skipped because they are not images.');
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-    setImageFile(file);
-    setRemoveExistingImage(false);
-  };
-
-  const handleRemoveImage = () => {
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    setImagePreview(null);
-    setImageFile(null);
-    if (editingEntry?.image_url) {
-      setRemoveExistingImage(true);
-    }
+    const previewUrls = imageFiles.map((file) => URL.createObjectURL(file));
+    setNewImageFiles((prev) => [...prev, ...imageFiles]);
+    setNewImagePreviews((prev) => [...prev, ...previewUrls]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveExistingImage = (index: number) => {
+    setExistingImages((prev) => {
+      const target = prev[index];
+      if (target?.filename) {
+        setImagesMarkedForRemoval((prevRemoval) =>
+          prevRemoval.includes(target.filename!)
+            ? prevRemoval
+            : [...prevRemoval, target.filename!]
+        );
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const handleRemoveNewImage = (index: number) => {
+    setNewImageFiles((prev) => prev.filter((_, idx) => idx !== index));
+    setNewImagePreviews((prev) => {
+      const target = prev[index];
+      if (target && target.startsWith('blob:')) {
+        URL.revokeObjectURL(target);
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
   };
 
   const uploadImage = async (file: File) => {
@@ -171,9 +267,13 @@ export default function TimelineModal({
     const entryDate = new Date(entry.event_time);
     setEventDate(entryDate.toISOString().slice(0, 10));
     setEventTime(entryDate.toISOString().slice(11, 16));
-    setImagePreview(entry.image_url);
-    setImageFile(null);
-    setRemoveExistingImage(false);
+    setExistingImages(mapEntryImages(entry));
+    setImagesMarkedForRemoval([]);
+    setNewImageFiles([]);
+    setNewImagePreviews((prev) => {
+      revokeObjectUrls(prev);
+      return [];
+    });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -187,10 +287,14 @@ export default function TimelineModal({
       const { error } = await supabase.from('timeline_entries').delete().eq('id', entry.id);
       if (error) throw error;
 
-      if (entry.image_filename) {
+      const filenamesToRemove = mapEntryImages(entry)
+        .map((image) => image.filename)
+        .filter((filename): filename is string => Boolean(filename));
+
+      if (filenamesToRemove.length > 0) {
         const { error: storageError } = await supabase.storage
           .from('timeline-images')
-          .remove([entry.image_filename]);
+          .remove(filenamesToRemove);
         if (storageError) {
           console.warn('Failed to remove timeline image:', storageError);
         }
@@ -229,40 +333,41 @@ export default function TimelineModal({
     setSaving(true);
 
     try {
-      let nextImageUrl = editingEntry?.image_url || null;
-      let nextImageFilename = editingEntry?.image_filename || null;
-
-      if (removeExistingImage && nextImageFilename) {
+      if (imagesMarkedForRemoval.length > 0) {
         const { error: removeError } = await supabase.storage
           .from('timeline-images')
-          .remove([nextImageFilename]);
+          .remove(imagesMarkedForRemoval);
         if (removeError) {
-          console.warn('Failed to delete previous timeline image:', removeError);
+          console.warn('Failed to delete previous timeline images:', removeError);
         }
-        nextImageUrl = null;
-        nextImageFilename = null;
+        setImagesMarkedForRemoval([]);
       }
 
-      if (imageFile) {
-        const upload = await uploadImage(imageFile);
-        if (nextImageFilename && upload.fileName !== nextImageFilename) {
-          const { error: purgeError } = await supabase.storage
-            .from('timeline-images')
-            .remove([nextImageFilename]);
-          if (purgeError) {
-            console.warn('Failed to remove older timeline image:', purgeError);
-          }
-        }
-        nextImageUrl = upload.publicUrl;
-        nextImageFilename = upload.fileName;
-      }
+      const uploads =
+        newImageFiles.length > 0
+          ? await Promise.all(newImageFiles.map((file) => uploadImage(file)))
+          : [];
+
+      const allImages: TimelineImage[] = [
+        ...existingImages,
+        ...uploads.map((upload) => ({
+          url: upload.publicUrl,
+          filename: upload.fileName,
+        })),
+      ];
+      const imageUrls = allImages.length > 0 ? allImages.map((image) => image.url) : null;
+      const imageFilenames =
+        allImages.length > 0 ? allImages.map((image) => image.filename ?? null) : null;
+      const primaryImage = allImages[0] ?? null;
 
       const payload = {
         title: title.trim(),
         details: details.trim() ? details.trim() : null,
         event_time: timestamp.toISOString(),
-        image_url: nextImageUrl,
-        image_filename: nextImageFilename,
+        image_url: primaryImage?.url ?? null,
+        image_filename: primaryImage?.filename ?? null,
+        image_urls: imageUrls,
+        image_filenames: imageFilenames,
       };
 
       if (editingEntry) {
@@ -311,7 +416,7 @@ export default function TimelineModal({
   }, []);
 
   const timelineStats = useMemo(() => {
-    if (entries.length === 0) return null;
+    if (entries.length === 0 || hasMore) return null;
     const first = entries[entries.length - 1];
     const last = entries[0];
     const spanYears =
@@ -320,21 +425,24 @@ export default function TimelineModal({
       total: entries.length,
       spanYears: Math.max(spanYears, 0),
     };
-  }, [entries]);
+  }, [entries, hasMore]);
 
   const timelineSummary = useMemo(() => {
-    if (!timelineStats) {
+    if (entries.length === 0) {
       return 'Log the little things that made today special.';
+    }
+    if (!timelineStats) {
+      return `Showing ${entries.length} recent entr${entries.length === 1 ? 'y' : 'ies'}. Load more to revisit earlier moments.`;
     }
     const span = Math.max(timelineStats.spanYears, 0);
     const displayYears = span === 0 ? 1 : span;
     const plural = displayYears === 1 ? '' : 's';
     return `Tracking ${timelineStats.total} entries across ${displayYears} year${plural}`;
-  }, [timelineStats]);
+  }, [entries.length, timelineStats]);
 
-  const handleOpenLightbox = (imageUrl: string) => {
-    setLightboxImages([imageUrl]);
-    setLightboxIndex(0);
+  const handleOpenLightbox = (images: string[], initialIndex = 0) => {
+    setLightboxImages(images);
+    setLightboxIndex(initialIndex);
     setShowLightbox(true);
   };
 
@@ -397,6 +505,7 @@ export default function TimelineModal({
                       hour: 'numeric',
                       minute: '2-digit',
                     });
+                    const entryImages = getEntryImageUrls(entry);
                     return (
                       <div key={entry.id} className="relative pl-12 group">
                         <div
@@ -446,24 +555,42 @@ export default function TimelineModal({
                               </div>
                             )}
                           </div>
-                          {entry.image_url && (
-                            <div className="mt-4">
-                              <div
-                                className="w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
-                                onClick={() => handleOpenLightbox(entry.image_url!)}
-                              >
-                                <img
-                                  src={entry.image_url}
-                                  alt={entry.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
+                          {entryImages.length > 0 && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {entryImages.map((imageUrl, imageIndex) => (
+                                <div
+                                  key={`${entry.id}-${imageIndex}`}
+                                  className="w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                                  onClick={() => handleOpenLightbox(entryImages, imageIndex)}
+                                >
+                                  <img
+                                    src={imageUrl}
+                                    alt={`${entry.title} image ${imageIndex + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
                       </div>
                     );
                   })}
+                  {hasMore && (
+                    <div className="pt-2 text-center space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        className="px-4 py-2 border-2 border-gray-900 bg-white text-sm font-semibold hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {loadingMore ? 'Loading...' : 'Load more entries'}
+                      </button>
+                      {loadMoreError && (
+                        <div className="text-xs text-red-500">{loadMoreError}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -529,39 +656,78 @@ export default function TimelineModal({
                     />
                   </div>
                   <div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-gray-600">
-                        Image <span className="text-gray-400">(optional)</span>
-                      </label>
-                      {imagePreview && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveImage}
-                          className="text-xs text-red-500 underline"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
+                    <label className="text-xs font-semibold text-gray-600">
+                      Images <span className="text-gray-400">(optional)</span>
+                    </label>
                     <input
                       ref={fileInputRef}
                       type="file"
                       accept="image/*,.heic,.heif"
+                      multiple
                       onChange={handleImageChange}
                       className="mt-1 w-full text-xs"
                     />
-                    {imagePreview && (
-                      <div className="mt-2 w-28 h-28 border-2 border-gray-900 overflow-hidden">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
+                    {existingImages.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                          Existing
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {existingImages.map((image, index) => (
+                            <div
+                              key={`${image.filename ?? image.url}-${index}`}
+                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                            >
+                              <img
+                                src={image.url}
+                                alt={`Existing upload ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveExistingImage(index)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                aria-label="Remove existing image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    {!imagePreview && editingEntry?.image_url && removeExistingImage && (
+                    {newImagePreviews.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                          New uploads
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {newImagePreviews.map((preview, index) => (
+                            <div
+                              key={`new-${index}`}
+                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                            >
+                              <img
+                                src={preview}
+                                alt={`New upload ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveNewImage(index)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                aria-label="Remove new image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {imagesMarkedForRemoval.length > 0 && editingEntry && (
                       <div className="text-xs text-gray-500 mt-1">
-                        Image will be removed when you save.
+                        Removed images will be deleted once you save.
                       </div>
                     )}
                   </div>

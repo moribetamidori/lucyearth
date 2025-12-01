@@ -179,6 +179,8 @@ export type TimelineEntry = {
   event_time: string;
   image_url: string | null;
   image_filename: string | null;
+  image_urls?: string[] | null;
+  image_filenames?: (string | null)[] | null;
   created_at: string;
   updated_at: string;
 };
