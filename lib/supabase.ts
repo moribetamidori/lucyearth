@@ -171,3 +171,25 @@ export type WomenProfile = {
   created_at: string;
   updated_at: string;
 };
+
+export type TimelineEntry = {
+  id: string;
+  title: string;
+  details: string | null;
+  event_time: string;
+  image_url: string | null;
+  image_filename: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SlotMachineSpin = {
+  id: string;
+  anon_id: string | null;
+  reel_one: string;
+  reel_two: string;
+  reel_three: string;
+  fortune_text: string;
+  fortune_model?: string | null;
+  created_at: string;
+};

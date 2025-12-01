@@ -16,6 +16,8 @@ import GardenModal from '@/components/GardenModal';
 import BookshelfModal from '@/components/BookshelfModal';
 import WomenModal from '@/components/WomenModal';
 import ScrollFeedModal from '@/components/ScrollFeedModal';
+import TimelineModal from '@/components/TimelineModal';
+import SlotMachineModal from '@/components/SlotMachineModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -55,6 +57,8 @@ export default function Home() {
   const [showBookshelfModal, setShowBookshelfModal] = useState<boolean>(false);
   const [showWomenModal, setShowWomenModal] = useState<boolean>(false);
   const [showScrollFeed, setShowScrollFeed] = useState<boolean>(false);
+  const [showTimelineModal, setShowTimelineModal] = useState<boolean>(false);
+  const [showSlotMachineModal, setShowSlotMachineModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -414,15 +418,15 @@ export default function Home() {
                 className="w-full h-full object-contain"
               />
             </div>
-          <div className="text-[15px] text-gray-900">SPOTIFY</div>
-        </div>
-      )}
+            <div className="text-[15px] text-gray-900">SPOTIFY</div>
+          </div>
+        )}
 
-      {/* Journal icon - always visible */}
-      <div className="flex flex-col items-center gap-2 max-sm:gap-0">
-        <div
-          onClick={() => {
-            setShowJournal(true);
+        {/* Journal icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowJournal(true);
               logActivity('Opened Journal', 'Viewing journal entries');
             }}
             className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
@@ -482,6 +486,48 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Timeline icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowTimelineModal(true);
+              logActivity('Opened Timeline', 'Viewed personal timeline');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-sky-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">🕒</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              TIME
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">TIMELINE</div>
+        </div>
+
+        {/* Activity Log icon - always visible */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowSlotMachineModal(true);
+              logActivity('Opened Slot Machine', 'Ready to spin for a fortune');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-rose-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-lg">🎰</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              FORTUNE
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">FORTUNE</div>
+        </div>
+
         {/* Activity Log icon - always visible */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
@@ -516,9 +562,8 @@ export default function Home() {
                 setShowLoginModal(true);
               }
             }}
-            className={`w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1 ${
-              isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
-            }`}
+            className={`w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1 ${isEditMode ? 'hover:bg-red-500' : 'hover:bg-green-500'
+              }`}
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
@@ -541,11 +586,11 @@ export default function Home() {
       {/* Header */}
       <header className="relative z-10 p-6 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-blue-500 animate-pulse" />
-          <div className="text-base">lucyearth.system</div>
+          {/* <div className="w-2 h-2 bg-blue-500 animate-pulse" />
+          <div className="text-base">lucyearth.system</div> */}
         </div>
         <div className="flex gap-4 text-sm text-gray-500 items-center">
-        <button
+          <button
             onClick={() => {
               setShowAchievements(true);
               logActivity('Opened Achievements', 'Viewing achievements');
@@ -564,8 +609,8 @@ export default function Home() {
             <span className="text-xl max-sm:text-lg">📱</span>
             <span className="text-gray-900 font-semibold whitespace-nowrap max-sm:text-xs">Scroll Mode</span>
           </button>
-   
-         
+
+
         </div>
       </header>
 
@@ -731,6 +776,14 @@ export default function Home() {
         userNumber={userNumber}
       />
 
+      {/* Timeline Modal */}
+      <TimelineModal
+        isOpen={showTimelineModal}
+        onClose={() => setShowTimelineModal(false)}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
       {/* Arena Modal */}
       <ArenaModal
         isOpen={showArenaModal}
@@ -744,6 +797,14 @@ export default function Home() {
       <ScrollFeedModal
         isOpen={showScrollFeed}
         onClose={() => setShowScrollFeed(false)}
+        anonId={anonId}
+        onLogActivity={logActivity}
+      />
+
+      {/* Slot Machine Modal */}
+      <SlotMachineModal
+        isOpen={showSlotMachineModal}
+        onClose={() => setShowSlotMachineModal(false)}
         anonId={anonId}
         onLogActivity={logActivity}
       />

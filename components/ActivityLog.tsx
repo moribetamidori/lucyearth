@@ -109,10 +109,20 @@ export default function ActivityLog({ isOpen, onClose, anonId, userNumber }: Act
                 >
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
-                      <div className="font-medium">{log.action}</div>
-                      {log.details && (
-                        <div className="text-sm text-gray-600 mt-1">{log.details}</div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-medium">{log.action}</div>
+                        {log.details && (
+                          <div
+                            className={`text-sm text-gray-600 ${
+                              log.action === 'Spun Slot Machine'
+                                ? 'font-mono text-base text-gray-800'
+                                : ''
+                            }`}
+                          >
+                            {log.details}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="text-xs text-gray-500 whitespace-nowrap">
                       {formatTime(log.created_at)}
