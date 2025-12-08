@@ -772,13 +772,12 @@ export default function TimelineModal({
                   key={dateKey}
                   type="button"
                   onClick={() => handleCalendarDayClick(day)}
-                  className={`aspect-square border-2 border-gray-900 flex flex-col items-center justify-center transition-colors p-1 cursor-pointer ${
-                    isSelected
+                  className={`aspect-square border-2 border-gray-900 flex flex-col items-center justify-center transition-colors p-1 cursor-pointer ${isSelected
                       ? 'bg-yellow-100'
                       : entryCount > 0
                         ? 'bg-white hover:bg-gray-100'
                         : 'bg-gray-50 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <div className="text-xs font-semibold">
                     {day}
@@ -813,7 +812,7 @@ export default function TimelineModal({
   );
 
   const renderCalendarEntriesPanel = () => (
-    <div className="lg:w-[360px] border-t-4 border-gray-900 lg:border-t-0 lg:border-l-4 p-4 flex flex-col bg-white">
+    <div className="min-h-[60vh] lg:min-h-0 lg:min-w-[45%] lg:w-[50%] max-w-[420px] lg:max-w-[360px] border-t-4 lg:border-t-0 lg:border-l-4 border-gray-900 p-4 flex flex-col bg-white overflow-y-auto">
       <div className="text-xs text-gray-500 tracking-[0.2em] uppercase">
         {selectedCalendarDate
           ? `Entries for ${getDisplayLabelForDateKey(selectedCalendarDate)}`
@@ -917,7 +916,6 @@ export default function TimelineModal({
           <div className="p-4 border-b-4 border-gray-900 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-2xl font-bold tracking-wider">TIMELINE</div>
-              <div className="text-xs text-gray-500 mt-1">{timelineSummary}</div>
             </div>
             <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-end">
               <div className="flex border-2 border-gray-900 divide-x-2 divide-gray-900 text-xs font-semibold bg-white shadow-[4px_4px_0_0_#000]">
@@ -960,14 +958,14 @@ export default function TimelineModal({
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             {/* Timeline / Calendar column */}
-            <div className="flex-1 overflow-y-auto p-4 relative">
+            <div className="flex-1 min-h-[45vh] lg:min-h-0 lg:min-w-[50%] overflow-y-auto p-4 relative">
               {viewMode === 'timeline' ? renderTimelineView() : renderCalendarView()}
             </div>
 
             {viewMode === 'timeline' ? (
-              <div className="lg:w-[340px] border-t-4 border-gray-900 lg:border-t-0 lg:border-l-4 p-4 flex flex-col">
+              <div className="min-h-[60vh] lg:min-h-0 lg:min-w-[45%] lg:w-[50%] max-w-[420px] border-t-4 lg:border-t-0 lg:border-l-4 border-gray-900 p-4 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-bold">
                     {editingEntry ? 'Edit Entry' : 'New Entry'}
@@ -982,7 +980,10 @@ export default function TimelineModal({
                   )}
                 </div>
                 {isEditMode ? (
-                  <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1">
+                  <form
+                    onSubmit={handleSubmit}
+                    className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0"
+                  >
                     <div>
                       <label className="text-xs font-semibold text-gray-600">Date</label>
                       <input
