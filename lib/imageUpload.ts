@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { CatPicture } from './supabase';
 import { generateVideoThumbnail } from './videoThumbnail';
+import imageCompression from 'browser-image-compression';
 
 /**
  * Converts HEIC to PNG first if needed
@@ -43,7 +44,22 @@ async function convertHeicToPng(file: File): Promise<File> {
 }
 
 /**
+ * Check if browser supports native WebP encoding via canvas
+ */
+function supportsWebPEncoding(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Converts an image to WebP format with compression
+ * Uses browser-image-compression library for reliable WebP encoding on all browsers
  * @param file - The original image file
  * @param quality - Quality of the WebP output (0-1), default 0.8
  * @returns Promise<Blob> - The compressed WebP blob
@@ -52,13 +68,49 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
   // First convert HEIC to PNG if needed
   const processedFile = await convertHeicToPng(file);
 
+  // Use browser-image-compression for reliable WebP encoding
+  // This library handles Safari and other browsers that don't support native WebP encoding
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1200,
+    useWebWorker: true,
+    fileType: 'image/webp' as const,
+    initialQuality: quality,
+  };
+
+  try {
+    const compressedFile = await imageCompression(processedFile, options);
+
+    // Verify it's actually WebP
+    if (compressedFile.type === 'image/webp') {
+      return compressedFile;
+    }
+
+    // If library couldn't produce WebP, try native canvas as fallback
+    if (supportsWebPEncoding()) {
+      return await convertWithCanvas(processedFile, quality);
+    }
+
+    // Last resort: return compressed file even if not WebP
+    console.warn('WebP encoding not supported, using compressed image');
+    return compressedFile;
+  } catch (error) {
+    console.error('Image compression error:', error);
+    // Fallback to canvas method
+    return convertWithCanvas(processedFile, quality);
+  }
+}
+
+/**
+ * Canvas-based WebP conversion (fallback method)
+ */
+async function convertWithCanvas(file: File, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // Create canvas
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
@@ -67,7 +119,6 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
           return;
         }
 
-        // Calculate dimensions (max 1200px on longest side for compression)
         const maxSize = 1200;
         let width = img.width;
         let height = img.height;
@@ -84,17 +135,14 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
 
         canvas.width = width;
         canvas.height = height;
-
-        // Draw image
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to WebP blob
         canvas.toBlob(
           (blob) => {
             if (blob) {
               resolve(blob);
             } else {
-              reject(new Error('Failed to convert image to WebP'));
+              reject(new Error('Failed to convert image'));
             }
           },
           'image/webp',
@@ -107,7 +155,7 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
     };
 
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(processedFile);
+    reader.readAsDataURL(file);
   });
 }
 

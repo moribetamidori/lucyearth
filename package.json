@@ -2,6 +2,9 @@
   "name": "lucyearth",
   "version": "0.1.0",
   "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp"]
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +13,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.1",
+    "browser-image-compression": "^2.0.2",
     "heic2any": "^0.0.4",
     "leaflet": "^1.9.4",
     "next": "15.5.7",
@@ -25,8 +29,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sharp": "^0.32.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
