@@ -41,6 +41,7 @@ export default function DoubanModal({
   const [ratings, setRatings] = useState<DoubanRating[]>([]);
   const [loading, setLoading] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -48,6 +49,8 @@ export default function DoubanModal({
   const [rating, setRating] = useState(5);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   // Filter state
@@ -183,12 +186,7 @@ export default function DoubanModal({
       }
 
       // Reset form
-      setTitle('');
-      setCategory('movie');
-      setRating(5);
-      setSelectedImage(null);
-      setImagePreview(null);
-      setShowEditForm(false);
+      cancelEdit();
 
       alert('Rating added successfully!');
     } catch (error) {
@@ -229,6 +227,99 @@ export default function DoubanModal({
       console.error('Error deleting rating:', error);
       alert('Failed to delete rating. Please try again.');
     }
+  };
+
+  const startEdit = (r: DoubanRating) => {
+    setEditingId(r.id);
+    setTitle(r.title);
+    setCategory(r.category as Category);
+    setRating(r.rating);
+    setExistingImageUrl(r.image_url);
+    setOriginalImageUrl(r.image_url);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setShowEditForm(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setTitle('');
+    setCategory('movie');
+    setRating(5);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setExistingImageUrl(null);
+    setOriginalImageUrl(null);
+    setShowEditForm(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!title.trim() || !editingId) {
+      alert('Please enter a title.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Upload new image if selected
+      let imageUrl: string | null = existingImageUrl;
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+        if (!imageUrl) {
+          alert('Failed to upload image. Please try again.');
+          return;
+        }
+      }
+
+      // Delete old image from storage if it was removed or replaced
+      if (originalImageUrl && originalImageUrl !== imageUrl) {
+        const oldFileName = originalImageUrl.split('/').pop();
+        if (oldFileName) {
+          await supabase.storage.from('douban-images').remove([oldFileName]);
+        }
+      }
+
+      // Update rating in database
+      const { data, error } = await supabase
+        .from('douban_ratings')
+        .update({
+          title: title.trim(),
+          category,
+          rating,
+          image_url: imageUrl,
+        })
+        .eq('id', editingId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update ratings list
+      setRatings(ratings.map((r) => (r.id === editingId ? data : r)));
+
+      // Log activity
+      if (onLogActivity) {
+        onLogActivity(
+          'Updated Douban Rating',
+          `Updated "${title}" (${categoryLabels[category]}) - ${rating} stars`
+        );
+      }
+
+      // Reset form
+      cancelEdit();
+
+      alert('Rating updated successfully!');
+    } catch (error) {
+      console.error('Error updating rating:', error);
+      alert('Failed to update rating. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeExistingImage = () => {
+    setExistingImageUrl(null);
   };
 
   if (!isOpen) return null;
@@ -285,17 +376,11 @@ export default function DoubanModal({
                 ) : (
                   <div className="border-2 border-black p-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-bold">ADD NEW RATING</h3>
+                      <h3 className="text-lg font-bold">
+                        {editingId ? 'EDIT RATING' : 'ADD NEW RATING'}
+                      </h3>
                       <button
-                        onClick={() => {
-                          setShowEditForm(false);
-                          // Reset form
-                          setTitle('');
-                          setCategory('movie');
-                          setRating(5);
-                          setSelectedImage(null);
-                          setImagePreview(null);
-                        }}
+                        onClick={cancelEdit}
                         className="text-sm text-gray-500 hover:text-red-500"
                       >
                         ✕ CANCEL
@@ -370,10 +455,10 @@ export default function DoubanModal({
                       >
                         📷 CHOOSE IMAGE
                       </label>
-                      {imagePreview && (
+                      {(imagePreview || existingImageUrl) && (
                         <div className="mt-4">
                           <img
-                            src={imagePreview}
+                            src={imagePreview || existingImageUrl || ''}
                             alt="Preview"
                             className="max-w-xs border-4 border-gray-900"
                           />
@@ -381,6 +466,9 @@ export default function DoubanModal({
                             onClick={() => {
                               setSelectedImage(null);
                               setImagePreview(null);
+                              if (existingImageUrl) {
+                                removeExistingImage();
+                              }
                             }}
                             className="mt-2 text-sm text-red-500 hover:underline"
                             disabled={uploading}
@@ -393,11 +481,11 @@ export default function DoubanModal({
 
                     {/* Submit button */}
                     <button
-                      onClick={handleSubmit}
+                      onClick={editingId ? handleUpdate : handleSubmit}
                       disabled={uploading}
                       className="w-full px-4 py-3 bg-green-500 hover:bg-green-600 text-white font-bold disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      {uploading ? 'UPLOADING...' : 'ADD RATING'}
+                      {uploading ? 'UPLOADING...' : editingId ? 'UPDATE RATING' : 'ADD RATING'}
                     </button>
                   </div>
                 )}
@@ -511,11 +599,16 @@ export default function DoubanModal({
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h4 className="font-bold text-lg break-words">{r.title}</h4>
                           {isEditMode && (
-                            <ActionButton
-                              variant="delete"
-                              onClick={() => handleDelete(r.id, r.image_url)}
-                              className="flex-shrink-0"
-                            />
+                            <div className="flex gap-1 flex-shrink-0">
+                              <ActionButton
+                                variant="edit"
+                                onClick={() => startEdit(r)}
+                              />
+                              <ActionButton
+                                variant="delete"
+                                onClick={() => handleDelete(r.id, r.image_url)}
+                              />
+                            </div>
                           )}
                         </div>
                         <div className="text-sm mb-2">
