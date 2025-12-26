@@ -167,6 +167,7 @@ export type WomenProfile = {
   intro: string | null;
   accomplishments: string | null;
   tags: string[];
+  birth_year: number | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

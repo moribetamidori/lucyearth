@@ -12,11 +12,9 @@ type WomenModalProps = {
   onLogActivity?: (action: string, details: string) => void;
 };
 
-type ViewMode = 'graph' | 'list';
+type SortMode = 'recent' | 'oldest' | 'birth_asc' | 'birth_desc' | 'name';
 
-type PositionedProfile = WomenProfile & {
-  position: { x: number; y: number };
-};
+const PAGE_SIZE = 12;
 
 export default function WomenModal({
   isOpen,
@@ -27,15 +25,19 @@ export default function WomenModal({
 }: WomenModalProps) {
   const [profiles, setProfiles] = useState<WomenProfile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<ViewMode>('graph');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
   const [filterTag, setFilterTag] = useState<string>('all');
-  const [isMobile, setIsMobile] = useState(false);
-  const [graphScale, setGraphScale] = useState(1);
-  const pinchStartDistance = useRef<number | null>(null);
-  const pinchStartScale = useRef<number>(1);
+  const [sortMode, setSortMode] = useState<SortMode>('birth_desc');
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<WomenProfile | null>(null);
+  const [loadingRandom, setLoadingRandom] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
+  const [birthYear, setBirthYear] = useState('');
   const [intro, setIntro] = useState('');
   const [accomplishments, setAccomplishments] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -47,93 +49,172 @@ export default function WomenModal({
   const [savingMessage, setSavingMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const fetchProfiles = useCallback(async () => {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Fetch all tags once for the filter
+  const fetchAllTags = useCallback(async () => {
+    const { data } = await supabase
+      .from('women_profiles')
+      .select('tags');
+
+    if (data) {
+      const tagSet = new Set<string>();
+      data.forEach((row) => {
+        (row.tags || []).forEach((tag: string) => tagSet.add(tag));
+      });
+      setAllTags(Array.from(tagSet).sort((a, b) => a.localeCompare(b)));
+    }
+  }, []);
+
+  // Fetch total count
+  const fetchTotalCount = useCallback(async (tag: string, search: string) => {
+    let query = supabase
+      .from('women_profiles')
+      .select('*', { count: 'exact', head: true });
+
+    if (tag !== 'all') {
+      query = query.contains('tags', [tag]);
+    }
+
+    if (search.trim()) {
+      query = query.ilike('name', `%${search.trim()}%`);
+    }
+
+    const { count } = await query;
+    setTotalCount(count || 0);
+  }, []);
+
+  // Build the query with sorting
+  const buildQuery = useCallback((tag: string, sort: SortMode, search: string, offset: number, limit: number) => {
+    let query = supabase
+      .from('women_profiles')
+      .select('*');
+
+    if (tag !== 'all') {
+      query = query.contains('tags', [tag]);
+    }
+
+    if (search.trim()) {
+      query = query.ilike('name', `%${search.trim()}%`);
+    }
+
+    switch (sort) {
+      case 'recent':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'birth_asc':
+        query = query.order('birth_year', { ascending: true, nullsFirst: false });
+        break;
+      case 'birth_desc':
+        query = query.order('birth_year', { ascending: false, nullsFirst: true });
+        break;
+      case 'name':
+        query = query.order('name', { ascending: true });
+        break;
+    }
+
+    return query.range(offset, offset + limit - 1);
+  }, []);
+
+  // Initial fetch
+  const fetchProfiles = useCallback(async (tag: string, sort: SortMode, search: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('women_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      setProfiles([]);
+      setHasMore(true);
+
+      await fetchTotalCount(tag, search);
+
+      const { data, error } = await buildQuery(tag, sort, search, 0, PAGE_SIZE);
 
       if (error) throw error;
       setProfiles(data || []);
+      setHasMore((data?.length || 0) >= PAGE_SIZE);
     } catch (error) {
       console.error('Error fetching women profiles:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildQuery, fetchTotalCount]);
+
+  // Load more
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const offset = profiles.length;
+
+      const { data, error } = await buildQuery(filterTag, sortMode, searchQuery, offset, PAGE_SIZE);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setProfiles((prev) => [...prev, ...data]);
+        setHasMore(data.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more profiles:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [buildQuery, filterTag, sortMode, searchQuery, profiles.length, loadingMore, hasMore]);
+
+  // Fetch random woman
+  const fetchRandomWoman = useCallback(async () => {
+    if (loadingRandom) return;
+
+    try {
+      setLoadingRandom(true);
+
+      // Get total count first
+      const { count } = await supabase
+        .from('women_profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (!count || count === 0) return;
+
+      // Pick random offset
+      const randomOffset = Math.floor(Math.random() * count);
+
+      const { data, error } = await supabase
+        .from('women_profiles')
+        .select('*')
+        .range(randomOffset, randomOffset)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching random woman:', error);
+    } finally {
+      setLoadingRandom(false);
+    }
+  }, [loadingRandom]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchProfiles();
+      fetchAllTags();
+      fetchProfiles(filterTag, sortMode, searchQuery);
       if (onLogActivity) {
-        onLogActivity('Opened Women Network', 'Viewed women graph + list');
+        onLogActivity('Opened Women Network', 'Viewed women list');
       }
     }
-  }, [fetchProfiles, isOpen, onLogActivity]);
+  }, [isOpen]);
 
+  // Re-fetch when filter, sort, or search changes
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      // Auto-scale down slightly on small screens for better spacing
-      setGraphScale(window.innerWidth < 480 ? 0.8 : window.innerWidth < 768 ? 0.9 : 1);
-    };
-
-    if (typeof window !== 'undefined') {
-      handleResize();
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+    if (isOpen) {
+      fetchProfiles(filterTag, sortMode, searchQuery);
     }
-  }, []);
-
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    profiles.forEach((profile) => {
-      profile.tags?.forEach((tag) => tags.add(tag));
-    });
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
-  }, [profiles]);
-
-  const positionedProfiles: PositionedProfile[] = useMemo(() => {
-    const goldenAngle = 137.5;
-
-    return profiles.map((profile, index) => {
-      const angle = (goldenAngle * index * Math.PI) / 180;
-      // Keep desktop spacing and shrink nodes on mobile to avoid overlap
-      const radius = Math.min(48, 14 + Math.sqrt(index + 1) * 10);
-      const x = 50 + radius * Math.cos(angle);
-      const y = 50 + radius * Math.sin(angle);
-
-      return {
-        ...profile,
-        position: {
-          x: Math.max(6, Math.min(94, x)),
-          y: Math.max(6, Math.min(94, y)),
-        },
-      };
-    });
-  }, [profiles]);
-
-  const connections = useMemo(() => {
-    const links: Array<{ from: number; to: number; sharedTags: string[] }> = [];
-    for (let i = 0; i < profiles.length; i++) {
-      for (let j = i + 1; j < profiles.length; j++) {
-        const tagsA = profiles[i].tags || [];
-        const tagsB = profiles[j].tags || [];
-        const shared = tagsA.filter((tag) => tagsB.includes(tag));
-        if (shared.length > 0) {
-          links.push({ from: i, to: j, sharedTags: shared });
-        }
-      }
-    }
-    return links;
-  }, [profiles]);
-
-  const filteredProfiles =
-    filterTag === 'all'
-      ? profiles
-      : profiles.filter((profile) => profile.tags?.includes(filterTag));
+  }, [filterTag, sortMode, searchQuery]);
 
   const availableTags = useMemo(() => {
     const query = tagsInput.trim().toLowerCase();
@@ -160,6 +241,7 @@ export default function WomenModal({
   const startEdit = (profile: WomenProfile) => {
     setEditingId(profile.id);
     setName(profile.name);
+    setBirthYear(profile.birth_year?.toString() || '');
     setIntro(profile.intro || '');
     setAccomplishments(profile.accomplishments || '');
     setTags(profile.tags || []);
@@ -170,15 +252,12 @@ export default function WomenModal({
   };
 
   const handleDelete = async (id: string) => {
-    if (!isEditMode) {
-      alert('Enter edit mode to delete.');
-      return;
-    }
     const confirmDelete = confirm('Delete this profile? This cannot be undone.');
     if (!confirmDelete) return;
     try {
       await supabase.from('women_profiles').delete().eq('id', id);
       setProfiles((prev) => prev.filter((p) => p.id !== id));
+      setTotalCount((prev) => prev - 1);
     } catch (error) {
       console.error('Error deleting profile:', error);
       alert('Could not delete profile.');
@@ -223,46 +302,7 @@ export default function WomenModal({
     }
   };
 
-  const clampScale = (value: number) => Math.min(1.7, Math.max(0.6, value));
-
-  const onPinchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      pinchStartDistance.current = dist;
-      pinchStartScale.current = graphScale;
-    }
-  };
-
-  const onPinchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStartDistance.current) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const ratio = dist / pinchStartDistance.current;
-      setGraphScale(clampScale(pinchStartScale.current * ratio));
-    }
-  };
-
-  const onPinchEnd = () => {
-    pinchStartDistance.current = null;
-  };
-
-  const onWheelZoom = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setGraphScale((prev) => clampScale(prev + delta));
-  };
-
   const handleCreateOrUpdate = async () => {
-    if (!isEditMode) {
-      alert('Enter edit mode to add women.');
-      return;
-    }
-
     if (!name.trim()) {
       alert('Name is required.');
       return;
@@ -283,11 +323,14 @@ export default function WomenModal({
 
       let savedProfile: WomenProfile | null = null;
 
+      const parsedBirthYear = birthYear ? parseInt(birthYear, 10) : null;
+
       if (editingId) {
         const { data, error } = await supabase
           .from('women_profiles')
           .update({
             name: name.trim(),
+            birth_year: parsedBirthYear,
             intro: intro.trim() || null,
             accomplishments: accomplishments.trim() || null,
             image_url: imageUrl ?? imagePreview,
@@ -305,6 +348,7 @@ export default function WomenModal({
           .from('women_profiles')
           .insert({
             name: name.trim(),
+            birth_year: parsedBirthYear,
             intro: intro.trim() || null,
             accomplishments: accomplishments.trim() || null,
             image_url: imageUrl,
@@ -318,10 +362,12 @@ export default function WomenModal({
 
         savedProfile = data;
         setProfiles((prev) => [data, ...prev]);
+        setTotalCount((prev) => prev + 1);
         setSavingMessage('Saved to network');
       }
 
       setName('');
+      setBirthYear('');
       setIntro('');
       setAccomplishments('');
       setTags([]);
@@ -349,117 +395,167 @@ export default function WomenModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative bg-white border-4 border-gray-900 w-full max-w-6xl max-h-[90vh] overflow-y-auto p-6 shadow-lg">
+      <div className="relative bg-white border-4 border-gray-900 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-lg">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-9 h-9 border-2 border-gray-900 bg-gray-100 hover:bg-red-400 hover:text-white transition-colors"
+          className="absolute top-3 right-3 w-9 h-9 border-2 border-gray-900 bg-gray-100 hover:bg-red-400 hover:text-white transition-colors z-10"
           aria-label="Close women modal"
         >
           ✕
         </button>
 
-        <div className="flex flex-col gap-4">
+        {/* Header */}
+        <div className="p-6 pb-4 border-b-2 border-gray-900">
           <div className="flex flex-wrap items-center justify-between gap-3 pr-12">
             <div>
               <div className="text-xs text-gray-500">NETWORK</div>
               <h2 className="text-2xl font-semibold">Women Galaxy</h2>
-              <p className="text-sm text-gray-600 max-w-xl">
-                Add women, note their accomplishments, and see how shared tags weave them together.
+              <p className="text-sm text-gray-600">
+                {totalCount} women across history
               </p>
-              <p className="text-[11px] text-gray-500 mt-1">Pinch or scroll to zoom the graph on mobile.</p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setView('graph')}
-                className={`px-3 py-2 text-xs border-2 border-gray-900 ${view === 'graph' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-blue-100'}`}
-              >
-                GRAPH
-              </button>
-              <button
-                onClick={() => setView('list')}
-                className={`px-3 py-2 text-xs border-2 border-gray-900 ${view === 'list' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-blue-100'}`}
-              >
-                LIST
-              </button>
-              <button
-                onClick={() => {
-                  setShowForm(true);
-                  setEditingId(null);
-                  setName('');
-                  setIntro('');
-                  setAccomplishments('');
-                  setTags([]);
-                  setTagsInput('');
-                  setSelectedImage(null);
-                  setImagePreview(null);
-                  setSavingMessage(null);
-                }}
-                className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
-              >
-                Add Woman
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setShowForm(true);
+                setEditingId(null);
+                setName('');
+                setBirthYear('');
+                setIntro('');
+                setAccomplishments('');
+                setTags([]);
+                setTagsInput('');
+                setSelectedImage(null);
+                setImagePreview(null);
+                setSavingMessage(null);
+              }}
+              className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
+            >
+              Add Woman
+            </button>
           </div>
 
-          <div className="grid lg:grid-cols-[2fr,1fr] gap-4">
-            <div className="border-2 border-gray-900 p-4 bg-gradient-to-br from-sky-50 via-white to-violet-50 relative overflow-hidden">
-              {loading ? (
-                <div className="flex items-center justify-center h-[400px] text-gray-500 text-sm">
-                  Loading network...
-                </div>
-              ) : view === 'graph' ? (
-                <GraphView
-                  profiles={positionedProfiles}
-                  connections={connections}
-                  isMobile={isMobile}
-                  graphScale={graphScale}
-                  onPinchStart={onPinchStart}
-                  onPinchMove={onPinchMove}
-                  onPinchEnd={onPinchEnd}
-                  onWheelZoom={onWheelZoom}
-                  isEditMode={isEditMode}
-                  onEdit={startEdit}
-                  onDelete={handleDelete}
-                />
-              ) : (
-                <ListView
-                  profiles={filteredProfiles}
-                  allTags={allTags}
-                  filterTag={filterTag}
-                  setFilterTag={setFilterTag}
-                  isEditMode={isEditMode}
-                  onEdit={startEdit}
-                  onDelete={handleDelete}
-                />
-              )}
+          {/* Search, Sort & Filter */}
+          <div className="mt-4 flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name..."
+                className="px-3 py-1 text-sm border-2 border-gray-900 bg-white w-48"
+              />
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Sort:</span>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                className="px-2 py-1 text-xs border-2 border-gray-900 bg-white"
+              >
+                <option value="birth_asc">Birth Year (Oldest First)</option>
+                <option value="birth_desc">Birth Year (Newest First)</option>
+                <option value="name">Name A-Z</option>
+                <option value="recent">Recently Added</option>
+                <option value="oldest">Oldest Added</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Filter:</span>
+              <select
+                value={filterTag}
+                onChange={(e) => setFilterTag(e.target.value)}
+                className="px-2 py-1 text-xs border-2 border-gray-900 bg-white max-w-[200px]"
+              >
+                <option value="all">All tags ({totalCount})</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={fetchRandomWoman}
+              disabled={loadingRandom}
+              className="px-3 py-1 text-xs border-2 border-gray-900 bg-violet-200 hover:bg-violet-300 disabled:opacity-50"
+            >
+              {loadingRandom ? 'Loading...' : 'Inspire me'}
+            </button>
+          </div>
+        </div>
 
-            <aside className="border-2 border-gray-900 p-4 bg-white">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">
-                  {editingId ? 'Edit Woman' : 'Add Woman'}
-                </h3>
-                <span className={`text-xs px-2 py-1 border ${isEditMode ? 'bg-green-100 border-green-500 text-green-700' : 'bg-red-100 border-red-500 text-red-700'}`}>
-                  {isEditMode ? 'EDIT MODE' : 'VIEW ONLY'}
-                </span>
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* List */}
+          <div
+            ref={listRef}
+            className="flex-1 overflow-y-auto p-4 bg-gradient-to-br from-sky-50 via-white to-violet-50"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+                Loading...
               </div>
-
-              {!showForm && !editingId ? (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm text-gray-600">Click &quot;Add Woman&quot; to open the form, or edit from any card.</p>
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="w-full py-2 border-2 border-gray-900 bg-blue-500 text-white text-sm hover:bg-blue-600"
-                  >
-                    Open Form
-                  </button>
+            ) : profiles.length === 0 ? (
+              <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+                No women found. Try a different filter or add some!
+              </div>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {profiles.map((profile) => (
+                    <ProfileCard
+                      key={profile.id}
+                      profile={profile}
+                      onEdit={startEdit}
+                      onDelete={handleDelete}
+                      onClick={setSelectedProfile}
+                    />
+                  ))}
                 </div>
-              ) : (
+
+                {/* Load More */}
+                {hasMore && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      className="px-6 py-2 border-2 border-gray-900 bg-white hover:bg-blue-50 text-sm disabled:opacity-50"
+                    >
+                      {loadingMore ? 'Loading...' : `Load More (${profiles.length} of ${totalCount})`}
+                    </button>
+                  </div>
+                )}
+
+                {!hasMore && profiles.length > 0 && (
+                  <div className="mt-4 text-center text-xs text-gray-500">
+                    Showing all {profiles.length} women
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Form Sidebar */}
+          {showForm && (
+            <aside className="w-80 border-l-2 border-gray-900 p-4 bg-white overflow-y-auto">
+              <h3 className="text-lg font-semibold">
+                {editingId ? 'Edit Woman' : 'Add Woman'}
+              </h3>
+
               <div className="space-y-3 mt-3">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Name"
+                  className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
+                />
+                <input
+                  type="number"
+                  value={birthYear}
+                  onChange={(e) => setBirthYear(e.target.value)}
+                  placeholder="Birth Year (e.g. 1867)"
+                  min="1"
+                  max="2025"
                   className="w-full px-3 py-2 border-2 border-gray-900 text-sm"
                 />
                 <textarea
@@ -505,9 +601,9 @@ export default function WomenModal({
                     placeholder="Type to add tag"
                     className="w-full px-3 py-2 border-2 border-gray-900 text-sm mt-2"
                   />
-                  {availableTags.length > 0 && (
+                  {availableTags.length > 0 && tagsInput && (
                     <div className="mt-2 border-2 border-gray-900 bg-white max-h-32 overflow-y-auto">
-                      {availableTags.map((tag) => (
+                      {availableTags.slice(0, 10).map((tag) => (
                         <button
                           key={tag}
                           type="button"
@@ -548,277 +644,234 @@ export default function WomenModal({
                 >
                   {uploading ? 'Saving...' : editingId ? 'Update Profile' : 'Save to Network'}
                 </button>
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingId(null);
-                      setName('');
-                      setIntro('');
-                      setAccomplishments('');
-                      setTags([]);
-                      setTagsInput('');
-                      setImagePreview(null);
-                      setSelectedImage(null);
-                      setShowForm(false);
-                    }}
-                    className="w-full py-2 border-2 border-gray-900 bg-gray-100 text-sm hover:bg-gray-200"
-                  >
-                    Cancel edit
-                  </button>
-                )}
-                {!editingId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setName('');
-                      setIntro('');
-                      setAccomplishments('');
-                      setTags([]);
-                      setTagsInput('');
-                      setImagePreview(null);
-                      setSelectedImage(null);
-                      setSavingMessage(null);
-                    }}
-                    className="w-full py-2 border-2 border-gray-900 bg-gray-100 text-sm hover:bg-gray-200"
-                  >
-                    Close form
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(null);
+                    setName('');
+                    setBirthYear('');
+                    setIntro('');
+                    setAccomplishments('');
+                    setTags([]);
+                    setTagsInput('');
+                    setImagePreview(null);
+                    setSelectedImage(null);
+                    setShowForm(false);
+                    setSavingMessage(null);
+                  }}
+                  className="w-full py-2 border-2 border-gray-900 bg-gray-100 text-sm hover:bg-gray-200"
+                >
+                  {editingId ? 'Cancel' : 'Close'}
+                </button>
               </div>
-              )}
             </aside>
-          </div>
+          )}
+        </div>
+      </div>
+
+      {/* Detail Modal */}
+      {selectedProfile && (
+        <ProfileDetailModal
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
+          onEdit={(profile) => {
+            setSelectedProfile(null);
+            startEdit(profile);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProfileCard({
+  profile,
+  onEdit,
+  onDelete,
+  onClick,
+}: {
+  profile: WomenProfile;
+  onEdit: (profile: WomenProfile) => void;
+  onDelete: (id: string) => void;
+  onClick: (profile: WomenProfile) => void;
+}) {
+  return (
+    <div
+      className="group flex gap-3 border-2 border-gray-900 bg-white p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => onClick(profile)}
+    >
+      <div className="w-16 h-16 rounded border border-gray-300 overflow-hidden flex-shrink-0 bg-gray-50">
+        {profile.image_url ? (
+          <img src={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-2xl">👩‍🚀</div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h4 className="font-semibold text-sm truncate">{profile.name}</h4>
+          {profile.birth_year && (
+            <span className="text-[10px] text-gray-500 flex-shrink-0">
+              b. {profile.birth_year}
+            </span>
+          )}
+        </div>
+        {profile.intro && (
+          <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{profile.intro}</p>
+        )}
+        <div className="flex flex-wrap gap-1 mt-1">
+          {(profile.tags || []).slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-[9px] rounded"
+            >
+              {tag}
+            </span>
+          ))}
+          {(profile.tags?.length || 0) > 3 && (
+            <span className="px-1.5 py-0.5 bg-gray-100 text-[9px] rounded">
+              +{(profile.tags?.length || 0) - 3}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(profile);
+            }}
+            className="px-2 py-0.5 text-[10px] border border-gray-400 text-gray-600 bg-white hover:bg-blue-100 hover:border-gray-900"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(profile.id);
+            }}
+            className="px-2 py-0.5 text-[10px] border border-gray-400 text-gray-600 bg-white hover:bg-red-100 hover:border-gray-900"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function GraphView({
-  profiles,
-  connections,
-  isMobile,
-  graphScale,
-  onPinchStart,
-  onPinchMove,
-  onPinchEnd,
-  onWheelZoom,
-  isEditMode,
+function ProfileDetailModal({
+  profile,
+  onClose,
   onEdit,
-  onDelete,
 }: {
-  profiles: PositionedProfile[];
-  connections: Array<{ from: number; to: number; sharedTags: string[] }>;
-  isMobile: boolean;
-  graphScale: number;
-  onPinchStart: (e: React.TouchEvent) => void;
-  onPinchMove: (e: React.TouchEvent) => void;
-  onPinchEnd: () => void;
-  onWheelZoom: (e: React.WheelEvent) => void;
-  isEditMode: boolean;
+  profile: WomenProfile;
+  onClose: () => void;
   onEdit: (profile: WomenProfile) => void;
-  onDelete: (id: string) => void;
 }) {
-  const nodeScale = isMobile ? 0.7 : 1;
-
   return (
     <div
-      className="relative h-[420px] overflow-hidden rounded-sm border border-gray-200 bg-white/60 touch-none"
-      onTouchStart={onPinchStart}
-      onTouchMove={onPinchMove}
-      onTouchEnd={onPinchEnd}
-      onWheel={onWheelZoom}
+      className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
     >
       <div
-        className="absolute inset-0 origin-center"
-        style={{
-          transform: `scale(${graphScale})`,
-          transition: isMobile ? 'transform 0.05s linear' : 'transform 0.12s ease',
-        }}
+        className="bg-white border-4 border-gray-900 w-full max-w-xl max-h-[80vh] overflow-y-auto shadow-xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {connections.map((link, idx) => {
-            const from = profiles[link.from]?.position;
-            const to = profiles[link.to]?.position;
-            if (!from || !to) return null;
-          return (
-            <line
-              key={idx}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-              stroke="#93c5fd"
-              strokeWidth={0.8}
-              strokeDasharray={link.sharedTags.length > 1 ? '2 2' : '0'}
-              opacity={0.9}
+        {/* Header with image */}
+        <div className="relative overflow-hidden">
+          {/* Blurred background */}
+          {profile.image_url ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center blur-xl scale-110 opacity-60"
+              style={{ backgroundImage: `url(${profile.image_url})` }}
             />
-          );
-        })}
-      </svg>
-
-        {profiles.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
-            No women added yet. Switch to edit mode to seed the graph.
-          </div>
-        )}
-
-        {profiles.map((profile) => (
-          <div
-            key={profile.id}
-            className="group absolute w-36 text-center p-2 bg-white border-2 border-gray-900 shadow-md transition-all"
-            style={{
-              left: `${profile.position.x}%`,
-              top: `${profile.position.y}%`,
-              transform: `translate(-50%, -50%) scale(${nodeScale})`,
-              transformOrigin: 'center',
-          }}
-        >
-          <div className="w-14 h-14 max-sm:w-12 max-sm:h-12 mx-auto rounded-full overflow-hidden border border-gray-300 bg-gray-100">
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-200 to-sky-200" />
+          )}
+          {/* Overlay for better contrast */}
+          <div className="absolute inset-0 bg-black/20" />
+          {/* Square image */}
+          <div className="relative p-8 flex justify-center">
             {profile.image_url ? (
-              <img src={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
+              <img
+                src={profile.image_url}
+                alt={profile.name}
+                className="w-48 h-48 object-cover border-4 border-gray-900"
+              />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-xl">👩‍🚀</div>
-              )}
-            </div>
-            <div className="mt-2 text-sm max-sm:text-xs font-semibold truncate">{profile.name}</div>
-            <div className="text-[11px] max-sm:text-[10px] text-gray-600 line-clamp-2 leading-tight h-8">
-              {profile.intro || 'Awaiting intro'}
-            </div>
-            <div className="flex flex-wrap justify-center gap-1 mt-2">
-              {(profile.tags || []).slice(0, 3).map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 bg-blue-100 border border-blue-300 text-[10px] rounded">
-                  {tag}
-                </span>
-              ))}
-              {(profile.tags?.length || 0) > 3 && (
-                <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 text-[10px] rounded">
-                  +{(profile.tags?.length || 0) - 3}
-                </span>
-              )}
-            </div>
-            {isEditMode && (
-              <div className="flex justify-center gap-2 mt-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity max-md:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => onEdit(profile)}
-                  className="px-2 py-1 text-[10px] border border-gray-900 bg-white hover:bg-blue-100"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(profile.id)}
-                  className="px-2 py-1 text-[10px] border border-gray-900 bg-white hover:bg-red-100"
-                >
-                  Del
-                </button>
+              <div className="w-48 h-48 bg-gradient-to-br from-violet-100 to-sky-100 flex items-center justify-center border-4 border-gray-900">
+                <span className="text-5xl">👩‍🚀</span>
               </div>
             )}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ListView({
-          profiles,
-          allTags,
-          filterTag,
-          setFilterTag,
-          isEditMode,
-          onEdit,
-          onDelete,
-        }: {
-  profiles: WomenProfile[];
-  allTags: string[];
-  filterTag: string;
-  setFilterTag: (tag: string) => void;
-  isEditMode: boolean;
-          onEdit: (profile: WomenProfile) => void;
-          onDelete: (id: string) => void;
-        }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilterTag('all')}
-          className={`px-2.5 py-1 text-xs border-2 border-gray-900 ${filterTag === 'all' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-blue-100'}`}
-        >
-          All tags
-        </button>
-        {allTags.map((tag) => (
           <button
-            key={tag}
-            onClick={() => setFilterTag(tag)}
-            className={`px-2.5 py-1 text-xs border-2 border-gray-900 ${filterTag === tag ? 'bg-blue-500 text-white' : 'bg-white hover:bg-blue-100'}`}
+            onClick={onClose}
+            className="absolute top-3 right-3 w-8 h-8 border-2 border-gray-900 bg-white hover:bg-red-400 hover:text-white transition-colors flex items-center justify-center z-10"
+            aria-label="Close"
           >
-            {tag}
+            ✕
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="grid md:grid-cols-2 gap-3 max-h-[330px] overflow-y-auto pr-1">
-        {profiles.length === 0 ? (
-          <div className="text-sm text-gray-500 col-span-full">
-            No women match this tag yet. Try a different tag or add a profile.
+        {/* Content */}
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-2xl font-bold">{profile.name}</h2>
+            {profile.birth_year && (
+              <span className="text-sm text-gray-500 border border-gray-300 px-2 py-0.5 rounded">
+                b. {profile.birth_year}
+              </span>
+            )}
           </div>
-        ) : (
-          profiles.map((profile) => (
-            <div key={profile.id} className="group flex gap-3 border-2 border-gray-900 bg-white p-3 shadow-sm">
-              <div className="w-20 h-20 rounded border border-gray-300 overflow-hidden flex-shrink-0 bg-gray-50">
-                {profile.image_url ? (
-                  <img src={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl">👩‍🚀</div>
-                )}
-              </div>
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold truncate">{profile.name}</h4>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">
-                    {new Date(profile.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {profile.intro && <p className="text-sm text-gray-700 line-clamp-2">{profile.intro}</p>}
-                {profile.accomplishments && (
-                  <p className="text-xs text-gray-600 line-clamp-3">{profile.accomplishments}</p>
-                )}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {(profile.tags || []).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-[10px] rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                {isEditMode && (
-                  <div className="flex gap-2 pt-2 md:opacity-0 md:hover:opacity-100 md:group-hover:opacity-100 transition-opacity max-md:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(profile)}
-                      className="px-2 py-1 text-xs border border-gray-900 bg-white hover:bg-blue-100"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(profile.id)}
-                      className="px-2 py-1 text-xs border border-gray-900 bg-white hover:bg-red-100"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
+
+          {/* Tags */}
+          {profile.tags && profile.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {profile.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-1 bg-blue-50 border border-blue-200 text-xs rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
-          ))
-        )}
+          )}
+
+          {/* Intro */}
+          {profile.intro && (
+            <div className="mb-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">About</h3>
+              <p className="text-sm text-gray-700 leading-relaxed">{profile.intro}</p>
+            </div>
+          )}
+
+          {/* Accomplishments */}
+          {profile.accomplishments && (
+            <div className="mb-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">Accomplishments</h3>
+              <p className="text-sm text-gray-700 leading-relaxed">{profile.accomplishments}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => onEdit(profile)}
+              className="px-4 py-2 text-sm border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
+            >
+              Edit Profile
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm border-2 border-gray-900 bg-gray-100 hover:bg-gray-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
