@@ -68,9 +68,52 @@ export function extractBirthYear(text: string): number | null {
 }
 
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
+const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetch birth year from Wikidata (more reliable than text parsing)
+ */
+async function fetchBirthYearFromWikidata(wikidataId: string): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({
+      action: 'wbgetentities',
+      ids: wikidataId,
+      props: 'claims',
+      format: 'json',
+      origin: '*',
+    });
+
+    const response = await fetch(`${WIKIDATA_API}?${params}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const entity = data.entities?.[wikidataId];
+    if (!entity) return null;
+
+    // P569 is "date of birth" in Wikidata
+    const birthClaim = entity.claims?.P569?.[0];
+    if (!birthClaim) return null;
+
+    const timeValue = birthClaim.mainsnak?.datavalue?.value?.time;
+    if (!timeValue) return null;
+
+    // Format is like "+1990-01-15T00:00:00Z" or "-0500-01-01T00:00:00Z" for BCE
+    const yearMatch = timeValue.match(/^[+-](\d+)-/);
+    if (yearMatch) {
+      const year = parseInt(yearMatch[1]);
+      if (year >= 1 && year <= 2025) {
+        return year;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
 }
 
 /**
@@ -83,11 +126,11 @@ export async function fetchWikipediaData(
   const title = wikiTitle || name.replace(/ /g, '_');
 
   try {
-    // Fetch extract and image
+    // Fetch extract, image, and pageprops (for Wikidata ID)
     const params = new URLSearchParams({
       action: 'query',
       titles: title,
-      prop: 'extracts|pageimages|categories',
+      prop: 'extracts|pageimages|categories|pageprops',
       exintro: 'true',
       explaintext: 'true',
       pithumbsize: '500',
@@ -126,8 +169,17 @@ export async function fetchWikipediaData(
     const accomplishments =
       sentences.length > 2 ? sentences.slice(2, 5).join(' ').trim() : null;
 
-    // Extract birth year from the full extract (more likely to contain date info)
-    const birthYear = extractBirthYear(extract);
+    // Try to get birth year from Wikidata first (more reliable)
+    let birthYear: number | null = null;
+    const wikidataId = page.pageprops?.wikibase_item;
+    if (wikidataId) {
+      birthYear = await fetchBirthYearFromWikidata(wikidataId);
+    }
+
+    // Fall back to text extraction if Wikidata didn't have it
+    if (!birthYear) {
+      birthYear = extractBirthYear(extract);
+    }
 
     return {
       name,

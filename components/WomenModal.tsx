@@ -34,6 +34,10 @@ export default function WomenModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<WomenProfile | null>(null);
   const [loadingRandom, setLoadingRandom] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importName, setImportName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -198,6 +202,48 @@ export default function WomenModal({
       setLoadingRandom(false);
     }
   }, [loadingRandom]);
+
+  // Import from Wikipedia
+  const handleImport = useCallback(async () => {
+    if (!importName.trim() || importing) return;
+
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      // Check if name contains wiki title (format: "Name:Wiki_Title")
+      const [name, wikiTitle] = importName.includes(':')
+        ? importName.split(':')
+        : [importName, undefined];
+
+      const response = await fetch('/api/import-woman', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), wikiTitle }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setImportError(data.error || 'Import failed');
+        return;
+      }
+
+      // Add to profiles list and show detail modal
+      setProfiles((prev) => [data.profile, ...prev]);
+      setTotalCount((prev) => prev + 1);
+      setSelectedProfile(data.profile);
+      setShowImport(false);
+      setImportName('');
+
+      // Refresh tags
+      fetchAllTags();
+    } catch (error) {
+      setImportError('Failed to import. Please try again.');
+    } finally {
+      setImporting(false);
+    }
+  }, [importName, importing, fetchAllTags]);
 
   useEffect(() => {
     if (isOpen) {
@@ -414,24 +460,32 @@ export default function WomenModal({
                 {totalCount} women across history
               </p>
             </div>
-            <button
-              onClick={() => {
-                setShowForm(true);
-                setEditingId(null);
-                setName('');
-                setBirthYear('');
-                setIntro('');
-                setAccomplishments('');
-                setTags([]);
-                setTagsInput('');
-                setSelectedImage(null);
-                setImagePreview(null);
-                setSavingMessage(null);
-              }}
-              className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
-            >
-              Add Woman
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowImport(true)}
+                className="px-3 py-2 text-xs border-2 border-gray-900 bg-green-200 hover:bg-green-300"
+              >
+                Import from Wiki
+              </button>
+              <button
+                onClick={() => {
+                  setShowForm(true);
+                  setEditingId(null);
+                  setName('');
+                  setBirthYear('');
+                  setIntro('');
+                  setAccomplishments('');
+                  setTags([]);
+                  setTagsInput('');
+                  setSelectedImage(null);
+                  setImagePreview(null);
+                  setSavingMessage(null);
+                }}
+                className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
+              >
+                Add Manually
+              </button>
+            </div>
           </div>
 
           {/* Search, Sort & Filter */}
@@ -679,6 +733,66 @@ export default function WomenModal({
             startEdit(profile);
           }}
         />
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+          onClick={() => {
+            setShowImport(false);
+            setImportError(null);
+            setImportName('');
+          }}
+        >
+          <div
+            className="bg-white border-4 border-gray-900 w-full max-w-md p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4">Import from Wikipedia</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Enter a name to fetch their Wikipedia info, image, and auto-generate tags.
+            </p>
+            <input
+              type="text"
+              value={importName}
+              onChange={(e) => setImportName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleImport();
+              }}
+              placeholder="e.g., Taylor Swift"
+              className="w-full px-3 py-2 border-2 border-gray-900 text-sm mb-2"
+              autoFocus
+            />
+            <p className="text-xs text-gray-500 mb-4">
+              Tip: If not found, try &quot;Name:Wikipedia_Title&quot; (e.g., &quot;Grimes:Grimes_(musician)&quot;)
+            </p>
+            {importError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 mb-4">
+                {importError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleImport}
+                disabled={importing || !importName.trim()}
+                className="flex-1 py-2 border-2 border-gray-900 bg-green-500 text-white text-sm hover:bg-green-600 disabled:opacity-50"
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowImport(false);
+                  setImportError(null);
+                  setImportName('');
+                }}
+                className="px-4 py-2 border-2 border-gray-900 bg-gray-100 text-sm hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

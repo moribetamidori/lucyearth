@@ -8,8 +8,104 @@
  *   npx tsx scripts/add-women.ts --dry-run "Someone" # Preview without inserting
  */
 
-import { fetchWikipediaData, generateTags } from './lib/wikipedia.js';
+import { fetchWikipediaData, extractNationality } from './lib/wikipedia.js';
 import { processAndUploadImage, getSupabaseClient } from './lib/image-upload.js';
+
+/**
+ * Extract meaningful tags from Wikipedia intro and categories
+ */
+function extractTags(intro: string | null, categories: string[]): string[] {
+  const tags = new Set<string>();
+
+  // Common occupations/roles to look for in intro
+  const occupationPatterns = [
+    /\b(actress|actor)\b/i,
+    /\b(singer|vocalist)\b/i,
+    /\b(songwriter)\b/i,
+    /\b(musician)\b/i,
+    /\b(rapper)\b/i,
+    /\b(producer)\b/i,
+    /\b(director)\b/i,
+    /\b(writer|author|novelist|poet)\b/i,
+    /\b(journalist)\b/i,
+    /\b(politician)\b/i,
+    /\b(entrepreneur)\b/i,
+    /\b(businesswoman|businessman)\b/i,
+    /\b(ceo|founder)\b/i,
+    /\b(scientist)\b/i,
+    /\b(physicist)\b/i,
+    /\b(chemist)\b/i,
+    /\b(biologist)\b/i,
+    /\b(mathematician)\b/i,
+    /\b(engineer)\b/i,
+    /\b(astronaut)\b/i,
+    /\b(athlete)\b/i,
+    /\b(olympian)\b/i,
+    /\b(tennis player)\b/i,
+    /\b(soccer player|footballer)\b/i,
+    /\b(basketball player)\b/i,
+    /\b(gymnast)\b/i,
+    /\b(swimmer)\b/i,
+    /\b(skier)\b/i,
+    /\b(model)\b/i,
+    /\b(comedian)\b/i,
+    /\b(activist)\b/i,
+    /\b(philanthropist)\b/i,
+    /\b(designer)\b/i,
+    /\b(artist)\b/i,
+    /\b(painter)\b/i,
+    /\b(photographer)\b/i,
+    /\b(chef)\b/i,
+    /\b(lawyer|attorney)\b/i,
+    /\b(doctor|physician)\b/i,
+    /\b(nurse)\b/i,
+    /\b(professor)\b/i,
+    /\b(educator)\b/i,
+    /\b(influencer)\b/i,
+    /\b(youtuber)\b/i,
+    /\b(streamer)\b/i,
+    /\b(billionaire)\b/i,
+    /\b(investor)\b/i,
+    /\b(queen|princess|empress)\b/i,
+    /\b(first lady)\b/i,
+    /\b(prime minister)\b/i,
+    /\b(president)\b/i,
+  ];
+
+  // Extract from intro
+  if (intro) {
+    for (const pattern of occupationPatterns) {
+      const match = intro.match(pattern);
+      if (match) {
+        tags.add(match[1].toLowerCase());
+      }
+    }
+
+    // Extract nationality
+    const nationality = extractNationality(intro);
+    if (nationality) {
+      tags.add(nationality);
+    }
+  }
+
+  // Extract from Wikipedia categories
+  const categoryKeywords = [
+    'nobel', 'pulitzer', 'oscar', 'emmy', 'grammy', 'tony',
+    'olympic', 'world champion', 'billionaire', 'activist',
+    'feminist', 'lgbtq', 'entrepreneur', 'philanthropist'
+  ];
+
+  for (const cat of categories) {
+    const lowerCat = cat.toLowerCase();
+    for (const keyword of categoryKeywords) {
+      if (lowerCat.includes(keyword)) {
+        tags.add(keyword);
+      }
+    }
+  }
+
+  return Array.from(tags).slice(0, 8);
+}
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -69,7 +165,7 @@ async function main() {
       }
 
       // Generate tags
-      const tags = generateTags('', [], wikiData.intro, wikiData.categories || []);
+      const tags = extractTags(wikiData.intro, wikiData.categories || []);
       console.log(`   ↳ Tags: ${tags.join(', ')}`);
       console.log(`   ↳ Born: ${wikiData.birthYear || 'unknown'}`);
 
