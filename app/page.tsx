@@ -19,6 +19,7 @@ import ScrollFeedModal from '@/components/ScrollFeedModal';
 import TimelineModal from '@/components/TimelineModal';
 import SlotMachineModal from '@/components/SlotMachineModal';
 import FindMeModal from '@/components/FindMeModal';
+import WishlistModal from '@/components/WishlistModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -61,6 +62,7 @@ export default function Home() {
   const [showTimelineModal, setShowTimelineModal] = useState<boolean>(false);
   const [showSlotMachineModal, setShowSlotMachineModal] = useState<boolean>(false);
   const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
+  const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -314,6 +316,25 @@ export default function Home() {
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">SHELF</span>
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">SHELF</div>
+        </div>
+
+        {/* Wishlist icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowWishlistModal(true);
+              logActivity('Opened Wishlist', 'Viewed wishlist items');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-rose-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-base">🎁</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">WISH</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">WISHLIST</div>
         </div>
 
         {/* Are.na icon */}
@@ -933,6 +954,15 @@ export default function Home() {
       <BookshelfModal
         isOpen={showBookshelfModal}
         onClose={() => setShowBookshelfModal(false)}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Wishlist Modal */}
+      <WishlistModal
+        isOpen={showWishlistModal}
+        onClose={() => setShowWishlistModal(false)}
+        anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
       />

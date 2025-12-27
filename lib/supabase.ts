@@ -103,6 +103,7 @@ export type DoubanRating = {
   title: string;
   category: 'movie' | 'tv' | 'book' | 'music' | 'game';
   rating: number; // 1-5
+  comment: string | null;
   image_url: string | null;
   created_at: string;
   updated_at: string;
@@ -195,4 +196,16 @@ export type SlotMachineSpin = {
   fortune_text: string;
   fortune_model?: string | null;
   created_at: string;
+};
+
+export type WishlistItem = {
+  id: string;
+  title: string;
+  image_url: string | null;
+  link_url: string | null;
+  is_purchased: boolean;
+  order_index: number;
+  anon_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
