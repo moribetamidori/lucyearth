@@ -29,7 +29,7 @@ export default function WomenModal({
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [filterTag, setFilterTag] = useState<string>('all');
-  const [sortMode, setSortMode] = useState<SortMode>('birth_desc');
+  const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [allTags, setAllTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<WomenProfile | null>(null);

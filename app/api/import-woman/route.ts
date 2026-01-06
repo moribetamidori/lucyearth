@@ -4,11 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
 
-// Initialize Supabase with service role for storage uploads
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialize Supabase client
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 async function fetchBirthYearFromWikidata(wikidataId: string): Promise<number | null> {
   try {
@@ -129,7 +131,7 @@ function extractTags(intro: string | null, categories: string[]): string[] {
   return Array.from(tags).slice(0, 8);
 }
 
-async function uploadImage(imageUrl: string, name: string): Promise<string | null> {
+async function uploadImage(imageUrl: string, name: string, supabase: ReturnType<typeof getSupabaseClient>): Promise<string | null> {
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) return null;
@@ -155,6 +157,18 @@ async function uploadImage(imageUrl: string, name: string): Promise<string | nul
 
 export async function POST(request: NextRequest) {
   try {
+    // Check for required env vars
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error('Missing NEXT_PUBLIC_SUPABASE_URL');
+      return NextResponse.json({ error: 'Server configuration error: missing Supabase URL' }, { status: 500 });
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing SUPABASE_SERVICE_ROLE_KEY');
+      return NextResponse.json({ error: 'Server configuration error: missing service key' }, { status: 500 });
+    }
+
+    const supabase = getSupabaseClient();
+
     const { name, wikiTitle } = await request.json();
 
     if (!name) {
@@ -220,7 +234,7 @@ export async function POST(request: NextRequest) {
     // Upload image
     let imageUrl: string | null = null;
     if (wikiImageUrl) {
-      imageUrl = await uploadImage(wikiImageUrl, name);
+      imageUrl = await uploadImage(wikiImageUrl, name, supabase);
     }
 
     // Generate tags
