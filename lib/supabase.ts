@@ -73,6 +73,11 @@ export type ArenaBlock = {
   thumbnail_url?: string;
 };
 
+export type Redaction = {
+  start: number;
+  end: number;
+};
+
 export type JournalEntry = {
   id: string;
   anon_id: string;
@@ -80,6 +85,7 @@ export type JournalEntry = {
   created_at: string;
   updated_at: string;
   upvote_count?: number;
+  redactions?: Redaction[];
 };
 
 export type JournalEntryVote = {

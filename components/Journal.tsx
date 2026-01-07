@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 
+interface Redaction {
+  start: number;
+  end: number;
+}
+
 interface JournalEntry {
   id: string;
   anon_id: string;
@@ -11,6 +16,7 @@ interface JournalEntry {
   created_at: string;
   updated_at: string;
   upvote_count?: number;
+  redactions?: Redaction[];
 }
 
 interface JournalProps {
@@ -30,6 +36,10 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
   const [editText, setEditText] = useState('');
   const [votedEntries, setVotedEntries] = useState<Set<string>>(new Set());
   const [isVoting, setIsVoting] = useState<string | null>(null);
+  const [redactingEntryId, setRedactingEntryId] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -207,6 +217,200 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
     }
   };
 
+  const handleTextSelection = (entryId: string, entryText: string) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      setSelectedRange(null);
+      return;
+    }
+
+    const selectedText = selection.toString();
+    if (!selectedText.trim()) {
+      setSelectedRange(null);
+      return;
+    }
+
+    // Find the selection range within the entry text
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+
+    // Make sure selection is within the entry text element
+    const entryElement = document.getElementById(`entry-text-${entryId}`);
+    if (!entryElement || !entryElement.contains(container)) {
+      setSelectedRange(null);
+      return;
+    }
+
+    // Calculate the offset within the entry text
+    const treeWalker = document.createTreeWalker(
+      entryElement,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let charCount = 0;
+    let startOffset = 0;
+    let endOffset = 0;
+    let foundStart = false;
+    let foundEnd = false;
+
+    while (treeWalker.nextNode()) {
+      const node = treeWalker.currentNode;
+      const nodeLength = node.textContent?.length || 0;
+
+      if (node === range.startContainer) {
+        startOffset = charCount + range.startOffset;
+        foundStart = true;
+      }
+      if (node === range.endContainer) {
+        endOffset = charCount + range.endOffset;
+        foundEnd = true;
+        break;
+      }
+      charCount += nodeLength;
+    }
+
+    if (foundStart && foundEnd && startOffset < endOffset) {
+      setSelectedRange({ start: startOffset, end: endOffset });
+    } else {
+      setSelectedRange(null);
+    }
+  };
+
+  const handleAddRedaction = async (entryId: string) => {
+    if (!selectedRange) return;
+
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+
+    const existingRedactions = entry.redactions || [];
+
+    // Check for overlapping redactions and merge if needed
+    const newRedactions = [...existingRedactions];
+    let merged = false;
+
+    for (let i = 0; i < newRedactions.length; i++) {
+      const existing = newRedactions[i];
+      // Check if ranges overlap or are adjacent
+      if (selectedRange.start <= existing.end && selectedRange.end >= existing.start) {
+        // Merge the ranges
+        newRedactions[i] = {
+          start: Math.min(existing.start, selectedRange.start),
+          end: Math.max(existing.end, selectedRange.end)
+        };
+        merged = true;
+        break;
+      }
+    }
+
+    if (!merged) {
+      newRedactions.push(selectedRange);
+    }
+
+    // Sort by start position
+    newRedactions.sort((a, b) => a.start - b.start);
+
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({ redactions: newRedactions })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      setEntries(current =>
+        current.map(e => e.id === entryId ? { ...e, redactions: newRedactions } : e)
+      );
+      setSelectedRange(null);
+      window.getSelection()?.removeAllRanges();
+      onLogActivity('Redacted Journal Text', `Entry ID: ${entryId}`);
+    } catch (error) {
+      console.error('Error adding redaction:', error);
+      alert('Failed to add redaction');
+    }
+  };
+
+  const handleRemoveRedaction = async (entryId: string, redactionIndex: number) => {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry || !entry.redactions) return;
+
+    const newRedactions = entry.redactions.filter((_, i) => i !== redactionIndex);
+
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({ redactions: newRedactions })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      setEntries(current =>
+        current.map(e => e.id === entryId ? { ...e, redactions: newRedactions } : e)
+      );
+      onLogActivity('Removed Redaction', `Entry ID: ${entryId}`);
+    } catch (error) {
+      console.error('Error removing redaction:', error);
+      alert('Failed to remove redaction');
+    }
+  };
+
+  const renderRedactedText = (text: string, redactions: Redaction[] = [], isRedactMode: boolean = false, entryId: string) => {
+    if (!redactions || redactions.length === 0) {
+      return <span>{text}</span>;
+    }
+
+    // Sort redactions by start position
+    const sortedRedactions = [...redactions].sort((a, b) => a.start - b.start);
+
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    sortedRedactions.forEach((redaction, idx) => {
+      // Add normal text before redaction
+      if (redaction.start > lastIndex) {
+        segments.push(
+          <span key={`text-${idx}`}>{text.slice(lastIndex, redaction.start)}</span>
+        );
+      }
+
+      // Add redacted text (black bars)
+      const redactedLength = redaction.end - redaction.start;
+      const blackBars = '█'.repeat(redactedLength);
+
+      if (isRedactMode) {
+        // In redact mode, show clickable redaction that can be removed
+        segments.push(
+          <span
+            key={`redacted-${idx}`}
+            className="cursor-pointer hover:bg-red-200 transition-colors"
+            onClick={() => handleRemoveRedaction(entryId, idx)}
+            title="Click to remove redaction"
+            style={{ color: '#000' }}
+          >
+            {blackBars}
+          </span>
+        );
+      } else {
+        segments.push(
+          <span key={`redacted-${idx}`} style={{ color: '#000' }}>
+            {blackBars}
+          </span>
+        );
+      }
+
+      lastIndex = redaction.end;
+    });
+
+    // Add remaining text after last redaction
+    if (lastIndex < text.length) {
+      segments.push(
+        <span key="text-end">{text.slice(lastIndex)}</span>
+      );
+    }
+
+    return <>{segments}</>;
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -233,6 +437,18 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  const handleCopyId = async () => {
+    await navigator.clipboard.writeText(anonId);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleCopyEmail = async () => {
+    await navigator.clipboard.writeText('lucy1049684100@gmail.com');
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
   };
 
   if (!isOpen) return null;
@@ -325,6 +541,34 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
             </div>
           )}
 
+          {/* Redaction Access Request */}
+          <div
+            className="mb-4 p-3 text-xs text-gray-500"
+            style={{
+              fontFamily: "'Courier Prime', 'Courier New', monospace",
+              borderTop: '1px dashed #ccc',
+              borderBottom: '1px dashed #ccc'
+            }}
+          >
+            Want to see redacted text?{' '}
+            <button
+              onClick={handleCopyId}
+              className="underline hover:text-gray-700 cursor-pointer"
+            >
+              Copy your ID
+            </button>
+            {copiedId && <span className="ml-1 text-green-600">✓ copied</span>}
+            {' '}and{' '}
+            <button
+              onClick={handleCopyEmail}
+              className="underline hover:text-gray-700 cursor-pointer"
+            >
+              send an email
+            </button>
+            {copiedEmail && <span className="ml-1 text-green-600">✓ copied</span>}
+            {' '}with one sentence why you should get access.
+          </div>
+
           {/* Entries List */}
           {isLoading ? (
             <div className="text-center py-8" style={{ fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
@@ -411,6 +655,22 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                                   CANCEL
                                 </button>
                               </>
+                            ) : redactingEntryId === entry.id ? (
+                              <button
+                                onClick={() => {
+                                  setRedactingEntryId(null);
+                                  setSelectedRange(null);
+                                  window.getSelection()?.removeAllRanges();
+                                }}
+                                className="px-3 py-1 bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold transition-colors"
+                                style={{
+                                  border: '2px solid #000',
+                                  boxShadow: '2px 2px 0 0 #000',
+                                  fontFamily: "'Courier Prime', 'Courier New', monospace"
+                                }}
+                              >
+                                DONE
+                              </button>
                             ) : (
                               <>
                                 <ActionButton
@@ -420,6 +680,21 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                                     setEditText(entry.entry_text);
                                   }}
                                 />
+                                <button
+                                  onClick={() => {
+                                    setRedactingEntryId(entry.id);
+                                    setSelectedRange(null);
+                                  }}
+                                  className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm font-bold transition-colors"
+                                  style={{
+                                    border: '2px solid #000',
+                                    boxShadow: '2px 2px 0 0 #000',
+                                    fontFamily: "'Courier Prime', 'Courier New', monospace"
+                                  }}
+                                  title="Redact text in this entry"
+                                >
+                                  REDACT
+                                </button>
                                 <ActionButton
                                   variant="delete"
                                   onClick={() => handleDeleteEntry(entry.id)}
@@ -444,8 +719,59 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                         }}
                         disabled={isSaving}
                       />
+                    ) : redactingEntryId === entry.id ? (
+                      <div>
+                        <div
+                          id={`entry-text-${entry.id}`}
+                          className="whitespace-pre-wrap p-3 border-2 border-dashed border-gray-400 bg-gray-50 cursor-text select-text"
+                          style={{
+                            fontFamily: "'Courier Prime', 'Courier New', monospace",
+                            fontSize: '16px',
+                            lineHeight: '1.6',
+                            color: '#1a1a1a'
+                          }}
+                          onMouseUp={() => handleTextSelection(entry.id, entry.entry_text)}
+                          onTouchEnd={() => handleTextSelection(entry.id, entry.entry_text)}
+                        >
+                          {renderRedactedText(entry.entry_text, entry.redactions, true, entry.id)}
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-gray-500" style={{ fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                            Select text to redact • Click black bars to unredact
+                          </span>
+                          {selectedRange && (
+                            <button
+                              onClick={() => handleAddRedaction(entry.id)}
+                              className="px-3 py-1 bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold transition-colors"
+                              style={{
+                                border: '2px solid #000',
+                                boxShadow: '2px 2px 0 0 #000',
+                                fontFamily: "'Courier Prime', 'Courier New', monospace"
+                              }}
+                            >
+                              REDACT SELECTION
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setRedactingEntryId(null);
+                              setSelectedRange(null);
+                              window.getSelection()?.removeAllRanges();
+                            }}
+                            className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-900 text-sm font-bold transition-colors"
+                            style={{
+                              border: '2px solid #000',
+                              boxShadow: '2px 2px 0 0 #000',
+                              fontFamily: "'Courier Prime', 'Courier New', monospace"
+                            }}
+                          >
+                            DONE
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       <div
+                        id={`entry-text-${entry.id}`}
                         className="whitespace-pre-wrap"
                         style={{
                           fontFamily: "'Courier Prime', 'Courier New', monospace",
@@ -454,7 +780,7 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                           color: '#1a1a1a'
                         }}
                       >
-                        {entry.entry_text}
+                        {renderRedactedText(entry.entry_text, entry.redactions, false, entry.id)}
                       </div>
                     )}
                   </div>
