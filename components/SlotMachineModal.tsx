@@ -43,16 +43,15 @@ export default function SlotMachineModal({
   const [history, setHistory] = useState<SlotMachineSpin[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [question, setQuestion] = useState('');
   const spinIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadHistory = useCallback(async () => {
-    if (!anonId) return;
     try {
       setLoadingHistory(true);
       const { data, error } = await supabase
         .from('slot_machine_spins')
         .select('*')
-        .eq('anon_id', anonId)
         .order('created_at', { ascending: false })
         .limit(8);
 
@@ -65,7 +64,7 @@ export default function SlotMachineModal({
     } finally {
       setLoadingHistory(false);
     }
-  }, [anonId]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,7 +129,7 @@ export default function SlotMachineModal({
       const response = await fetch('/api/slot-machine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reels: finalReels, anonId }),
+        body: JSON.stringify({ reels: finalReels, anonId, question: question.trim() || undefined }),
       });
 
       const payload = await response.json();
@@ -201,6 +200,22 @@ export default function SlotMachineModal({
               ))}
             </div>
 
+            <div className="w-full">
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Ask a question... (optional)"
+                disabled={isSpinning}
+                className="w-full px-4 py-3 border-4 border-gray-900 text-sm mb-2 disabled:bg-gray-100"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isSpinning) {
+                    handleSpin();
+                  }
+                }}
+              />
+            </div>
+
             <button
               onClick={handleSpin}
               disabled={isSpinning}
@@ -209,7 +224,7 @@ export default function SlotMachineModal({
                 : 'bg-yellow-300 hover:bg-yellow-400'
                 } transition-colors`}
             >
-              {isSpinning ? 'Spinning...' : 'Spin & Ask Lucy Earth'}
+              {isSpinning ? 'Spinning...' : question.trim() ? 'Spin & Get Answer' : 'Spin & Ask Lucy Earth'}
             </button>
 
             {error && (
@@ -221,7 +236,7 @@ export default function SlotMachineModal({
             {fortune && (
               <div className="w-full border-4 border-gray-900 bg-white p-4 space-y-3">
                 <div className="text-xs text-gray-500 tracking-wide">
-                  GEMINI 2.5 FLASH SAYS:
+                  LUCY EARTH SAYS:
                 </div>
                 <p className="text-lg leading-relaxed">{fortune}</p>
                 <div className="text-xs text-gray-500">
@@ -264,9 +279,7 @@ export default function SlotMachineModal({
               <div className="border-2 border-dashed border-gray-400 p-4 text-sm text-gray-500 text-center">
                 {loadingHistory
                   ? 'Loading fortunes...'
-                  : anonId
-                    ? 'No fortune history yet. Spin the reels!'
-                    : 'Play to record your first fortune.'}
+                  : 'No fortune history yet. Spin the reels!'}
               </div>
             ) : (
               <div className="border-2 border-gray-900 p-3 bg-white flex flex-col gap-3">

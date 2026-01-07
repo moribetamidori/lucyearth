@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, RefObject } from 'react';
+import { useState, useEffect, useCallback, RefObject } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import { convertToWebP } from '@/lib/imageUpload';
@@ -55,6 +56,29 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
   const [editSelectedCoverFile, setEditSelectedCoverFile] = useState<File | null>(null);
   const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
 
+  const handleSongEnd = useCallback(() => {
+    if (repeatMode === 'one') {
+      audioRef.current?.play();
+    } else if (repeatMode === 'all' || isShuffle) {
+      // Play next song
+      if (songs.length === 0 || currentSongIndex === null) return;
+      let nextIndex: number;
+      if (isShuffle) {
+        nextIndex = Math.floor(Math.random() * songs.length);
+      } else {
+        nextIndex = (currentSongIndex + 1) % songs.length;
+      }
+      setCurrentSongIndex(nextIndex);
+      setIsPlaying(true);
+      if (audioRef.current) {
+        audioRef.current.src = songs[nextIndex].file_url;
+        audioRef.current.play();
+      }
+    } else {
+      setIsPlaying(false);
+    }
+  }, [repeatMode, isShuffle, audioRef, songs, currentSongIndex]);
+
   useEffect(() => {
     if (isOpen && anonId) {
       fetchSongs();
@@ -79,7 +103,7 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
       audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [currentSongIndex, repeatMode, isShuffle, songs]);
+  }, [currentSongIndex, songs, audioRef, handleSongEnd]);
 
   const fetchSongs = async () => {
     setLoading(true);
@@ -92,16 +116,6 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
       setSongs(data);
     }
     setLoading(false);
-  };
-
-  const handleSongEnd = () => {
-    if (repeatMode === 'one') {
-      audioRef.current?.play();
-    } else if (repeatMode === 'all' || isShuffle) {
-      playNext();
-    } else {
-      setIsPlaying(false);
-    }
   };
 
   const playSong = (index: number) => {
@@ -475,11 +489,12 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
                       className="w-full px-3 py-2 bg-gray-900 border-2 border-gray-700 text-sm text-white"
                     />
                     {coverPreview && (
-                      <div className="mt-2 relative inline-block">
-                        <img
+                      <div className="mt-2 relative inline-block w-32 h-32">
+                        <Image
                           src={coverPreview}
                           alt="Cover preview"
-                          className="w-32 h-32 object-cover border-2 border-gray-700"
+                          fill
+                          className="object-cover border-2 border-gray-700"
                         />
                         <button
                           onClick={() => {
@@ -566,11 +581,12 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
                           className="w-full px-3 py-2 bg-gray-900 border-2 border-gray-700 text-sm text-white"
                         />
                         {editCoverPreview && (
-                          <div className="mt-2 relative inline-block">
-                            <img
+                          <div className="mt-2 relative inline-block w-32 h-32">
+                            <Image
                               src={editCoverPreview}
                               alt="Cover preview"
-                              className="w-32 h-32 object-cover border-2 border-gray-700"
+                              fill
+                              className="object-cover border-2 border-gray-700"
                             />
                             <button
                               onClick={() => {
@@ -613,11 +629,14 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
                     onClick={() => playSong(index)}
                   >
                     {song.cover_url ? (
-                      <img
-                        src={song.cover_url}
-                        alt={song.title}
-                        className="w-12 h-12 object-cover border-2 border-gray-600 flex-shrink-0"
-                      />
+                      <div className="relative w-12 h-12 flex-shrink-0">
+                        <Image
+                          src={song.cover_url}
+                          alt={song.title}
+                          fill
+                          className="object-cover border-2 border-gray-600"
+                        />
+                      </div>
                     ) : (
                       <div className="w-12 h-12 bg-gray-700 border-2 border-gray-600 flex items-center justify-center flex-shrink-0">
                         🎵
@@ -664,11 +683,14 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
                 {/* Now Playing Info - Left Side */}
                 <div className="flex items-center gap-3 min-w-0">
                   {currentSong.cover_url ? (
-                    <img
-                      src={currentSong.cover_url}
-                      alt={currentSong.title}
-                      className="w-14 h-14 object-cover border-2 border-gray-700 flex-shrink-0"
-                    />
+                    <div className="relative w-14 h-14 flex-shrink-0">
+                      <Image
+                        src={currentSong.cover_url}
+                        alt={currentSong.title}
+                        fill
+                        className="object-cover border-2 border-gray-700"
+                      />
+                    </div>
                   ) : (
                     <div className="w-14 h-14 bg-gray-800 border-2 border-gray-700 flex items-center justify-center flex-shrink-0">
                       🎵
@@ -756,11 +778,14 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
               <div className="md:hidden flex items-center gap-3">
                 {/* Album Cover */}
                 {currentSong.cover_url ? (
-                  <img
-                    src={currentSong.cover_url}
-                    alt={currentSong.title}
-                    className="w-12 h-12 object-cover border-2 border-gray-700 flex-shrink-0"
-                  />
+                  <div className="relative w-12 h-12 flex-shrink-0">
+                    <Image
+                      src={currentSong.cover_url}
+                      alt={currentSong.title}
+                      fill
+                      className="object-cover border-2 border-gray-700"
+                    />
+                  </div>
                 ) : (
                   <div className="w-12 h-12 bg-gray-800 border-2 border-gray-700 flex items-center justify-center flex-shrink-0">
                     🎵

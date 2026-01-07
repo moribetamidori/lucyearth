@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import PoopCalendar from '@/components/PoopCalendar';
 import ChildCalendar from '@/components/ChildCalendar';
 import CatProfile from '@/components/CatProfile';
@@ -28,7 +29,7 @@ export default function Home() {
   const [showChildCalendar, setShowChildCalendar] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [orbs, setOrbs] = useState<Array<{
+  const [orbs] = useState<Array<{
     size: number;
     left: number;
     top: number;
@@ -289,9 +290,11 @@ export default function Home() {
               imageRendering: 'pixelated',
             }}
           >
-            <img
+            <Image
               src="/substack.webp"
               alt="Substack"
+              width={32}
+              height={32}
               className="w-8 h-8 max-sm:w-7 max-sm:h-7 object-contain"
             />
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">STACK</span>
@@ -406,9 +409,11 @@ export default function Home() {
               imageRendering: 'pixelated',
             }}
           >
-            <img
+            <Image
               src="/images/garden/jatree.webp"
               alt="Garden"
+              width={51}
+              height={51}
               className="w-full h-full object-contain"
               style={{ imageRendering: 'pixelated' }}
             />
@@ -475,9 +480,11 @@ export default function Home() {
                 imageRendering: 'pixelated',
               }}
             >
-              <img
+              <Image
                 src="/spotify.png"
                 alt="Spotify"
+                width={51}
+                height={51}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -518,9 +525,11 @@ export default function Home() {
                 imageRendering: 'pixelated',
               }}
             >
-              <img
+              <Image
                 src="/spotify.png"
                 alt="Spotify"
+                width={51}
+                height={51}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -541,9 +550,11 @@ export default function Home() {
               imageRendering: 'pixelated',
             }}
           >
-            <img
+            <Image
               src="/spotify.png"
               alt="Spotify"
+              width={48}
+              height={48}
               className="w-full h-full object-contain"
             />
           </div>
@@ -681,21 +692,28 @@ export default function Home() {
       <main className="relative z-10 container mx-auto px-6 py-20 max-w-5xl flex-grow flex items-center justify-center">
         <div className="relative flex flex-col items-center w-full">
           {/* Tree background image */}
-          <img
+          <Image
             src="/images/garden/jatree.webp"
             alt="Tree"
+            width={0}
+            height={0}
+            sizes="100vw"
             className="absolute left-1/2 bottom-0 transform -translate-x-1/2 pointer-events-none"
             style={{
               imageRendering: 'pixelated',
               width: '70%',
+              height: 'auto',
               zIndex: -1
             }}
           />
-          <img
+          <Image
             src="/gifs/oranges.gif"
             alt="Orange cats"
+            width={0}
+            height={0}
+            sizes="100vw"
             className="h-auto cursor-pointer hover:scale-105 transition-transform max-sm:w-[80%] relative z-10"
-            style={{ imageRendering: 'pixelated', width: '50%' }}
+            style={{ imageRendering: 'pixelated', width: '50%', height: 'auto' }}
             onClick={async (e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
@@ -920,6 +938,7 @@ export default function Home() {
         isOpen={showFindMeModal}
         onClose={() => setShowFindMeModal(false)}
         anonId={anonId}
+        isEditMode={isEditMode}
         onLogActivity={logActivity}
       />
 

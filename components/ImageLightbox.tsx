@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 
 interface ImageLightboxProps {
   images: string[];
@@ -180,12 +181,17 @@ export default function ImageLightbox({
         )}
 
         {/* Image */}
-        <img
-          src={images[currentIndex]}
-          alt={`Image ${currentIndex + 1}`}
-          className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div className="relative max-w-full max-h-[calc(90vh-12rem)] w-full h-full flex items-center justify-center">
+          <Image
+            src={images[currentIndex]}
+            alt={`Image ${currentIndex + 1}`}
+            width={800}
+            height={600}
+            className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black w-auto h-auto"
+            onClick={(e) => e.stopPropagation()}
+            unoptimized
+          />
+        </div>
       </div>
 
       {/* Next button - Desktop only */}

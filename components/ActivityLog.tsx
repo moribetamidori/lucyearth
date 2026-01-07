@@ -22,27 +22,27 @@ export default function ActivityLog({ isOpen, onClose, anonId, userNumber }: Act
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const loadLogs = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('anon_id', anonId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error loading logs:', error);
+      } else {
+        setLogs(data || []);
+      }
+      setLoading(false);
+    };
+
     if (isOpen && anonId) {
       loadLogs();
     }
   }, [isOpen, anonId]);
-
-  const loadLogs = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('anon_id', anonId)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (error) {
-      console.error('Error loading logs:', error);
-    } else {
-      setLogs(data || []);
-    }
-    setLoading(false);
-  };
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -113,11 +113,10 @@ export default function ActivityLog({ isOpen, onClose, anonId, userNumber }: Act
                         <div className="font-medium">{log.action}</div>
                         {log.details && (
                           <div
-                            className={`text-sm text-gray-600 ${
-                              log.action === 'Spun Slot Machine'
+                            className={`text-sm text-gray-600 ${log.action === 'Spun Slot Machine'
                                 ? 'font-mono text-base text-gray-800'
                                 : ''
-                            }`}
+                              }`}
                           >
                             {log.details}
                           </div>

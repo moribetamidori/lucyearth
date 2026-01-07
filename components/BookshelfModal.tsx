@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { supabase, type BookshelfBook } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
 import { ActionButton } from './ActionButtons';
@@ -111,19 +112,7 @@ export default function BookshelfModal({
     [activeBookId, books]
   );
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchBooks();
-      onLogActivity('Opened Bookshelf', 'Browsing the pixel shelf');
-    } else {
-      setActiveBookId(null);
-      setCoverBookId(null);
-      setHoveredBookId(null);
-      setShowAddForm(false);
-    }
-  }, [isOpen, onLogActivity]);
-
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('bookshelf_books')
@@ -141,7 +130,19 @@ export default function BookshelfModal({
       }
     }
     setLoading(false);
-  };
+  }, [coverBookId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchBooks();
+      onLogActivity('Opened Bookshelf', 'Browsing the pixel shelf');
+    } else {
+      setActiveBookId(null);
+      setCoverBookId(null);
+      setHoveredBookId(null);
+      setShowAddForm(false);
+    }
+  }, [isOpen, onLogActivity, fetchBooks]);
 
   const resetForm = () => {
     setFormState(defaultForm);
@@ -400,10 +401,12 @@ export default function BookshelfModal({
                     }}
                   >
                     {activeBook.cover_url ? (
-                      <img
+                      <Image
                         src={activeBook.cover_url}
                         alt={activeBook.title}
-                        className="max-w-full max-h-full object-contain"
+                        fill
+                        className="object-contain"
+                        unoptimized
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-amber-100 to-amber-300" />
@@ -729,10 +732,12 @@ export default function BookshelfModal({
                         width: `${positiveOrDefault(formState.length, 120)}px`,
                       }}
                     >
-                      <img
+                      <Image
                         src={coverPreview}
                         alt="Cover preview"
-                        className="max-w-full max-h-full object-contain"
+                        fill
+                        className="object-contain"
+                        unoptimized
                       />
                     </div>
                   )}

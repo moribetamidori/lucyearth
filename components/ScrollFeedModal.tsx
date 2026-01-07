@@ -521,7 +521,7 @@ export default function ScrollFeedModal({
   const likeCount = (item: FeedItem) =>
     voteCounts[item.id] || 0;
 
-  const cards = visibleItems.map((item, idx) => {
+  const cards = visibleItems.map((item) => {
     const liked = votedIds.has(item.id);
     const mediaUrl = item.mediaUrl;
     const hasMedia = Boolean(mediaUrl);

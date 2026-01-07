@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { supabase, type WomenProfile } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
 
@@ -238,29 +239,35 @@ export default function WomenModal({
 
       // Refresh tags
       fetchAllTags();
-    } catch (error) {
+    } catch {
       setImportError('Failed to import. Please try again.');
     } finally {
       setImporting(false);
     }
   }, [importName, importing, fetchAllTags]);
 
+  // Track if we've logged activity for this open session
+  const hasLoggedOpen = useRef(false);
+
+  // When modal opens, fetch tags and log activity once
   useEffect(() => {
     if (isOpen) {
       fetchAllTags();
-      fetchProfiles(filterTag, sortMode, searchQuery);
-      if (onLogActivity) {
+      if (onLogActivity && !hasLoggedOpen.current) {
+        hasLoggedOpen.current = true;
         onLogActivity('Opened Women Network', 'Viewed women list');
       }
+    } else {
+      hasLoggedOpen.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, fetchAllTags, onLogActivity]);
 
-  // Re-fetch when filter, sort, or search changes
+  // Fetch profiles when modal is open or when filter/sort/search changes
   useEffect(() => {
     if (isOpen) {
       fetchProfiles(filterTag, sortMode, searchQuery);
     }
-  }, [filterTag, sortMode, searchQuery]);
+  }, [isOpen, fetchProfiles, filterTag, sortMode, searchQuery]);
 
   const availableTags = useMemo(() => {
     const query = tagsInput.trim().toLowerCase();
@@ -461,29 +468,40 @@ export default function WomenModal({
               </p>
             </div>
             <div className="flex gap-2">
+              {isEditMode && (
+                <>
+                  <button
+                    onClick={() => setShowImport(true)}
+                    className="px-3 py-2 text-xs border-2 border-gray-900 bg-green-200 hover:bg-green-300"
+                  >
+                    Import from Wiki
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowForm(true);
+                      setEditingId(null);
+                      setName('');
+                      setBirthYear('');
+                      setIntro('');
+                      setAccomplishments('');
+                      setTags([]);
+                      setTagsInput('');
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                      setSavingMessage(null);
+                    }}
+                    className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
+                  >
+                    Add Manually
+                  </button>
+                </>
+              )}
               <button
-                onClick={() => setShowImport(true)}
-                className="px-3 py-2 text-xs border-2 border-gray-900 bg-green-200 hover:bg-green-300"
+                onClick={fetchRandomWoman}
+                disabled={loadingRandom}
+                className="px-3 py-2 text-xs border-2 border-gray-900 bg-violet-200 hover:bg-violet-300 disabled:opacity-50"
               >
-                Import from Wiki
-              </button>
-              <button
-                onClick={() => {
-                  setShowForm(true);
-                  setEditingId(null);
-                  setName('');
-                  setBirthYear('');
-                  setIntro('');
-                  setAccomplishments('');
-                  setTags([]);
-                  setTagsInput('');
-                  setSelectedImage(null);
-                  setImagePreview(null);
-                  setSavingMessage(null);
-                }}
-                className="px-3 py-2 text-xs border-2 border-gray-900 bg-amber-200 hover:bg-amber-300"
-              >
-                Add Manually
+                {loadingRandom ? 'Loading...' : 'Inspire me'}
               </button>
             </div>
           </div>
@@ -528,13 +546,6 @@ export default function WomenModal({
                 ))}
               </select>
             </div>
-            <button
-              onClick={fetchRandomWoman}
-              disabled={loadingRandom}
-              className="px-3 py-1 text-xs border-2 border-gray-900 bg-violet-200 hover:bg-violet-300 disabled:opacity-50"
-            >
-              {loadingRandom ? 'Loading...' : 'Inspire me'}
-            </button>
           </div>
         </div>
 
@@ -679,10 +690,13 @@ export default function WomenModal({
                     className="w-full text-sm"
                   />
                   {imagePreview && (
-                    <img
+                    <Image
                       src={imagePreview}
                       alt="Preview"
+                      width={320}
+                      height={128}
                       className="w-full h-32 object-cover border-2 border-gray-900"
+                      unoptimized
                     />
                   )}
                 </div>
@@ -816,7 +830,7 @@ function ProfileCard({
     >
       <div className="w-16 h-16 rounded border border-gray-300 overflow-hidden flex-shrink-0 bg-gray-50">
         {profile.image_url ? (
-          <img src={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
+          <Image src={profile.image_url} alt={profile.name} width={64} height={64} className="w-full h-full object-cover" unoptimized />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl">👩‍🚀</div>
         )}
@@ -909,10 +923,13 @@ function ProfileDetailModal({
           {/* Square image */}
           <div className="relative p-8 flex justify-center">
             {profile.image_url ? (
-              <img
+              <Image
                 src={profile.image_url}
                 alt={profile.name}
+                width={192}
+                height={192}
                 className="w-48 h-48 object-cover border-4 border-gray-900"
+                unoptimized
               />
             ) : (
               <div className="w-48 h-48 bg-gradient-to-br from-violet-100 to-sky-100 flex items-center justify-center border-4 border-gray-900">

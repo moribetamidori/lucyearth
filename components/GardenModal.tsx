@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import Image from 'next/image';
 import { supabase, type GardenPlacement, type GardenSpecies } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
 
@@ -61,6 +62,33 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
 
   const gridAreaRef = useRef<HTMLDivElement | null>(null);
 
+  const closeForm = useCallback(() => {
+    setSaving(false);
+    setFormError('');
+    setCommonName('');
+    setScientificName('');
+    setSunlight('');
+    setWateringSchedule('');
+    setSoilType('');
+    setBloomSeason('');
+    setPlantedOn('');
+    setLastPrunedOn('');
+    setStatus('');
+    setLocation('');
+    setNotes('');
+    setSelectedCells([]);
+    setEditingSpecies(null);
+    setEditingPlacementId(null);
+    setImageFile(null);
+    setImagePreview((prev) => {
+      if (prev && prev.startsWith('blob:')) {
+        URL.revokeObjectURL(prev);
+      }
+      return '';
+    });
+    setIsAdding(false);
+  }, []);
+
   const gridCells = useMemo(
     () => Array.from({ length: gridCols * gridRows }, (_, index) => index),
     [gridCols, gridRows]
@@ -88,7 +116,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
       setSelectedSpecies(null);
       closeForm();
     }
-  }, [isOpen, onLogActivity]);
+  }, [isOpen, onLogActivity, closeForm]);
 
   useEffect(() => {
     return () => {
@@ -158,11 +186,6 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
       URL.revokeObjectURL(imagePreview);
     }
     setImagePreview('');
-  };
-
-  const closeForm = () => {
-    clearForm();
-    setIsAdding(false);
   };
 
   const fetchGardenData = async () => {
@@ -536,9 +559,11 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
           style={{ borderBottom: '4px solid #000' }}
         >
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src="/images/garden/jatree.webp"
               alt="Garden"
+              width={48}
+              height={48}
               className="w-12 h-12 object-contain"
             />
             {selectedSpecies ? (
@@ -663,6 +688,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                             {displayPlacement?.species && (
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-4 h-4 rounded-sm overflow-hidden border border-black/10 bg-white/80 shadow-sm">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
                                     src={displayPlacement.species.image_url}
                                     alt={displayPlacement.species.common_name}
@@ -842,6 +868,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                           </div>
                           {imagePreview && (
                             <div className="border-2 border-gray-900 bg-gray-50 flex items-center justify-center p-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={imagePreview}
                                 alt="Preview"
@@ -910,6 +937,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                           >
                             <div className="grid grid-cols-[60px_1fr] gap-3 p-3">
                               <div className="w-full h-[60px] overflow-hidden border border-gray-900 bg-gray-100">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={species.image_url}
                                   alt={species.common_name}
@@ -950,6 +978,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
                     className="absolute inset-4 border-4 border-gray-900 pointer-events-none"
                     style={{ boxShadow: '8px 8px 0 0 #000' }}
                   />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={selectedSpecies.image_url}
                     alt={selectedSpecies.common_name}

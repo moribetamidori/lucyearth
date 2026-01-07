@@ -66,7 +66,7 @@ export default function DoubanModal({
         onLogActivity('Opened Douban modal', 'Viewed ratings');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, onLogActivity]);
 
   const fetchRatings = async () => {
     try {
@@ -120,7 +120,7 @@ export default function DoubanModal({
       const fileName = `${timestamp}_${randomString}.webp`;
 
       // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('douban-images')
         .upload(fileName, webpBlob, {
           contentType: 'image/webp',
@@ -475,6 +475,7 @@ export default function DoubanModal({
                       </label>
                       {(imagePreview || existingImageUrl) && (
                         <div className="mt-4">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imagePreview || existingImageUrl || ''}
                             alt="Preview"
@@ -604,6 +605,7 @@ export default function DoubanModal({
                       {/* Image */}
                       {r.image_url && (
                         <div className="flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={r.image_url}
                             alt={r.title}

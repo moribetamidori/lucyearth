@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 
@@ -41,18 +41,34 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
   const [copiedId, setCopiedId] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
 
+  const fetchUserVotes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('journal_entry_votes')
+        .select('entry_id')
+        .eq('anon_id', anonId);
+
+      if (error) throw error;
+
+      const votedSet = new Set((data || []).map((vote) => vote.entry_id));
+      setVotedEntries(votedSet);
+    } catch (error) {
+      console.error('Error fetching journal votes:', error);
+    }
+  }, [anonId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchEntries();
       onLogActivity('Opened Journal', 'Viewing journal entries');
     }
-  }, [isOpen]);
+  }, [isOpen, onLogActivity]);
 
   useEffect(() => {
     if (isOpen && anonId) {
       fetchUserVotes();
     }
-  }, [isOpen, anonId]);
+  }, [isOpen, anonId, fetchUserVotes]);
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -68,22 +84,6 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
       console.error('Error fetching journal entries:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchUserVotes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('journal_entry_votes')
-        .select('entry_id')
-        .eq('anon_id', anonId);
-
-      if (error) throw error;
-
-      const votedSet = new Set((data || []).map((vote) => vote.entry_id));
-      setVotedEntries(votedSet);
-    } catch (error) {
-      console.error('Error fetching journal votes:', error);
     }
   };
 
@@ -217,7 +217,7 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
     }
   };
 
-  const handleTextSelection = (entryId: string, entryText: string) => {
+  const handleTextSelection = (entryId: string) => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
       setSelectedRange(null);
@@ -730,8 +730,8 @@ export default function Journal({ isOpen, onClose, isEditMode, anonId, onLogActi
                             lineHeight: '1.6',
                             color: '#1a1a1a'
                           }}
-                          onMouseUp={() => handleTextSelection(entry.id, entry.entry_text)}
-                          onTouchEnd={() => handleTextSelection(entry.id, entry.entry_text)}
+                          onMouseUp={() => handleTextSelection(entry.id)}
+                          onTouchEnd={() => handleTextSelection(entry.id)}
                         >
                           {renderRedactedText(entry.entry_text, entry.redactions, true, entry.id)}
                         </div>

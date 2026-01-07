@@ -2,27 +2,53 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 type SlotRequestPayload = {
   reels: string[];
   anonId?: string | null;
+  question?: string;
 };
 
-async function fetchFortuneText(symbols: string[]): Promise<string> {
+async function fetchFortuneText(symbols: string[], question?: string): Promise<string> {
   if (!GEMINI_API_KEY) {
     throw new Error('Missing Gemini API key');
   }
 
-  const prompt = [
-    'You are the mischievous LucyEarth arcade oracle.',
-    'Return exactly one short prophecy (max 45 words) that feels specific and vivid.',
-    'Blend oddly precise claims like “$1,000 windfall next month,” “your pottery skills level up,” or “text that person at 11:11.”',
-    'You may be funny, spicy, neutral, or sweet, but never apologetic or negative.',
-    `Today’s slot combo: ${symbols.join(' | ')}.`,
-    'Reference those icons loosely and end with a wink, flourish, or dramatic mic drop.',
-  ].join(' ');
+  const symbolMeanings: Record<string, string> = {
+    '🍒': 'sweetness, new beginnings, small pleasures',
+    '🍋': 'sourness turning sweet, unexpected twists, zesty energy',
+    '💎': 'wealth, clarity, rare treasures, hidden value',
+    '🌈': 'hope, diversity, after storms comes beauty, magic',
+    '⭐️': 'success, wishes granted, destiny, bright future',
+    '🍀': 'luck, fortune, rare finds, serendipity',
+    '🔥': 'passion, transformation, intensity, burning desire',
+    '🌙': 'dreams, intuition, mystery, nighttime revelations',
+  };
+
+  const symbolContext = symbols
+    .map(s => symbolMeanings[s] || 'mystery')
+    .join('; ');
+
+  const prompt = question
+    ? [
+        'You are LucyEarth, a playful and mystical oracle.',
+        `The seeker asks: "${question}"`,
+        `Their slot combo: ${symbols.join(' | ')} (meanings: ${symbolContext}).`,
+        'Answer their question directly based on the energy of these symbols.',
+        'Be creative, specific, and vivid. You can be funny, mysterious, poetic, or sage-like.',
+        'Vary your tone and style - sometimes be cryptic, sometimes direct, sometimes whimsical.',
+        'Keep it under 50 words. No need for formal structure.',
+      ].join(' ')
+    : [
+        'You are LucyEarth, a playful arcade oracle.',
+        `Slot combo: ${symbols.join(' | ')} (meanings: ${symbolContext}).`,
+        'Give a short, vivid fortune (under 45 words) inspired by these symbols.',
+        'Be unpredictable - sometimes funny, sometimes mysterious, sometimes oddly specific.',
+        'Vary your style: could be a prophecy, advice, observation, or cryptic riddle.',
+        'No fixed format needed.',
+      ].join(' ');
 
   const response = await fetch(
     `${GEMINI_BASE_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -76,7 +102,7 @@ export async function POST(request: NextRequest) {
       typeof symbol === 'string' ? symbol : String(symbol ?? '')
     );
 
-    const fortuneText = await fetchFortuneText(cleanReels);
+    const fortuneText = await fetchFortuneText(cleanReels, body.question);
 
     const { data, error } = await supabase
       .from('slot_machine_spins')

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { supabase, type WishlistItem } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
 import { ActionButton } from './ActionButtons';
@@ -34,15 +35,20 @@ export default function WishlistModal({
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const stableLogActivity = useCallback(
+    (action: string, details: string) => {
+      onLogActivity?.(action, details);
+    },
+    [onLogActivity]
+  );
+
   // Fetch items on mount
   useEffect(() => {
     if (isOpen) {
       fetchItems();
-      if (onLogActivity) {
-        onLogActivity('Opened Wishlist modal', 'Viewed wishlist items');
-      }
+      stableLogActivity('Opened Wishlist modal', 'Viewed wishlist items');
     }
-  }, [isOpen]);
+  }, [isOpen, stableLogActivity]);
 
   const fetchItems = async () => {
     try {
@@ -432,11 +438,16 @@ export default function WishlistModal({
                       </label>
                       {(imagePreview || existingImageUrl) && (
                         <div className="mt-4">
-                          <img
-                            src={imagePreview || existingImageUrl || ''}
-                            alt="Preview"
-                            className="max-w-xs border-4 border-gray-900"
-                          />
+                          <div className="relative w-64 h-64 border-4 border-gray-900">
+                            <Image
+                              src={imagePreview || existingImageUrl || ''}
+                              alt="Preview"
+                              fill
+                              sizes="256px"
+                              className="object-contain"
+                              unoptimized
+                            />
+                          </div>
                           <button
                             onClick={() => {
                               setSelectedImage(null);
@@ -546,11 +557,14 @@ function WishlistItemCard({
     >
       {/* Image */}
       {item.image_url && (
-        <div className="flex-shrink-0">
-          <img
+        <div className="flex-shrink-0 relative w-24 h-24 border-2 border-gray-900">
+          <Image
             src={item.image_url}
             alt={item.title}
-            className="w-24 h-24 object-cover border-2 border-gray-900"
+            fill
+            sizes="96px"
+            className="object-cover"
+            unoptimized
           />
         </div>
       )}
@@ -593,17 +607,19 @@ function WishlistItemCard({
           </a>
         )}
 
-        {/* Purchased toggle button */}
-        <button
-          onClick={onTogglePurchased}
-          className={`px-3 py-1.5 border-2 border-gray-900 text-sm font-bold transition-colors ${
-            item.is_purchased
-              ? 'bg-green-500 text-white hover:bg-gray-200 hover:text-gray-900'
-              : 'bg-white hover:bg-green-500 hover:text-white'
-          }`}
-        >
-          {item.is_purchased ? '✓ PURCHASED' : 'MARK PURCHASED'}
-        </button>
+        {/* Purchased toggle button - only in edit mode */}
+        {isEditMode && (
+          <button
+            onClick={onTogglePurchased}
+            className={`px-3 py-1.5 border-2 border-gray-900 text-sm font-bold transition-colors ${
+              item.is_purchased
+                ? 'bg-green-500 text-white hover:bg-gray-200 hover:text-gray-900'
+                : 'bg-white hover:bg-green-500 hover:text-white'
+            }`}
+          >
+            {item.is_purchased ? '✓ PURCHASED' : 'MARK PURCHASED'}
+          </button>
+        )}
       </div>
     </div>
   );

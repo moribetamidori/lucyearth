@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import ImageLightbox from './ImageLightbox';
@@ -667,15 +668,18 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                               </div>
                               {pin.images && pin.images.length > 0 && (
                                 <div className="relative mt-2">
-                                  <img
+                                  <Image
                                     src={pin.images[0].image_url}
                                     alt={pin.location}
+                                    width={200}
+                                    height={96}
                                     className="w-full h-24 object-cover border border-gray-300 cursor-pointer hover:opacity-90"
                                     onClick={() => {
                                       setLightboxImages(pin.images!.map(img => img.image_url));
                                       setLightboxIndex(0);
                                       setShowLightbox(true);
                                     }}
+                                    unoptimized
                                   />
                                   {pin.images.length > 1 && (
                                     <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">
@@ -796,10 +800,13 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                         <div className="mt-2 grid grid-cols-3 gap-2">
                           {imagePreviews.map((preview, index) => (
                             <div key={index} className="relative">
-                              <img
+                              <Image
                                 src={preview}
                                 alt={`Preview ${index + 1}`}
+                                width={100}
+                                height={80}
                                 className="w-full h-20 object-cover border-2 border-gray-900"
+                                unoptimized
                               />
                               <button
                                 onClick={() => {
@@ -931,10 +938,13 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                               <div className="mb-2 grid grid-cols-3 gap-2">
                                 {editExistingImages.map((image) => (
                                   <div key={image.id} className="relative">
-                                    <img
+                                    <Image
                                       src={image.image_url}
                                       alt="Existing"
+                                      width={100}
+                                      height={80}
                                       className="w-full h-20 object-cover border-2 border-gray-900"
+                                      unoptimized
                                     />
                                     <button
                                       onClick={() => handleRemoveExistingImage(image.id, image.image_url)}
@@ -958,10 +968,13 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                               <div className="mt-2 grid grid-cols-3 gap-2">
                                 {editImagePreviews.map((preview, index) => (
                                   <div key={index} className="relative">
-                                    <img
+                                    <Image
                                       src={preview}
                                       alt={`Preview ${index + 1}`}
+                                      width={100}
+                                      height={80}
                                       className="w-full h-20 object-cover border-2 border-gray-900"
+                                      unoptimized
                                     />
                                     <button
                                       onClick={() => {
@@ -1019,10 +1032,12 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
                               setShowLightbox(true);
                             }}
                           >
-                            <img
+                            <Image
                               src={pin.images[0].image_url}
                               alt={pin.location}
-                              className="w-full h-full object-cover"
+                              fill
+                              className="object-cover"
+                              unoptimized
                             />
                             {pin.images.length > 1 && (
                               <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5">

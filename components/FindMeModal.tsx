@@ -87,9 +87,10 @@ interface FindMeModalProps {
   onClose: () => void;
   onLogActivity: (action: string, details?: string) => void;
   anonId: string;
+  isEditMode: boolean;
 }
 
-export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: FindMeModalProps) {
+export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId, isEditMode }: FindMeModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -595,6 +596,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
           </div>
 
           <div className="lg:w-1/2 flex-1 overflow-y-auto p-5 space-y-6 bg-gray-50">
+            {isEditMode && (
             <form onSubmit={handleSubmitEntry} className="space-y-3">
               {editingEntryId && (
                 <div className="flex items-center justify-between border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
@@ -760,6 +762,7 @@ export default function FindMeModal({ isOpen, onClose, onLogActivity, anonId }: 
                   : 'Highlight this place'}
               </button>
             </form>
+            )}
 
             <div>
               <h3 className="text-lg font-semibold text-gray-900 flex items-center justify-between">

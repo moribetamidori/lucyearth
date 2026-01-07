@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { ArenaCollection, ArenaBlock } from '@/lib/supabase';
 import {
   fetchCollections,
@@ -319,7 +320,7 @@ export default function ArenaModal({
         `Collection: ${currentCollection.title}, Files: ${fileArray.length}`
       );
       await loadBlocks(currentCollection.id, true);
-    } catch (error) {
+    } catch {
       alert('Failed to upload one or more files.');
     } finally {
       setIsUploading(false);
@@ -667,10 +668,12 @@ export default function ArenaModal({
                             playsInline
                           />
                         ) : (
-                          <img
+                          <Image
                             src={block.image_url}
                             alt="Block"
-                            className="w-full h-full object-cover cursor-pointer hover:opacity-90"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 16vw"
+                            className="object-cover cursor-pointer hover:opacity-90"
                             onClick={() => {
                               const index = blocks.findIndex(b => b.id === block.id);
                               setSelectedImage(block.image_url);
@@ -843,11 +846,14 @@ export default function ArenaModal({
                 playsInline
               />
             ) : (
-              <img
+              <Image
                 src={selectedImage}
                 alt="Full size"
-                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-black"
+                width={800}
+                height={600}
+                className="max-w-full max-h-[calc(90vh-12rem)] w-auto h-auto object-contain border-4 border-black"
                 onClick={(e) => e.stopPropagation()}
+                unoptimized
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { uploadCatPicture, fetchCatPictures, deleteCatPicture } from "@/lib/imageUpload";
 import type { CatPicture } from "@/lib/supabase";
 
@@ -356,9 +357,11 @@ export default function CatProfile({
       <div className="space-y-6">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img
+            <Image
               src={imagePath}
               alt={data.name}
+              width={192}
+              height={192}
               className="w-48 h-48 object-contain"
               style={{ imageRendering: "pixelated" }}
             />
@@ -472,10 +475,11 @@ export default function CatProfile({
                     playsInline
                   />
                 ) : (
-                  <img
+                  <Image
                     src={pic.image_url}
                     alt="Cat picture"
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                     style={{ imageRendering: "pixelated" }}
                     onClick={() => {
                       setSelectedImage(pic.image_url);
@@ -546,10 +550,11 @@ export default function CatProfile({
             className="border-2 border-gray-900 overflow-hidden bg-white hover:border-orange-400 transition-colors cursor-pointer"
           >
             <div className="aspect-square overflow-hidden relative bg-white">
-              <img
+              <Image
                 src={item.image}
                 alt={item.name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
                 style={{ imageRendering: "pixelated" }}
               />
               <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 text-xs font-bold border-2 border-gray-900">
@@ -707,10 +712,12 @@ export default function CatProfile({
                 playsInline
               />
             ) : (
-              <img
+              <Image
                 src={selectedImage}
                 alt="Enlarged cat picture"
-                className="max-w-full max-h-[calc(90vh-12rem)] object-contain border-4 border-gray-900"
+                width={800}
+                height={600}
+                className="max-w-full max-h-[calc(90vh-12rem)] w-auto h-auto object-contain border-4 border-gray-900"
                 style={{ imageRendering: 'pixelated' }}
                 onClick={(e) => e.stopPropagation()}
               />

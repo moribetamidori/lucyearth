@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { supabase, type PoopImage, type CalendarEntry } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
 
@@ -13,11 +14,11 @@ type PoopCalendarProps = {
 };
 
 const getStartOfCurrentMonth = () => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  return new Date(2025, 9, 1); // October 2025
 };
 
-export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLogActivity }: PoopCalendarProps) {
+export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId: _anonId, onLogActivity }: PoopCalendarProps) {
+  void _anonId; // Reserved for future use
   const [currentMonth, setCurrentMonth] = useState(() => getStartOfCurrentMonth());
   const [poopImages, setPoopImages] = useState<PoopImage[]>([]);
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
@@ -42,7 +43,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
   }, [isOpen]);
 
   const fetchPoopImages = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('poop_images')
       .select('*')
       .order('created_at', { ascending: false });
@@ -51,7 +52,7 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
   };
 
   const fetchCalendarEntries = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('calendar_entries')
       .select('*')
       .order('created_at', { ascending: true });
@@ -282,12 +283,15 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
                       💩
                       {additionalCount > 0 && <span className="text-[8px]">+{additionalCount}</span>}
                     </div>
-                    <img
-                      src={poopImage.image_url}
-                      alt={poopImage.label}
-                      title={poopImage.label}
-                      className="hidden sm:block w-20 h-20 object-cover mt-1"
-                    />
+                    <div className="hidden sm:block relative w-20 h-20 mt-1">
+                      <Image
+                        src={poopImage.image_url}
+                        alt={poopImage.label}
+                        title={poopImage.label}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                   </>
                 )}
                 {hasNote && (
@@ -332,7 +336,9 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
                         >
                           <div className="flex items-center gap-2 text-xs">
                             {img && (
-                              <img src={img.image_url} alt={img.label} className="w-8 h-8 object-cover" />
+                              <div className="relative w-8 h-8">
+                                <Image src={img.image_url} alt={img.label} fill className="object-cover" />
+                              </div>
                             )}
                             <span>{img?.label}</span>
                             {entry.notes && <span className="text-gray-500" title={entry.notes}>📝</span>}
@@ -369,11 +375,14 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
                         : 'border-gray-900 hover:bg-blue-50'
                     }`}
                   >
-                    <img
-                      src={img.image_url}
-                      alt={img.label}
-                      className="w-16 h-16 object-cover mb-2"
-                    />
+                    <div className="relative w-16 h-16 mb-2">
+                      <Image
+                        src={img.image_url}
+                        alt={img.label}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="text-[10px] text-center">{img.label}</div>
                   </div>
                 ))}
@@ -436,11 +445,14 @@ export default function PoopCalendar({ isOpen, onClose, isEditMode, anonId, onLo
                       <div className="flex flex-col items-center">
                         {image && (
                           <div className="flex flex-col items-center mb-4">
-                            <img
-                              src={image.image_url}
-                              alt={image.label}
-                              className="max-w-full max-h-64 object-contain mb-2"
-                            />
+                            <div className="relative w-full max-w-[256px] h-64 mb-2">
+                              <Image
+                                src={image.image_url}
+                                alt={image.label}
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
                             <div className="text-sm font-semibold">{image.label}</div>
                           </div>
                         )}
@@ -606,11 +618,14 @@ function ImageManager({ poopImages, onUpdate }: ImageManagerProps) {
             className="border-2 border-gray-900 p-2 flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <img
-                src={img.image_url}
-                alt={img.label}
-                className="w-8 h-8 object-cover"
-              />
+              <div className="relative w-8 h-8">
+                <Image
+                  src={img.image_url}
+                  alt={img.label}
+                  fill
+                  className="object-cover"
+                />
+              </div>
               <div className="text-[10px]">{img.label}</div>
             </div>
             <button

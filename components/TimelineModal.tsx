@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { supabase, type TimelineEntry } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import Image from 'next/image';
 import ImageLightbox from './ImageLightbox';
 import { ActionButtonGroup } from './ActionButtons';
 
@@ -522,30 +523,6 @@ export default function TimelineModal({
     return timelineColors[base % timelineColors.length];
   }, []);
 
-  const timelineStats = useMemo(() => {
-    if (entries.length === 0 || hasMore) return null;
-    const first = entries[entries.length - 1];
-    const last = entries[0];
-    const spanYears =
-      new Date(last.event_time).getFullYear() - new Date(first.event_time).getFullYear();
-    return {
-      total: entries.length,
-      spanYears: Math.max(spanYears, 0),
-    };
-  }, [entries, hasMore]);
-
-  const timelineSummary = useMemo(() => {
-    if (entries.length === 0) {
-      return 'Log the little things that made today special.';
-    }
-    if (!timelineStats) {
-      return `Showing ${entries.length} recent entr${entries.length === 1 ? 'y' : 'ies'}. Load more to revisit earlier moments.`;
-    }
-    const span = Math.max(timelineStats.spanYears, 0);
-    const displayYears = span === 0 ? 1 : span;
-    const plural = displayYears === 1 ? '' : 's';
-    return `Tracking ${timelineStats.total} entries across ${displayYears} year${plural}`;
-  }, [entries.length, timelineStats]);
 
   const calendarEntriesByDate = useMemo(() => {
     const grouped: Record<string, TimelineEntry[]> = {};
@@ -682,13 +659,16 @@ export default function TimelineModal({
                       {entryImages.map((imageUrl, imageIndex) => (
                         <div
                           key={`${entry.id}-${imageIndex}`}
-                          className="w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                          className="relative w-28 h-28 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
                           onClick={() => handleOpenLightbox(entryImages, imageIndex)}
                         >
-                          <img
+                          <Image
                             src={imageUrl}
                             alt={`${entry.title} image ${imageIndex + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="112px"
+                            className="object-cover"
+                            unoptimized
                           />
                         </div>
                       ))}
@@ -873,13 +853,16 @@ export default function TimelineModal({
                       {entryImages.map((imageUrl, imageIndex) => (
                         <div
                           key={`${entry.id}-calendar-${imageIndex}`}
-                          className="w-24 h-24 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                          className="relative w-24 h-24 border-2 border-gray-900 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
                           onClick={() => handleOpenLightbox(entryImages, imageIndex)}
                         >
-                          <img
+                          <Image
                             src={imageUrl}
                             alt={`${entry.title} image ${imageIndex + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="96px"
+                            className="object-cover"
+                            unoptimized
                           />
                         </div>
                       ))}
@@ -964,7 +947,7 @@ export default function TimelineModal({
               {viewMode === 'timeline' ? renderTimelineView() : renderCalendarView()}
             </div>
 
-            {viewMode === 'timeline' ? (
+            {viewMode === 'timeline' && isEditMode && (
               <div className="min-h-[60vh] lg:min-h-0 lg:min-w-[45%] lg:w-[50%] max-w-[420px] border-t-4 lg:border-t-0 lg:border-l-4 border-gray-900 p-4 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-bold">
@@ -979,163 +962,161 @@ export default function TimelineModal({
                     </button>
                   )}
                 </div>
-                {isEditMode ? (
-                  <form
-                    onSubmit={handleSubmit}
-                    className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0"
-                  >
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Date</label>
-                      <input
-                        type="date"
-                        value={eventDate}
-                        onChange={(e) => setEventDate(e.target.value)}
-                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Time</label>
-                      <input
-                        type="time"
-                        value={eventTime}
-                        onChange={(e) => setEventTime(e.target.value)}
-                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Headline</label>
-                      <input
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="What happened?"
-                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
-                        maxLength={120}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">
-                        Notes <span className="text-gray-400">(optional)</span>
-                      </label>
-                      <textarea
-                        value={details}
-                        onChange={(e) => setDetails(e.target.value)}
-                        placeholder="Add a few details..."
-                        className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm h-24"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">
-                        Images <span className="text-gray-400">(optional)</span>
-                      </label>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*,.heic,.heif"
-                        multiple
-                        onChange={handleImageChange}
-                        className="mt-1 w-full text-xs"
-                      />
-                      {existingImages.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
-                            Existing
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {existingImages.map((image, index) => (
-                              <div
-                                key={`${image.filename ?? image.url}-${index}`}
-                                className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
-                              >
-                                <img
-                                  src={image.url}
-                                  alt={`Existing upload ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveExistingImage(index)}
-                                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                                  aria-label="Remove existing image"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {newImagePreviews.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
-                            New uploads
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {newImagePreviews.map((preview, index) => (
-                              <div
-                                key={`new-${index}`}
-                                className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
-                              >
-                                <img
-                                  src={preview}
-                                  alt={`New upload ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveNewImage(index)}
-                                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                                  aria-label="Remove new image"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {imagesMarkedForRemoval.length > 0 && editingEntry && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Removed images will be deleted once you save.
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        type="submit"
-                        disabled={saving}
-                        className="bg-gray-900 text-white py-2 text-sm hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {saving
-                          ? 'Saving...'
-                          : editingEntry
-                            ? 'Save Changes'
-                            : 'Add Entry'}
-                      </button>
-                      {!editingEntry && (
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="text-xs text-gray-500 underline"
-                        >
-                          Reset form
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 px-4">
-                    <div className="text-4xl mb-3">🕒</div>
-                    <p className="text-sm">
-                      Enter edit mode to log new timeline moments and attach optional images.
-                    </p>
+                <form
+                  onSubmit={handleSubmit}
+                  className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0"
+                >
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">Date</label>
+                    <input
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                      required
+                    />
                   </div>
-                )}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">Time</label>
+                    <input
+                      type="time"
+                      value={eventTime}
+                      onChange={(e) => setEventTime(e.target.value)}
+                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">Headline</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="What happened?"
+                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm"
+                      maxLength={120}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">
+                      Notes <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      placeholder="Add a few details..."
+                      className="mt-1 w-full border-2 border-gray-900 px-2 py-1 text-sm h-24"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">
+                      Images <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,.heic,.heif"
+                      multiple
+                      onChange={handleImageChange}
+                      className="mt-1 w-full text-xs"
+                    />
+                    {existingImages.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                          Existing
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {existingImages.map((image, index) => (
+                            <div
+                              key={`${image.filename ?? image.url}-${index}`}
+                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                            >
+                              <Image
+                                src={image.url}
+                                alt={`Existing upload ${index + 1}`}
+                                fill
+                                sizes="80px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveExistingImage(index)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                aria-label="Remove existing image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {newImagePreviews.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase text-gray-500 tracking-wide mb-1">
+                          New uploads
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {newImagePreviews.map((preview, index) => (
+                            <div
+                              key={`new-${index}`}
+                              className="relative w-20 h-20 border-2 border-gray-900 overflow-hidden"
+                            >
+                              <Image
+                                src={preview}
+                                alt={`New upload ${index + 1}`}
+                                fill
+                                sizes="80px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveNewImage(index)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                aria-label="Remove new image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {imagesMarkedForRemoval.length > 0 && editingEntry && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Removed images will be deleted once you save.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="bg-gray-900 text-white py-2 text-sm hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {saving
+                        ? 'Saving...'
+                        : editingEntry
+                          ? 'Save Changes'
+                          : 'Add Entry'}
+                    </button>
+                    {!editingEntry && (
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="text-xs text-gray-500 underline"
+                      >
+                        Reset form
+                      </button>
+                    )}
+                  </div>
+                </form>
               </div>
-            ) : (
+            )}
+            {viewMode === 'calendar' && (
               renderCalendarEntriesPanel()
             )}
           </div>
