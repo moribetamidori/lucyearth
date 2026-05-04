@@ -7,6 +7,7 @@ type StonksModalProps = {
   isOpen: boolean;
   onClose: () => void;
   anonId?: string;
+  isEditMode: boolean;
   onLogActivity?: (action: string, details?: string) => void;
 };
 
@@ -15,6 +16,7 @@ type MonthEntry = {
   label: string;
   kMade: number;
   active: boolean;
+  recorded: boolean;
 };
 
 const LEVEL_SIZE_K = 20;
@@ -41,6 +43,7 @@ const makeDefaultMonths = () =>
     label,
     kMade: 0,
     active: true,
+    recorded: false,
   }));
 
 const clampK = (value: number) => Math.min(999, Math.max(0, Math.round(value)));
@@ -62,6 +65,7 @@ export default function StonksModal({
   isOpen,
   onClose,
   anonId,
+  isEditMode,
   onLogActivity,
 }: StonksModalProps) {
   const [months, setMonths] = useState<MonthEntry[]>(makeDefaultMonths);
@@ -101,6 +105,7 @@ export default function StonksModal({
                   ...month,
                   kMade: clampK(row.k_made),
                   active: row.active,
+                  recorded: true,
                 }
               : month;
           })
@@ -122,25 +127,31 @@ export default function StonksModal({
   }, [anonId, isOpen, onLogActivity]);
 
   const stats = useMemo(() => {
-    const activeMonths = months.filter((month) => month.active);
-    const totalK = activeMonths.reduce((sum, month) => sum + month.kMade, 0);
+    const recordedActiveMonths = months.filter(
+      (month) => month.recorded && month.active
+    );
+    const totalK = recordedActiveMonths.reduce(
+      (sum, month) => sum + month.kMade,
+      0
+    );
     const level = Math.floor(totalK / LEVEL_SIZE_K);
     const nextLevelTarget = (level + 1) * LEVEL_SIZE_K;
     const currentLevelStart = level * LEVEL_SIZE_K;
     const progressK = totalK - currentLevelStart;
     const progressPercent = Math.min(100, (progressK / LEVEL_SIZE_K) * 100);
-    const bestMonth = months.reduce(
+    const bestMonth = recordedActiveMonths.reduce(
       (best, month) => (month.kMade > best.kMade ? month : best),
-      months[0]
+      { ...months[0], kMade: 0 }
     );
-    const greenMonths = months.filter((month) => month.active && month.kMade > 0).length;
+    const greenMonths = recordedActiveMonths.filter(
+      (month) => month.kMade > 0
+    ).length;
     const streak = months.reduce((run, month) => {
-      if (!month.active) return run;
+      if (!month.recorded || !month.active) return run;
       return month.kMade > 0 ? run + 1 : 0;
     }, 0);
 
     return {
-      activeMonths: activeMonths.length,
       totalK,
       level,
       nextLevelTarget,
@@ -151,11 +162,16 @@ export default function StonksModal({
       greenMonths,
       streak,
       averageK:
-        activeMonths.length > 0 ? Math.round(totalK / activeMonths.length) : 0,
+        recordedActiveMonths.length > 0
+          ? Math.round(totalK / recordedActiveMonths.length)
+          : 0,
+      recordedActiveMonths: recordedActiveMonths.length,
     };
   }, [months]);
 
   const saveMonth = async (index: number, nextMonth: MonthEntry) => {
+    if (!isEditMode) return;
+
     if (!anonId) {
       setError('Waiting for user id before saving.');
       return;
@@ -190,10 +206,12 @@ export default function StonksModal({
   };
 
   const updateMonth = (index: number, changes: Partial<MonthEntry>) => {
+    if (!isEditMode) return;
+
     const currentMonth = months[index];
     if (!currentMonth) return;
 
-    const changedMonth = { ...currentMonth, ...changes };
+    const changedMonth = { ...currentMonth, ...changes, recorded: true };
 
     setMonths((current) =>
       current.map((month, monthIndex) => {
@@ -206,6 +224,7 @@ export default function StonksModal({
   };
 
   const resetRun = async () => {
+    if (!isEditMode) return;
     if (!confirm('Reset all stonks progress?')) return;
 
     const resetMonths = makeDefaultMonths();
@@ -220,20 +239,13 @@ export default function StonksModal({
     setLoading(true);
 
     try {
-      const { error: upsertError } = await supabase
+      const { error: deleteError } = await supabase
         .from(STONKS_TABLE)
-        .upsert(
-          resetMonths.map((month, index) => ({
-            anon_id: anonId,
-            entry_year: CURRENT_YEAR,
-            month_index: index,
-            k_made: month.kMade,
-            active: month.active,
-          })),
-          { onConflict: 'anon_id,entry_year,month_index' }
-        );
+        .delete()
+        .eq('anon_id', anonId)
+        .eq('entry_year', CURRENT_YEAR);
 
-      if (upsertError) throw upsertError;
+      if (deleteError) throw deleteError;
       onLogActivity?.('Reset Stonks', 'Cleared trading progress');
     } catch (resetError) {
       console.warn('Failed to reset stonks progress', resetError);
@@ -309,8 +321,13 @@ export default function StonksModal({
 
             <div className="grid sm:grid-cols-3 gap-3 mb-5">
               <div className="border-2 border-gray-900 p-3 bg-white">
-                <div className="text-xs text-gray-500">AVG ACTIVE MONTH</div>
+                <div className="text-xs text-gray-500">AVG RECORDED MONTH</div>
                 <div className="text-2xl font-bold">{stats.averageK}k</div>
+                <div className="text-xs text-gray-500">
+                  {`${stats.recordedActiveMonths} month${
+                    stats.recordedActiveMonths === 1 ? '' : 's'
+                  }`}
+                </div>
               </div>
               <div className="border-2 border-gray-900 p-3 bg-white">
                 <div className="text-xs text-gray-500">GREEN MONTHS</div>
@@ -328,33 +345,56 @@ export default function StonksModal({
               {months.map((month, index) => {
                 const height = Math.min(100, (month.kMade / LEVEL_SIZE_K) * 100);
                 return (
-                  <button
+                  <div
                     key={month.key}
-                    onClick={() => setSelectedMonth(index)}
-                    className={`text-left border-4 border-gray-900 bg-white p-3 min-h-[142px] transition-transform hover:-translate-y-0.5 ${
+                    className={`border-4 border-gray-900 bg-white p-3 min-h-[162px] transition-transform hover:-translate-y-0.5 ${
                       selectedMonth === index ? 'shadow-[4px_4px_0_0_#000]' : ''
                     } ${month.active ? '' : 'opacity-45'}`}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div>
-                        <div className="text-lg font-bold">{month.label}</div>
-                        <div className="text-xs text-gray-500">
-                          {savingMonth === index
-                            ? 'SAVING'
-                            : month.active
-                              ? 'ACTIVE'
-                              : 'OFF'}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMonth(index)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div>
+                          <div className="text-lg font-bold">{month.label}</div>
+                          <div className="text-xs text-gray-500">
+                            {savingMonth === index
+                              ? 'SAVING'
+                              : !month.recorded
+                                ? 'NOT RECORDED'
+                                : month.active
+                                  ? 'RECORDED'
+                                  : 'SKIPPED'}
+                          </div>
                         </div>
+                        <div className="text-2xl font-bold">{month.kMade}k</div>
                       </div>
-                      <div className="text-2xl font-bold">{month.kMade}k</div>
-                    </div>
-                    <div className="h-14 border-2 border-gray-900 bg-gray-100 flex items-end">
-                      <div
-                        className="w-full bg-lime-300 border-t-2 border-gray-900"
-                        style={{ height: `${height}%` }}
-                      />
-                    </div>
-                  </button>
+                      <div className="h-14 border-2 border-gray-900 bg-gray-100 flex items-end">
+                        <div
+                          className="w-full bg-lime-300 border-t-2 border-gray-900"
+                          style={{ height: `${height}%` }}
+                        />
+                      </div>
+                    </button>
+                    {isEditMode && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateMonth(index, { active: !month.active })
+                        }
+                        disabled={savingMonth === index}
+                        className={`mt-3 w-full border-2 border-gray-900 py-1.5 text-xs font-bold ${
+                          month.active
+                            ? 'bg-gray-100 hover:bg-gray-200'
+                            : 'bg-green-200 hover:bg-green-300'
+                        }`}
+                      >
+                        {month.active ? 'SKIP MONTH' : 'UNSKIP MONTH'}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -364,80 +404,92 @@ export default function StonksModal({
             <div className="border-4 border-gray-900 p-4 bg-yellow-50">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-xl font-bold">{selected.label} INPUT</h3>
-                  <p className="text-xs text-gray-600">1k increments</p>
+                  <h3 className="text-xl font-bold">{selected.label}</h3>
+                  <p className="text-xs text-gray-600">
+                    {!selected.recorded
+                      ? 'Not recorded'
+                      : selected.active
+                        ? 'Recorded month'
+                        : 'Skipped month'}
+                  </p>
                 </div>
-                <button
-                  onClick={() =>
-                    updateMonth(selectedMonth, { active: !selected.active })
-                  }
-                  disabled={savingMonth === selectedMonth}
-                  className={`px-3 py-2 border-2 border-gray-900 text-xs ${
-                    selected.active
-                      ? 'bg-green-300 hover:bg-green-400'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  {selected.active ? 'ON' : 'OFF'}
-                </button>
+                {isEditMode && (
+                  <button
+                    onClick={() =>
+                      updateMonth(selectedMonth, { active: !selected.active })
+                    }
+                    disabled={savingMonth === selectedMonth}
+                    className={`px-3 py-2 border-2 border-gray-900 text-xs ${
+                      selected.active
+                        ? 'bg-gray-100 hover:bg-gray-200'
+                        : 'bg-green-200 hover:bg-green-300'
+                    }`}
+                  >
+                    {selected.active ? 'SKIP' : 'UNSKIP'}
+                  </button>
+                )}
               </div>
 
               <div className="text-center border-4 border-gray-900 bg-white py-5 mb-4">
                 <div className="text-5xl font-bold">{selected.kMade}k</div>
               </div>
 
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={selected.kMade}
-                disabled={savingMonth === selectedMonth}
-                onChange={(event) =>
-                  updateMonth(selectedMonth, {
-                    kMade: clampK(Number(event.target.value)),
-                  })
-                }
-                className="w-full accent-green-500"
-              />
+              {isEditMode && (
+                <>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={selected.kMade}
+                    disabled={savingMonth === selectedMonth}
+                    onChange={(event) =>
+                      updateMonth(selectedMonth, {
+                        kMade: clampK(Number(event.target.value)),
+                      })
+                    }
+                    className="w-full accent-green-500"
+                  />
 
-              <div className="grid grid-cols-3 gap-2 mt-4">
-                <button
-                  onClick={() =>
-                    updateMonth(selectedMonth, {
-                      kMade: clampK(selected.kMade - 1),
-                    })
-                  }
-                  disabled={savingMonth === selectedMonth}
-                  className="border-2 border-gray-900 py-2 hover:bg-gray-100"
-                >
-                  -1k
-                </button>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={selected.kMade}
-                  disabled={savingMonth === selectedMonth}
-                  onChange={(event) =>
-                    updateMonth(selectedMonth, {
-                      kMade: clampK(Number(event.target.value)),
-                    })
-                  }
-                  className="border-2 border-gray-900 text-center px-2"
-                />
-                <button
-                  onClick={() =>
-                    updateMonth(selectedMonth, {
-                      kMade: clampK(selected.kMade + 1),
-                    })
-                  }
-                  disabled={savingMonth === selectedMonth}
-                  className="border-2 border-gray-900 py-2 hover:bg-gray-100"
-                >
-                  +1k
-                </button>
-              </div>
+                  <div className="grid grid-cols-3 gap-2 mt-4">
+                    <button
+                      onClick={() =>
+                        updateMonth(selectedMonth, {
+                          kMade: clampK(selected.kMade - 1),
+                        })
+                      }
+                      disabled={savingMonth === selectedMonth}
+                      className="border-2 border-gray-900 py-2 hover:bg-gray-100"
+                    >
+                      -1k
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={selected.kMade}
+                      disabled={savingMonth === selectedMonth}
+                      onChange={(event) =>
+                        updateMonth(selectedMonth, {
+                          kMade: clampK(Number(event.target.value)),
+                        })
+                      }
+                      className="border-2 border-gray-900 text-center px-2"
+                    />
+                    <button
+                      onClick={() =>
+                        updateMonth(selectedMonth, {
+                          kMade: clampK(selected.kMade + 1),
+                        })
+                      }
+                      disabled={savingMonth === selectedMonth}
+                      className="border-2 border-gray-900 py-2 hover:bg-gray-100"
+                    >
+                      +1k
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="border-4 border-gray-900 p-4 bg-white">
@@ -466,13 +518,15 @@ export default function StonksModal({
               </div>
             </div>
 
-            <button
-              onClick={resetRun}
-              disabled={loading}
-              className="border-4 border-gray-900 py-3 hover:bg-red-500 hover:text-white"
-            >
-              RESET RUN
-            </button>
+            {isEditMode && (
+              <button
+                onClick={resetRun}
+                disabled={loading}
+                className="border-4 border-gray-900 py-3 hover:bg-red-500 hover:text-white"
+              >
+                RESET RUN
+              </button>
+            )}
           </div>
         </div>
       </div>

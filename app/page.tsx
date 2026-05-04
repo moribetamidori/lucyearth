@@ -918,6 +918,7 @@ export default function Home() {
         isOpen={showStonksModal}
         onClose={() => setShowStonksModal(false)}
         anonId={anonId}
+        isEditMode={isEditMode}
         onLogActivity={logActivity}
       />
 
