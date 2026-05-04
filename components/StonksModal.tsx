@@ -319,19 +319,15 @@ export default function StonksModal({
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-3 mb-5">
-              <div className="border-2 border-gray-900 p-3 bg-white">
-                <div className="text-xs text-gray-500">AVG RECORDED MONTH</div>
-                <div className="text-2xl font-bold">{stats.averageK}k</div>
+            <div className="grid sm:grid-cols-2 gap-3 mb-5">
+              <div className="border-4 border-gray-900 p-4 bg-yellow-200 shadow-[4px_4px_0_0_#000]">
+                <div className="text-xs font-bold text-gray-700">AVG RECORDED MONTH</div>
+                <div className="text-4xl font-bold leading-none mt-1">{stats.averageK}k</div>
                 <div className="text-xs text-gray-500">
                   {`${stats.recordedActiveMonths} month${
                     stats.recordedActiveMonths === 1 ? '' : 's'
                   }`}
                 </div>
-              </div>
-              <div className="border-2 border-gray-900 p-3 bg-white">
-                <div className="text-xs text-gray-500">GREEN MONTHS</div>
-                <div className="text-2xl font-bold">{stats.greenMonths}</div>
               </div>
               <div className="border-2 border-gray-900 p-3 bg-white">
                 <div className="text-xs text-gray-500">BEST MONTH</div>

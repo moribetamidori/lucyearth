@@ -66,6 +66,7 @@ export default function Home() {
   const [showStonksModal, setShowStonksModal] = useState<boolean>(false);
   const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
   const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
+  const [showMobileApps, setShowMobileApps] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -161,13 +162,24 @@ export default function Home() {
         </div>
       )}
 
+      {showMobileApps && (
+        <button
+          type="button"
+          aria-label="Close app launcher"
+          className="hidden max-sm:block fixed inset-0 z-30 bg-transparent"
+          onClick={() => setShowMobileApps(false)}
+        />
+      )}
+
       {/* Left sidebar icons */}
       <div
-        className="fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-flow-col gap-4 gap-x-6 max-sm:left-auto max-sm:top-auto max-sm:bottom-4 max-sm:right-0 max-sm:transform-none max-sm:flex max-sm:flex-row max-sm:flex-wrap max-sm:gap-4 max-sm:w-full max-sm:justify-center max-sm:px-4"
-        style={{ gridTemplateRows: 'repeat(8, max-content)' }}
+        id="app-launcher"
+        className={`fixed left-6 top-1/2 transform -translate-y-1/2 z-20 grid grid-flow-col [grid-template-rows:repeat(8,max-content)] gap-4 gap-x-6 max-sm:left-1/2 max-sm:right-auto max-sm:top-1/2 max-sm:bottom-auto max-sm:z-40 max-sm:w-[calc(100vw-1.5rem)] max-sm:max-w-[27rem] max-sm:max-h-[calc(100dvh-1.5rem)] max-sm:overflow-y-auto max-sm:grid-flow-row max-sm:grid-cols-3 max-sm:[grid-template-rows:none] max-sm:justify-items-center max-sm:gap-x-5 max-sm:gap-y-5 max-sm:border-4 max-sm:border-gray-900 max-sm:bg-white max-sm:p-5 max-sm:shadow-[6px_6px_0_0_#000] max-sm:-translate-x-1/2 max-sm:-translate-y-1/2 ${
+          showMobileApps ? 'max-sm:grid' : 'max-sm:hidden'
+        }`}
       >
         {/* Poop Cal icon - first position on desktop */}
-        <div className="flex flex-col items-center gap-2 max-sm:flex-row max-sm:gap-4">
+        <div className="flex flex-col items-center gap-2 max-sm:contents">
           {/* Poop Cal icon */}
           <div className="flex flex-col items-center gap-2 max-sm:gap-0">
             <div
@@ -686,7 +698,7 @@ export default function Home() {
           {/* <div className="w-2 h-2 bg-blue-500 animate-pulse" />
           <div className="text-base">lucyearth.system</div> */}
         </div>
-        <div className="flex gap-4 text-sm text-gray-500 items-center">
+        <div className="flex gap-4 text-sm text-gray-500 items-center max-sm:gap-2">
           <button
             onClick={() => {
               setShowAchievements(true);
@@ -705,6 +717,16 @@ export default function Home() {
           >
             <span className="text-xl max-sm:text-lg">📱</span>
             <span className="text-gray-900 font-semibold whitespace-nowrap max-sm:text-xs">Scroll Mode</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMobileApps((current) => !current)}
+            className="hidden max-sm:flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-gray-900 shadow-[3px_3px_0_0_#000] hover:-translate-y-[1px] transition-transform"
+            aria-expanded={showMobileApps}
+            aria-controls="app-launcher"
+          >
+            <span className="text-lg leading-none">{showMobileApps ? '×' : '▦'}</span>
+            <span className="text-gray-900 font-semibold whitespace-nowrap text-xs">APPS</span>
           </button>
 
 
