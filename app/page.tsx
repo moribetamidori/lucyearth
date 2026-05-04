@@ -19,6 +19,7 @@ import WomenModal from '@/components/WomenModal';
 import ScrollFeedModal from '@/components/ScrollFeedModal';
 import TimelineModal from '@/components/TimelineModal';
 import SlotMachineModal from '@/components/SlotMachineModal';
+import StonksModal from '@/components/StonksModal';
 import FindMeModal from '@/components/FindMeModal';
 import WishlistModal from '@/components/WishlistModal';
 import { supabase } from '@/lib/supabase';
@@ -62,6 +63,7 @@ export default function Home() {
   const [showScrollFeed, setShowScrollFeed] = useState<boolean>(false);
   const [showTimelineModal, setShowTimelineModal] = useState<boolean>(false);
   const [showSlotMachineModal, setShowSlotMachineModal] = useState<boolean>(false);
+  const [showStonksModal, setShowStonksModal] = useState<boolean>(false);
   const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
   const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
 
@@ -602,6 +604,27 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">FORTUNE</div>
         </div>
 
+        {/* Stonks icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowStonksModal(true);
+              logActivity('Opened Stonks', 'Tracking stonk trading levels');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-lg">📈</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              STONKS
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">STONKS</div>
+        </div>
+
         {/* Activity Log icon - always visible */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
@@ -886,6 +909,14 @@ export default function Home() {
       <SlotMachineModal
         isOpen={showSlotMachineModal}
         onClose={() => setShowSlotMachineModal(false)}
+        anonId={anonId}
+        onLogActivity={logActivity}
+      />
+
+      {/* Stonks Modal */}
+      <StonksModal
+        isOpen={showStonksModal}
+        onClose={() => setShowStonksModal(false)}
         anonId={anonId}
         onLogActivity={logActivity}
       />

@@ -204,6 +204,17 @@ export type SlotMachineSpin = {
   created_at: string;
 };
 
+export type StonksEntry = {
+  id: string;
+  anon_id: string;
+  entry_year: number;
+  month_index: number;
+  k_made: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WishlistItem = {
   id: string;
   title: string;
