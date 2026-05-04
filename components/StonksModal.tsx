@@ -19,7 +19,7 @@ type MonthEntry = {
 
 const LEVEL_SIZE_K = 20;
 const CURRENT_YEAR = new Date().getFullYear();
-const STONKS_TABLE = 'stonks_entries';
+const STONKS_TABLE = 'stonks_monthly_entries';
 const MONTHS = [
   'Jan',
   'Feb',
@@ -190,19 +190,19 @@ export default function StonksModal({
   };
 
   const updateMonth = (index: number, changes: Partial<MonthEntry>) => {
-    let changedMonth: MonthEntry | null = null;
+    const currentMonth = months[index];
+    if (!currentMonth) return;
+
+    const changedMonth = { ...currentMonth, ...changes };
 
     setMonths((current) =>
       current.map((month, monthIndex) => {
         if (monthIndex !== index) return month;
-        changedMonth = { ...month, ...changes };
         return changedMonth;
       })
     );
 
-    if (changedMonth) {
-      void saveMonth(index, changedMonth);
-    }
+    void saveMonth(index, changedMonth);
   };
 
   const resetRun = async () => {
