@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { uploadBufferToS3 } from '@/lib/server/s3Storage';
 
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
+
+export const runtime = 'nodejs';
 
 // Lazy initialize Supabase client
 function getSupabaseClient() {
@@ -131,25 +134,15 @@ function extractTags(intro: string | null, categories: string[]): string[] {
   return Array.from(tags).slice(0, 8);
 }
 
-async function uploadImage(imageUrl: string, name: string, supabase: ReturnType<typeof getSupabaseClient>): Promise<string | null> {
+async function uploadImage(imageUrl: string, name: string): Promise<string | null> {
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) return null;
 
-    const buffer = await response.arrayBuffer();
+    const buffer = Buffer.from(await response.arrayBuffer());
     const fileName = `women/${Date.now()}_${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`;
 
-    const { error } = await supabase.storage
-      .from('women-profiles')
-      .upload(fileName, buffer, {
-        contentType: 'image/jpeg',
-        cacheControl: '3600',
-      });
-
-    if (error) return null;
-
-    const { data } = supabase.storage.from('women-profiles').getPublicUrl(fileName);
-    return data.publicUrl;
+    return uploadBufferToS3('women-profiles', fileName, buffer, 'image/jpeg', '3600');
   } catch {
     return null;
   }
@@ -234,7 +227,7 @@ export async function POST(request: NextRequest) {
     // Upload image
     let imageUrl: string | null = null;
     if (wikiImageUrl) {
-      imageUrl = await uploadImage(wikiImageUrl, name, supabase);
+      imageUrl = await uploadImage(wikiImageUrl, name);
     }
 
     // Generate tags

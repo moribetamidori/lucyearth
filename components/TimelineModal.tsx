@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { supabase, type TimelineEntry } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 import Image from 'next/image';
 import ImageLightbox from './ImageLightbox';
 import { ActionButtonGroup } from './ActionButtons';
@@ -344,7 +345,7 @@ export default function TimelineModal({
     const random = Math.random().toString(36).substring(2, 8);
     const filePath = `entries/${timestamp}_${random}.webp`;
 
-    const { error } = await supabase.storage
+    const { error } = await appStorage
       .from('timeline-images')
       .upload(filePath, webpBlob, {
         contentType: 'image/webp',
@@ -355,7 +356,7 @@ export default function TimelineModal({
       throw error;
     }
 
-    const { data } = supabase.storage.from('timeline-images').getPublicUrl(filePath);
+    const { data } = appStorage.from('timeline-images').getPublicUrl(filePath);
     return { publicUrl: data.publicUrl, fileName: filePath };
   };
 
@@ -391,7 +392,7 @@ export default function TimelineModal({
         .filter((filename): filename is string => Boolean(filename));
 
       if (filenamesToRemove.length > 0) {
-        const { error: storageError } = await supabase.storage
+        const { error: storageError } = await appStorage
           .from('timeline-images')
           .remove(filenamesToRemove);
         if (storageError) {
@@ -436,7 +437,7 @@ export default function TimelineModal({
 
     try {
       if (imagesMarkedForRemoval.length > 0) {
-        const { error: removeError } = await supabase.storage
+        const { error: removeError } = await appStorage
           .from('timeline-images')
           .remove(imagesMarkedForRemoval);
         if (removeError) {

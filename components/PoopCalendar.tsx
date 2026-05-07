@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { supabase, type PoopImage, type CalendarEntry } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 
 type PoopCalendarProps = {
   isOpen: boolean;
@@ -516,7 +517,7 @@ function ImageManager({ poopImages, onUpdate }: ImageManagerProps) {
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
       const filePath = fileName;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await appStorage
         .from('poop-images')
         .upload(filePath, webpBlob, {
           contentType: 'image/webp',
@@ -527,7 +528,7 @@ function ImageManager({ poopImages, onUpdate }: ImageManagerProps) {
       }
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = appStorage
         .from('poop-images')
         .getPublicUrl(filePath);
 
@@ -561,7 +562,7 @@ function ImageManager({ poopImages, onUpdate }: ImageManagerProps) {
       const urlParts = imageUrl.split('/');
       const fileName = urlParts[urlParts.length - 1];
 
-      await supabase.storage
+      await appStorage
         .from('poop-images')
         .remove([fileName]);
     }

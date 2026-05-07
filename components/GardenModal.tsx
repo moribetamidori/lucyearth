@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import Image from 'next/image';
 import { supabase, type GardenPlacement, type GardenSpecies } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 
 type GardenModalProps = {
   isOpen: boolean;
@@ -306,7 +307,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
         const webpBlob = await convertToWebP(imageFile, 0.85);
         const filePath = `species/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.webp`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await appStorage
           .from('garden-species')
           .upload(filePath, webpBlob, {
             contentType: 'image/webp',
@@ -317,7 +318,7 @@ export default function GardenModal({ isOpen, onClose, onLogActivity, isEditMode
           throw uploadError;
         }
 
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = appStorage
           .from('garden-species')
           .getPublicUrl(filePath);
         imageUrl = urlData.publicUrl;

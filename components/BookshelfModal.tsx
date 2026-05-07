@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { supabase, type BookshelfBook } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 import { ActionButton } from './ActionButtons';
 
 type BookshelfModalProps = {
@@ -186,7 +187,7 @@ export default function BookshelfModal({
     if (coverFile) {
       const webpBlob = await convertToWebP(coverFile, 0.82);
       const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.webp`;
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await appStorage
         .from('book-covers')
         .upload(fileName, webpBlob, {
           contentType: 'image/webp',
@@ -200,7 +201,7 @@ export default function BookshelfModal({
         return;
       }
 
-      const { data } = supabase.storage.from('book-covers').getPublicUrl(fileName);
+      const { data } = appStorage.from('book-covers').getPublicUrl(fileName);
       coverUrl = data.publicUrl;
     }
 
@@ -238,7 +239,7 @@ export default function BookshelfModal({
         if (previousCoverUrl && previousCoverUrl !== coverUrl) {
           const previousFile = extractFileName(previousCoverUrl);
           if (previousFile) {
-            await supabase.storage.from('book-covers').remove([previousFile]);
+            await appStorage.from('book-covers').remove([previousFile]);
           }
         }
         resetForm();
@@ -301,7 +302,7 @@ export default function BookshelfModal({
     if (book.cover_url) {
       const fileName = extractFileName(book.cover_url);
       if (fileName) {
-        await supabase.storage.from('book-covers').remove([fileName]);
+        await appStorage.from('book-covers').remove([fileName]);
       }
     }
 

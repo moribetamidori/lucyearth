@@ -1,11 +1,12 @@
 /**
- * Image download and upload helper for Supabase storage
+ * Image download and upload helper for S3 storage
  */
 
 import sharp from 'sharp';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { uploadBufferToS3 } from '../../lib/server/s3Storage';
 
 // Load environment variables from .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
@@ -71,9 +72,9 @@ export async function convertToWebP(
 }
 
 /**
- * Upload image to Supabase storage and return public URL
+ * Upload image to S3 storage and return public URL
  */
-export async function uploadToSupabase(
+export async function uploadToS3(
   imageBuffer: Buffer,
   name: string
 ): Promise<string | null> {
@@ -85,21 +86,7 @@ export async function uploadToSupabase(
       .slice(0, 30);
     const fileName = `women/${Date.now()}_${safeName}.webp`;
 
-    const { error } = await getSupabase().storage
-      .from('women-profiles')
-      .upload(fileName, imageBuffer, {
-        contentType: 'image/webp',
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (error) {
-      console.error(`Upload error for ${name}:`, error);
-      return null;
-    }
-
-    const { data } = getSupabase().storage.from('women-profiles').getPublicUrl(fileName);
-    return data.publicUrl;
+    return uploadBufferToS3('women-profiles', fileName, imageBuffer, 'image/webp', '3600');
   } catch (error) {
     console.error(`Error uploading image for ${name}:`, error);
     return null;
@@ -128,8 +115,8 @@ export async function processAndUploadImage(
     return null;
   }
 
-  // Upload to Supabase
-  return uploadToSupabase(webpBuffer, name);
+  // Upload to S3
+  return uploadToS3(webpBuffer, name);
 }
 
 /**

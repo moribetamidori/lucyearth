@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 
 interface Song {
   id: number;
@@ -221,7 +222,7 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
     const audioExt = selectedAudioFile.name.split('.').pop();
     const audioFileName = `${anonId}/${Date.now()}.${audioExt}`;
 
-    const { error: audioError } = await supabase.storage
+    const { error: audioError } = await appStorage
       .from('songs')
       .upload(audioFileName, selectedAudioFile);
 
@@ -231,7 +232,7 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
       return;
     }
 
-    const { data: audioUrlData } = supabase.storage
+    const { data: audioUrlData } = appStorage
       .from('songs')
       .getPublicUrl(audioFileName);
 
@@ -242,14 +243,14 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
       const webpBlob = await convertToWebP(selectedCoverFile, 0.8);
       const coverFileName = `${anonId}/${Date.now()}.webp`;
 
-      const { error: coverError } = await supabase.storage
+      const { error: coverError } = await appStorage
         .from('song-covers')
         .upload(coverFileName, webpBlob, {
           contentType: 'image/webp',
         });
 
       if (!coverError) {
-        const { data: coverUrlData } = supabase.storage
+        const { data: coverUrlData } = appStorage
           .from('song-covers')
           .getPublicUrl(coverFileName);
         coverUrl = coverUrlData.publicUrl;
@@ -347,14 +348,14 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
       const webpBlob = await convertToWebP(editSelectedCoverFile, 0.8);
       const coverFileName = `${anonId}/${Date.now()}.webp`;
 
-      const { error: coverError } = await supabase.storage
+      const { error: coverError } = await appStorage
         .from('song-covers')
         .upload(coverFileName, webpBlob, {
           contentType: 'image/webp',
         });
 
       if (!coverError) {
-        const { data: coverUrlData } = supabase.storage
+        const { data: coverUrlData } = appStorage
           .from('song-covers')
           .getPublicUrl(coverFileName);
         coverUrl = coverUrlData.publicUrl;
@@ -363,7 +364,7 @@ export default function MusicModal({ isOpen, onClose, anonId, isEditMode, onLogA
         if (existingSong?.cover_url) {
           const oldFileName = existingSong.cover_url.split('/').pop();
           if (oldFileName) {
-            await supabase.storage
+            await appStorage
               .from('song-covers')
               .remove([`${anonId}/${oldFileName}`]);
           }

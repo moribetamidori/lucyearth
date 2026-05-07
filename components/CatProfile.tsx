@@ -480,7 +480,7 @@ export default function CatProfile({
                     alt="Cat picture"
                     fill
                     className="object-cover"
-                    style={{ imageRendering: "pixelated" }}
+                    unoptimized
                     onClick={() => {
                       setSelectedImage(pic.image_url);
                       setSelectedImageIndex(globalIndex);
@@ -718,7 +718,7 @@ export default function CatProfile({
                 width={800}
                 height={600}
                 className="max-w-full max-h-[calc(90vh-12rem)] w-auto h-auto object-contain border-4 border-gray-900"
-                style={{ imageRendering: 'pixelated' }}
+                unoptimized
                 onClick={(e) => e.stopPropagation()}
               />
             )}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase, type WishlistItem } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 import { ActionButton } from './ActionButtons';
 
 type WishlistModalProps = {
@@ -98,7 +99,7 @@ export default function WishlistModal({
       const randomString = Math.random().toString(36).substring(7);
       const fileName = `${timestamp}_${randomString}.webp`;
 
-      const { error } = await supabase.storage
+      const { error } = await appStorage
         .from('wishlist-images')
         .upload(fileName, webpBlob, {
           contentType: 'image/webp',
@@ -109,7 +110,7 @@ export default function WishlistModal({
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from('wishlist-images').getPublicUrl(fileName);
+      } = appStorage.from('wishlist-images').getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error) {
@@ -186,7 +187,7 @@ export default function WishlistModal({
       if (imageUrl) {
         const fileName = imageUrl.split('/').pop();
         if (fileName) {
-          await supabase.storage.from('wishlist-images').remove([fileName]);
+          await appStorage.from('wishlist-images').remove([fileName]);
         }
       }
 
@@ -289,7 +290,7 @@ export default function WishlistModal({
       if (originalImageUrl && originalImageUrl !== imageUrl) {
         const oldFileName = originalImageUrl.split('/').pop();
         if (oldFileName) {
-          await supabase.storage.from('wishlist-images').remove([oldFileName]);
+          await appStorage.from('wishlist-images').remove([oldFileName]);
         }
       }
 

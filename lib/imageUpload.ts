@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { CatPicture } from './supabase';
 import { generateVideoThumbnail } from './videoThumbnail';
 import imageCompression from 'browser-image-compression';
+import { appStorage } from './storage';
 
 /**
  * Converts HEIC to PNG first if needed
@@ -71,8 +72,8 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
   // Use browser-image-compression for reliable WebP encoding
   // This library handles Safari and other browsers that don't support native WebP encoding
   const options = {
-    maxSizeMB: 1,
-    maxWidthOrHeight: 1200,
+    maxSizeMB: 3,
+    maxWidthOrHeight: 2000,
     useWebWorker: true,
     fileType: 'image/webp' as const,
     initialQuality: quality,
@@ -119,7 +120,7 @@ async function convertWithCanvas(file: File, quality: number): Promise<Blob> {
           return;
         }
 
-        const maxSize = 1200;
+        const maxSize = 2000;
         let width = img.width;
         let height = img.height;
 
@@ -191,7 +192,7 @@ export async function uploadCatPicture(
         const thumbnailBlob = await generateVideoThumbnail(file);
         const thumbnailFileName = `${timestamp}_${randomStr}_thumb.jpg`;
 
-        const { error: thumbUploadError } = await supabase.storage
+        const { error: thumbUploadError } = await appStorage
           .from('cat-pictures')
           .upload(thumbnailFileName, thumbnailBlob, {
             contentType: 'image/jpeg',
@@ -199,7 +200,7 @@ export async function uploadCatPicture(
           });
 
         if (!thumbUploadError) {
-          const { data: thumbUrlData } = supabase.storage
+          const { data: thumbUrlData } = appStorage
             .from('cat-pictures')
             .getPublicUrl(thumbnailFileName);
           thumbnailUrl = thumbUrlData.publicUrl;
@@ -216,7 +217,7 @@ export async function uploadCatPicture(
     }
 
     // Upload to Supabase storage
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await appStorage
       .from('cat-pictures')
       .upload(fileName, uploadBlob, {
         contentType: contentType,
@@ -228,7 +229,7 @@ export async function uploadCatPicture(
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = appStorage
       .from('cat-pictures')
       .getPublicUrl(fileName);
 
@@ -296,7 +297,7 @@ export async function deleteCatPicture(id: string, imageUrl: string) {
     const fileName = urlParts[urlParts.length - 1];
 
     // Delete from storage
-    const { error: storageError } = await supabase.storage
+    const { error: storageError } = await appStorage
       .from('cat-pictures')
       .remove([fileName]);
 

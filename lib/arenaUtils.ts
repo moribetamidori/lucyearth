@@ -1,6 +1,7 @@
 import { supabase, ArenaCollection, ArenaBlock } from './supabase';
 import { convertToWebP } from './imageUpload';
 import { generateVideoThumbnail } from './videoThumbnail';
+import { appStorage } from './storage';
 
 // Create a new collection
 export async function createCollection(
@@ -97,7 +98,7 @@ export async function deleteCollection(collectionId: string): Promise<boolean> {
         return parts[parts.length - 1];
       });
 
-      await supabase.storage.from('arena-blocks').remove(filePaths);
+      await appStorage.from('arena-blocks').remove(filePaths);
     }
 
     // Delete the collection (cascade will delete blocks)
@@ -142,7 +143,7 @@ export async function uploadBlockToCollection(
         const thumbnailBlob = await generateVideoThumbnail(file);
         const thumbnailFileName = `${timestamp}_${randomString}_thumb.jpg`;
 
-        const { error: thumbUploadError } = await supabase.storage
+        const { error: thumbUploadError } = await appStorage
           .from('arena-blocks')
           .upload(thumbnailFileName, thumbnailBlob, {
             contentType: 'image/jpeg',
@@ -150,7 +151,7 @@ export async function uploadBlockToCollection(
           });
 
         if (!thumbUploadError) {
-          const { data: thumbUrlData } = supabase.storage
+          const { data: thumbUrlData } = appStorage
             .from('arena-blocks')
             .getPublicUrl(thumbnailFileName);
           thumbnailUrl = thumbUrlData.publicUrl;
@@ -167,7 +168,7 @@ export async function uploadBlockToCollection(
     }
 
     // Upload to Supabase storage
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await appStorage
       .from('arena-blocks')
       .upload(fileName, uploadBlob, {
         contentType: contentType,
@@ -179,7 +180,7 @@ export async function uploadBlockToCollection(
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from('arena-blocks').getPublicUrl(fileName);
+    } = appStorage.from('arena-blocks').getPublicUrl(fileName);
 
     // Save to database
     const { data: blockData, error: dbError } = await supabase
@@ -250,7 +251,7 @@ export async function deleteBlock(blockId: string, imageUrl: string): Promise<bo
     const fileName = urlParts[urlParts.length - 1];
 
     // Delete from storage
-    const { error: storageError } = await supabase.storage
+    const { error: storageError } = await appStorage
       .from('arena-blocks')
       .remove([fileName]);
 

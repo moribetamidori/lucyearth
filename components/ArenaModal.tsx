@@ -674,6 +674,7 @@ export default function ArenaModal({
                             fill
                             sizes="(max-width: 768px) 50vw, 16vw"
                             className="object-cover cursor-pointer hover:opacity-90"
+                            unoptimized
                             onClick={() => {
                               const index = blocks.findIndex(b => b.id === block.id);
                               setSelectedImage(block.image_url);

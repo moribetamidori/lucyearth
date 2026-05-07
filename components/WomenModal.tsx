@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { supabase, type WomenProfile } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 
 type WomenModalProps = {
   isOpen: boolean;
@@ -338,7 +339,7 @@ export default function WomenModal({
       const webpBlob = await convertToWebP(file, 0.82);
       const fileName = `women/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.webp`;
 
-      const { error } = await supabase.storage
+      const { error } = await appStorage
         .from('women-profiles')
         .upload(fileName, webpBlob, {
           contentType: 'image/webp',
@@ -347,7 +348,7 @@ export default function WomenModal({
 
       if (error) throw error;
 
-      const { data } = supabase.storage.from('women-profiles').getPublicUrl(fileName);
+      const { data } = appStorage.from('women-profiles').getPublicUrl(fileName);
       return data.publicUrl;
     } catch (error) {
       console.error('Upload failed:', error);

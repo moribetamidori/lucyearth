@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, type DoubanRating } from '@/lib/supabase';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 import { ActionButton } from './ActionButtons';
 
 type DoubanModalProps = {
@@ -120,7 +121,7 @@ export default function DoubanModal({
       const fileName = `${timestamp}_${randomString}.webp`;
 
       // Upload to Supabase Storage
-      const { error } = await supabase.storage
+      const { error } = await appStorage
         .from('douban-images')
         .upload(fileName, webpBlob, {
           contentType: 'image/webp',
@@ -132,7 +133,7 @@ export default function DoubanModal({
       // Get public URL
       const {
         data: { publicUrl },
-      } = supabase.storage.from('douban-images').getPublicUrl(fileName);
+      } = appStorage.from('douban-images').getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error) {
@@ -215,7 +216,7 @@ export default function DoubanModal({
       if (imageUrl) {
         const fileName = imageUrl.split('/').pop();
         if (fileName) {
-          await supabase.storage.from('douban-images').remove([fileName]);
+          await appStorage.from('douban-images').remove([fileName]);
         }
       }
 
@@ -280,7 +281,7 @@ export default function DoubanModal({
       if (originalImageUrl && originalImageUrl !== imageUrl) {
         const oldFileName = originalImageUrl.split('/').pop();
         if (oldFileName) {
-          await supabase.storage.from('douban-images').remove([oldFileName]);
+          await appStorage.from('douban-images').remove([oldFileName]);
         }
       }
 

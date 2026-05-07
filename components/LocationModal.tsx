@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { ActionButton } from './ActionButtons';
 import ImageLightbox from './ImageLightbox';
 import { convertToWebP } from '@/lib/imageUpload';
+import { appStorage } from '@/lib/storage';
 import 'leaflet/dist/leaflet.css';
 
 // Dynamically import react-leaflet components with no SSR
@@ -331,14 +332,14 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
           const webpBlob = await convertToWebP(file, 0.8);
           const fileName = `${anonId}/${Date.now()}_${i}.webp`;
 
-          const { error: uploadError } = await supabase.storage
+          const { error: uploadError } = await appStorage
             .from('location-images')
             .upload(fileName, webpBlob, {
               contentType: 'image/webp',
             });
 
           if (!uploadError) {
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = appStorage
               .from('location-images')
               .getPublicUrl(fileName);
 
@@ -500,14 +501,14 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
           const webpBlob = await convertToWebP(file, 0.8);
           const fileName = `${anonId}/${Date.now()}_${i}.webp`;
 
-          const { error: uploadError } = await supabase.storage
+          const { error: uploadError } = await appStorage
             .from('location-images')
             .upload(fileName, webpBlob, {
               contentType: 'image/webp',
             });
 
           if (!uploadError) {
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = appStorage
               .from('location-images')
               .getPublicUrl(fileName);
 
@@ -546,7 +547,7 @@ export default function LocationModal({ isOpen, onClose, anonId, isEditMode, onL
       // Delete from storage
       const fileName = imageUrl.split('/').pop();
       if (fileName) {
-        await supabase.storage
+        await appStorage
           .from('location-images')
           .remove([`${anonId}/${fileName}`]);
       }
