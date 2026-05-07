@@ -65,9 +65,10 @@ function supportsWebPEncoding(): boolean {
  * @param quality - Quality of the WebP output (0-1), default 0.8
  * @returns Promise<Blob> - The compressed WebP blob
  */
-export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
+export async function convertToWebP(file: File, quality = 1): Promise<Blob> {
   // First convert HEIC to PNG if needed
   const processedFile = await convertHeicToPng(file);
+  const outputQuality = Math.max(quality, 1);
 
   // Use browser-image-compression for reliable WebP encoding
   // This library handles Safari and other browsers that don't support native WebP encoding
@@ -76,7 +77,7 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
     maxWidthOrHeight: 2000,
     useWebWorker: true,
     fileType: 'image/webp' as const,
-    initialQuality: quality,
+    initialQuality: outputQuality,
   };
 
   try {
@@ -89,7 +90,7 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
 
     // If library couldn't produce WebP, try native canvas as fallback
     if (supportsWebPEncoding()) {
-      return await convertWithCanvas(processedFile, quality);
+      return await convertWithCanvas(processedFile, outputQuality);
     }
 
     // Last resort: return compressed file even if not WebP
@@ -98,7 +99,7 @@ export async function convertToWebP(file: File, quality = 0.8): Promise<Blob> {
   } catch (error) {
     console.error('Image compression error:', error);
     // Fallback to canvas method
-    return convertWithCanvas(processedFile, quality);
+    return convertWithCanvas(processedFile, outputQuality);
   }
 }
 
@@ -192,18 +193,15 @@ export async function uploadCatPicture(
         const thumbnailBlob = await generateVideoThumbnail(file);
         const thumbnailFileName = `${timestamp}_${randomStr}_thumb.jpg`;
 
-        const { error: thumbUploadError } = await appStorage
+        const { data: thumbUploadData, error: thumbUploadError } = await appStorage
           .from('cat-pictures')
           .upload(thumbnailFileName, thumbnailBlob, {
             contentType: 'image/jpeg',
             cacheControl: '3600',
           });
 
-        if (!thumbUploadError) {
-          const { data: thumbUrlData } = appStorage
-            .from('cat-pictures')
-            .getPublicUrl(thumbnailFileName);
-          thumbnailUrl = thumbUrlData.publicUrl;
+        if (!thumbUploadError && thumbUploadData) {
+          thumbnailUrl = thumbUploadData.publicUrl;
         }
       } catch (thumbError) {
         console.warn('Failed to generate video thumbnail:', thumbError);
@@ -217,7 +215,7 @@ export async function uploadCatPicture(
     }
 
     // Upload to Supabase storage
-    const { error: uploadError } = await appStorage
+    const { data: uploadData, error: uploadError } = await appStorage
       .from('cat-pictures')
       .upload(fileName, uploadBlob, {
         contentType: contentType,
@@ -228,12 +226,11 @@ export async function uploadCatPicture(
       throw uploadError;
     }
 
-    // Get public URL
-    const { data: urlData } = appStorage
-      .from('cat-pictures')
-      .getPublicUrl(fileName);
+    if (!uploadData) {
+      throw new Error('Upload completed without a public URL');
+    }
 
-    const mediaUrl = urlData.publicUrl;
+    const mediaUrl = uploadData.publicUrl;
 
     // Save metadata to database
     const { data: dbData, error: dbError } = await supabase

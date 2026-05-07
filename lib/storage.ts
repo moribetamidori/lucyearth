@@ -90,7 +90,10 @@ export async function uploadStorageObject(
   });
 
   if (!uploadResponse.ok) {
-    throw new Error(`S3 upload failed (${uploadResponse.status})`);
+    const errorText = await uploadResponse.text().catch(() => '');
+    throw new Error(
+      `S3 upload failed (${uploadResponse.status})${errorText ? `: ${errorText}` : ''}`
+    );
   }
 
   uploadedPublicUrls.set(cacheKey(bucket, path), presigned.publicUrl);

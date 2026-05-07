@@ -143,18 +143,15 @@ export async function uploadBlockToCollection(
         const thumbnailBlob = await generateVideoThumbnail(file);
         const thumbnailFileName = `${timestamp}_${randomString}_thumb.jpg`;
 
-        const { error: thumbUploadError } = await appStorage
+        const { data: thumbUploadData, error: thumbUploadError } = await appStorage
           .from('arena-blocks')
           .upload(thumbnailFileName, thumbnailBlob, {
             contentType: 'image/jpeg',
             cacheControl: '3600',
           });
 
-        if (!thumbUploadError) {
-          const { data: thumbUrlData } = appStorage
-            .from('arena-blocks')
-            .getPublicUrl(thumbnailFileName);
-          thumbnailUrl = thumbUrlData.publicUrl;
+        if (!thumbUploadError && thumbUploadData) {
+          thumbnailUrl = thumbUploadData.publicUrl;
         }
       } catch (thumbError) {
         console.warn('Failed to generate video thumbnail:', thumbError);
@@ -168,7 +165,7 @@ export async function uploadBlockToCollection(
     }
 
     // Upload to Supabase storage
-    const { error: uploadError } = await appStorage
+    const { data: uploadData, error: uploadError } = await appStorage
       .from('arena-blocks')
       .upload(fileName, uploadBlob, {
         contentType: contentType,
@@ -176,11 +173,7 @@ export async function uploadBlockToCollection(
       });
 
     if (uploadError) throw uploadError;
-
-    // Get public URL
-    const {
-      data: { publicUrl },
-    } = appStorage.from('arena-blocks').getPublicUrl(fileName);
+    if (!uploadData) throw new Error('Upload completed without a public URL');
 
     // Save to database
     const { data: blockData, error: dbError } = await supabase
@@ -188,7 +181,7 @@ export async function uploadBlockToCollection(
       .insert([
         {
           collection_id: collectionId,
-          image_url: publicUrl,
+          image_url: uploadData.publicUrl,
           anon_id: anonId,
           media_type: isVideo ? 'video' : 'image',
           thumbnail_url: thumbnailUrl,

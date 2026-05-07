@@ -12,7 +12,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "storage:migrate": "tsx scripts/migrate-supabase-storage-to-s3.ts"
+    "storage:migrate": "tsx scripts/migrate-supabase-storage-to-s3.ts",
+    "storage:test": "tsx scripts/test-s3-upload.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1044.0",

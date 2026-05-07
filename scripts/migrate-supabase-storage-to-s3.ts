@@ -24,6 +24,11 @@ type UrlRow = {
   [column: string]: string | string[] | number | null;
 };
 
+type BucketFileList = {
+  bucketName: string;
+  files: string[];
+};
+
 const URL_COLUMNS: UrlColumnConfig[] = [
   { table: 'poop_images', columns: ['image_url'] },
   { table: 'cat_pictures', columns: ['image_url', 'thumbnail_url'] },
@@ -58,6 +63,7 @@ const dryRun = args.has('--dry-run');
 const skipCopy = args.has('--skip-copy');
 const skipDbUpdate = args.has('--skip-db-update');
 const deleteSourceAfterCopy = args.has('--delete-source-after-copy');
+const dbPageSize = 1000;
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -96,6 +102,28 @@ function convertSupabaseUrl(url: string | null): string | null {
 
   if (!bucket || !path) return url;
   return getPublicUrlForPath(bucket, path);
+}
+
+function getUrlUpdates(row: UrlRow, config: UrlColumnConfig) {
+  const updates: Record<string, string | string[] | null> = {};
+
+  for (const column of config.columns) {
+    const original = row[column] as string | null;
+    const converted = convertSupabaseUrl(original);
+    if (converted !== original) updates[column] = converted;
+  }
+
+  for (const column of config.arrayColumns || []) {
+    const original = row[column] as string[] | null;
+    if (!Array.isArray(original)) continue;
+
+    const converted = original.map((url) => convertSupabaseUrl(url) || url);
+    if (converted.some((url, index) => url !== original[index])) {
+      updates[column] = converted;
+    }
+  }
+
+  return updates;
 }
 
 async function listFiles(
@@ -137,23 +165,37 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
   const { data: buckets, error } = await supabase.storage.listBuckets();
   if (error) throw error;
 
+  const bucketFiles: BucketFileList[] = [];
+  let totalObjects = 0;
   let copied = 0;
   let deleted = 0;
 
   for (const bucket of buckets || []) {
     const bucketName = bucket.name;
     const files = await listFiles(supabase, bucketName);
+    bucketFiles.push({ bucketName, files });
+    totalObjects += files.length;
     console.log(`${bucketName}: ${files.length} object(s)`);
+  }
+
+  console.log(`${dryRun ? 'Would copy' : 'Copying'} ${totalObjects} total storage object(s).`);
+
+  for (const { bucketName, files } of bucketFiles) {
+    let bucketCopied = 0;
 
     for (const [fileIndex, path] of files.entries()) {
       const label = `${bucketName}/${path}`;
+      const nextCopied = copied + 1;
+      const progress = `${nextCopied}/${totalObjects}`;
 
       if (dryRun) {
-        console.log(`[dry-run] copy ${label}`);
+        copied += 1;
+        bucketCopied += 1;
+        console.log(`[dry-run] copy ${label} (${progress})`);
         continue;
       }
 
-      console.log(`Copying ${label} (${fileIndex + 1}/${files.length})`);
+      console.log(`Copying ${label} (${progress}, bucket ${fileIndex + 1}/${files.length})`);
       const { data, error: downloadError } = await supabase.storage.from(bucketName).download(path);
       if (downloadError) throw downloadError;
       if (!data) throw new Error(`Failed to download ${label}`);
@@ -162,6 +204,11 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
       const contentType = data.type || inferContentType(path);
       await uploadBufferToS3(bucketName, path, buffer, contentType, '3600', true);
       copied += 1;
+      bucketCopied += 1;
+    }
+
+    if (files.length > 0) {
+      console.log(`${dryRun ? 'Would copy' : 'Copied'} ${bucketCopied}/${files.length} object(s) from ${bucketName}.`);
     }
 
     if (!dryRun && deleteSourceAfterCopy && files.length > 0) {
@@ -170,6 +217,7 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
         const { error: removeError } = await supabase.storage.from(bucketName).remove(chunk);
         if (removeError) throw removeError;
         deleted += chunk.length;
+        console.log(`Deleted ${deleted}/${totalObjects} source storage object(s).`);
       }
     }
   }
@@ -179,48 +227,86 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
 
 async function updateDatabaseUrls(supabase: ReturnType<typeof getSupabaseClient>) {
   let updatedRows = 0;
+  let scannedRows = 0;
+  let rowsNeedingUpdates = 0;
 
   for (const config of URL_COLUMNS) {
     const selectedColumns = ['id', ...config.columns, ...(config.arrayColumns || [])].join(',');
-    const { data, error } = await supabase.from(config.table).select(selectedColumns);
+    let from = 0;
+    let tableScannedRows = 0;
+    let tableRowsNeedingUpdates = 0;
 
-    if (error) {
-      console.warn(`Skipping ${config.table}: ${error.message}`);
-      continue;
+    while (true) {
+      const to = from + dbPageSize - 1;
+      const { data, error } = await supabase
+        .from(config.table)
+        .select(selectedColumns)
+        .range(from, to);
+
+      if (error) {
+        console.warn(`Skipping ${config.table}: ${error.message}`);
+        break;
+      }
+
+      const rows = (data || []) as unknown as UrlRow[];
+      if (rows.length === 0) break;
+      tableScannedRows += rows.length;
+
+      for (const row of rows) {
+        const updates = getUrlUpdates(row, config);
+
+        if (Object.keys(updates).length === 0) continue;
+        tableRowsNeedingUpdates += 1;
+      }
+
+      if (rows.length < dbPageSize) break;
+      from += dbPageSize;
     }
 
-    for (const row of ((data || []) as unknown as UrlRow[])) {
-      const updates: Record<string, string | string[] | null> = {};
+    scannedRows += tableScannedRows;
+    rowsNeedingUpdates += tableRowsNeedingUpdates;
+    console.log(`${config.table}: ${tableRowsNeedingUpdates}/${tableScannedRows} row(s) need URL updates.`);
+  }
 
-      for (const column of config.columns) {
-        const original = row[column] as string | null;
-        const converted = convertSupabaseUrl(original);
-        if (converted !== original) updates[column] = converted;
-      }
+  console.log(`${dryRun ? 'Would update' : 'Updating'} ${rowsNeedingUpdates}/${scannedRows} scanned database row(s).`);
 
-      for (const column of config.arrayColumns || []) {
-        const original = row[column] as string[] | null;
-        if (!Array.isArray(original)) continue;
+  for (const config of URL_COLUMNS) {
+    const selectedColumns = ['id', ...config.columns, ...(config.arrayColumns || [])].join(',');
+    let from = 0;
 
-        const converted = original.map((url) => convertSupabaseUrl(url) || url);
-        if (converted.some((url, index) => url !== original[index])) {
-          updates[column] = converted;
+    while (true) {
+      const to = from + dbPageSize - 1;
+      const { data, error } = await supabase
+        .from(config.table)
+        .select(selectedColumns)
+        .range(from, to);
+
+      if (error) break;
+
+      const rows = (data || []) as unknown as UrlRow[];
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        const updates = getUrlUpdates(row, config);
+        if (Object.keys(updates).length === 0) continue;
+
+        const progress = `${updatedRows + 1}/${rowsNeedingUpdates}`;
+        if (dryRun) {
+          console.log(`[dry-run] update ${config.table}/${row.id} (${progress})`, updates);
+        } else {
+          console.log(`Updating ${config.table}/${row.id} (${progress})`);
+          const { error: updateError } = await supabase
+            .from(config.table)
+            .update(updates)
+            .eq('id', row.id);
+          if (updateError) throw updateError;
         }
+
+        updatedRows += 1;
       }
 
-      if (Object.keys(updates).length === 0) continue;
-
-      if (dryRun) {
-        console.log(`[dry-run] update ${config.table}/${row.id}`, updates);
-      } else {
-        const { error: updateError } = await supabase
-          .from(config.table)
-          .update(updates)
-          .eq('id', row.id);
-        if (updateError) throw updateError;
-      }
-
-      updatedRows += 1;
+      if (rows.length < dbPageSize) break;
+      from += dbPageSize;
     }
   }
 

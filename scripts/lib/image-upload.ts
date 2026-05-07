@@ -60,14 +60,14 @@ export async function downloadImage(url: string): Promise<Buffer | null> {
  */
 export async function convertToWebP(
   imageBuffer: Buffer,
-  quality = 82
+  quality = 100
 ): Promise<Buffer> {
   return sharp(imageBuffer)
     .resize(500, 500, {
       fit: 'cover',
       position: 'top', // Focus on face area
     })
-    .webp({ quality })
+    .webp({ quality: Math.max(quality, 100) })
     .toBuffer();
 }
 
