@@ -215,6 +215,20 @@ export type StonksEntry = {
   updated_at: string;
 };
 
+export type SportEntry = {
+  id: string;
+  anon_id: string | null;
+  sport_name: string;
+  equipment_name: string;
+  equipment_image_url: string | null;
+  achieved_on: string;
+  weight_value: number;
+  weight_unit: 'lb' | 'kg';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WishlistItem = {
   id: string;
   title: string;

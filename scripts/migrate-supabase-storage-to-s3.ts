@@ -63,6 +63,7 @@ const dryRun = args.has('--dry-run');
 const skipCopy = args.has('--skip-copy');
 const skipDbUpdate = args.has('--skip-db-update');
 const deleteSourceAfterCopy = args.has('--delete-source-after-copy');
+const deleteOnly = args.has('--delete-only');
 const dbPageSize = 1000;
 
 function getSupabaseClient() {
@@ -161,14 +162,12 @@ async function listFiles(
   return files;
 }
 
-async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>) {
+async function getBucketFileList(supabase: ReturnType<typeof getSupabaseClient>) {
   const { data: buckets, error } = await supabase.storage.listBuckets();
   if (error) throw error;
 
   const bucketFiles: BucketFileList[] = [];
   let totalObjects = 0;
-  let copied = 0;
-  let deleted = 0;
 
   for (const bucket of buckets || []) {
     const bucketName = bucket.name;
@@ -177,6 +176,48 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
     totalObjects += files.length;
     console.log(`${bucketName}: ${files.length} object(s)`);
   }
+
+  return { bucketFiles, totalObjects };
+}
+
+async function deleteSourceStorageObjects(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  bucketFiles: BucketFileList[],
+  totalObjects: number,
+  alreadyDeleted = 0
+) {
+  let deleted = alreadyDeleted;
+
+  if (alreadyDeleted === 0) {
+    console.log(`${dryRun ? 'Would delete' : 'Deleting'} ${totalObjects} source storage object(s).`);
+  }
+
+  for (const { bucketName, files } of bucketFiles) {
+    if (files.length === 0) continue;
+
+    if (dryRun) {
+      deleted += files.length;
+      console.log(`[dry-run] delete ${files.length} object(s) from ${bucketName} (${deleted}/${totalObjects})`);
+      continue;
+    }
+
+    for (let index = 0; index < files.length; index += 100) {
+      const chunk = files.slice(index, index + 100);
+      const { error: removeError } = await supabase.storage.from(bucketName).remove(chunk);
+      if (removeError) throw removeError;
+      deleted += chunk.length;
+      console.log(`Deleted ${deleted}/${totalObjects} source storage object(s).`);
+    }
+  }
+
+  return deleted;
+}
+
+async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>) {
+  const { bucketFiles, totalObjects } = await getBucketFileList(supabase);
+
+  let copied = 0;
+  let deleted = 0;
 
   console.log(`${dryRun ? 'Would copy' : 'Copying'} ${totalObjects} total storage object(s).`);
 
@@ -212,13 +253,12 @@ async function copyStorageObjects(supabase: ReturnType<typeof getSupabaseClient>
     }
 
     if (!dryRun && deleteSourceAfterCopy && files.length > 0) {
-      for (let index = 0; index < files.length; index += 100) {
-        const chunk = files.slice(index, index + 100);
-        const { error: removeError } = await supabase.storage.from(bucketName).remove(chunk);
-        if (removeError) throw removeError;
-        deleted += chunk.length;
-        console.log(`Deleted ${deleted}/${totalObjects} source storage object(s).`);
-      }
+      deleted = await deleteSourceStorageObjects(
+        supabase,
+        [{ bucketName, files }],
+        totalObjects,
+        deleted
+      );
     }
   }
 
@@ -315,6 +355,13 @@ async function updateDatabaseUrls(supabase: ReturnType<typeof getSupabaseClient>
 
 async function main() {
   const supabase = getSupabaseClient();
+
+  if (deleteOnly) {
+    const { bucketFiles, totalObjects } = await getBucketFileList(supabase);
+    const deleted = await deleteSourceStorageObjects(supabase, bucketFiles, totalObjects);
+    console.log(`${dryRun ? 'Would delete' : 'Deleted'} ${deleted} source Supabase object(s).`);
+    return;
+  }
 
   if (!skipCopy) {
     const result = await copyStorageObjects(supabase);

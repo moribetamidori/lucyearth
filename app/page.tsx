@@ -22,6 +22,7 @@ import SlotMachineModal from '@/components/SlotMachineModal';
 import StonksModal from '@/components/StonksModal';
 import FindMeModal from '@/components/FindMeModal';
 import WishlistModal from '@/components/WishlistModal';
+import SportModal from '@/components/SportModal';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
@@ -66,6 +67,7 @@ export default function Home() {
   const [showStonksModal, setShowStonksModal] = useState<boolean>(false);
   const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
   const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
+  const [showSportModal, setShowSportModal] = useState<boolean>(false);
   const [showMobileApps, setShowMobileApps] = useState<boolean>(false);
 
   // Audio player ref - persists across modal open/close
@@ -637,6 +639,27 @@ export default function Home() {
           <div className="text-[15px] text-gray-900 max-sm:hidden">STONKS</div>
         </div>
 
+        {/* Sports icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowSportModal(true);
+              logActivity('Opened Sports', 'Tracking sports progress');
+            }}
+            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-cyan-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            <span className="max-sm:text-lg">🏋️</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
+              SPORTS
+            </span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">SPORTS</div>
+        </div>
+
         {/* Activity Log icon - always visible */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
           <div
@@ -939,6 +962,15 @@ export default function Home() {
       <StonksModal
         isOpen={showStonksModal}
         onClose={() => setShowStonksModal(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Sports Modal */}
+      <SportModal
+        isOpen={showSportModal}
+        onClose={() => setShowSportModal(false)}
         anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
