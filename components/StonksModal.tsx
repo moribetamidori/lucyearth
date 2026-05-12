@@ -22,6 +22,7 @@ type MonthEntry = {
 const LEVEL_SIZE_K = 20;
 const CURRENT_YEAR = new Date().getFullYear();
 const STONKS_TABLE = 'stonks_monthly_entries';
+const SHARED_STONKS_ID = 'shared';
 const MONTHS = [
   'Jan',
   'Feb',
@@ -64,7 +65,6 @@ const getErrorMessage = (error: unknown) => {
 export default function StonksModal({
   isOpen,
   onClose,
-  anonId,
   isEditMode,
   onLogActivity,
 }: StonksModalProps) {
@@ -76,7 +76,7 @@ export default function StonksModal({
 
   useEffect(() => {
     const fetchProgress = async () => {
-      if (!isOpen || !anonId) return;
+      if (!isOpen) return;
       setLoading(true);
       setError('');
 
@@ -84,7 +84,7 @@ export default function StonksModal({
         const { data, error: fetchError } = await supabase
           .from(STONKS_TABLE)
           .select('*')
-          .eq('anon_id', anonId)
+          .eq('anon_id', SHARED_STONKS_ID)
           .eq('entry_year', CURRENT_YEAR)
           .order('month_index', { ascending: true });
 
@@ -124,7 +124,7 @@ export default function StonksModal({
       onLogActivity?.('Opened Stonks', 'Viewed trading level progress');
       void fetchProgress();
     }
-  }, [anonId, isOpen, onLogActivity]);
+  }, [isOpen, onLogActivity]);
 
   const stats = useMemo(() => {
     const recordedActiveMonths = months.filter(
@@ -172,11 +172,6 @@ export default function StonksModal({
   const saveMonth = async (index: number, nextMonth: MonthEntry) => {
     if (!isEditMode) return;
 
-    if (!anonId) {
-      setError('Waiting for user id before saving.');
-      return;
-    }
-
     setSavingMonth(index);
     setError('');
 
@@ -185,7 +180,7 @@ export default function StonksModal({
         .from(STONKS_TABLE)
         .upsert(
           {
-            anon_id: anonId,
+            anon_id: SHARED_STONKS_ID,
             entry_year: CURRENT_YEAR,
             month_index: index,
             k_made: nextMonth.kMade,
@@ -231,18 +226,13 @@ export default function StonksModal({
     setMonths(resetMonths);
     setError('');
 
-    if (!anonId) {
-      setError('Waiting for user id before saving.');
-      return;
-    }
-
     setLoading(true);
 
     try {
       const { error: deleteError } = await supabase
         .from(STONKS_TABLE)
         .delete()
-        .eq('anon_id', anonId)
+        .eq('anon_id', SHARED_STONKS_ID)
         .eq('entry_year', CURRENT_YEAR);
 
       if (deleteError) throw deleteError;
