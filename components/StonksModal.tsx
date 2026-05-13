@@ -20,7 +20,7 @@ type MonthEntry = {
 };
 
 const LEVEL_SIZE_K = 20;
-const CURRENT_YEAR = new Date().getFullYear();
+const RUN_YEAR = 2026;
 const STONKS_TABLE = 'stonks_monthly_entries';
 const SHARED_STONKS_ID = 'shared';
 const MONTHS = [
@@ -73,6 +73,8 @@ export default function StonksModal({
   const [loading, setLoading] = useState(false);
   const [savingMonth, setSavingMonth] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const runArchived = new Date().getFullYear() > RUN_YEAR;
+  const canEditRun = isEditMode && !runArchived;
 
   useEffect(() => {
     const fetchProgress = async () => {
@@ -85,7 +87,7 @@ export default function StonksModal({
           .from(STONKS_TABLE)
           .select('*')
           .eq('anon_id', SHARED_STONKS_ID)
-          .eq('entry_year', CURRENT_YEAR)
+          .eq('entry_year', RUN_YEAR)
           .order('month_index', { ascending: true });
 
         if (fetchError) throw fetchError;
@@ -170,7 +172,7 @@ export default function StonksModal({
   }, [months]);
 
   const saveMonth = async (index: number, nextMonth: MonthEntry) => {
-    if (!isEditMode) return;
+    if (!canEditRun) return;
 
     setSavingMonth(index);
     setError('');
@@ -181,7 +183,7 @@ export default function StonksModal({
         .upsert(
           {
             anon_id: SHARED_STONKS_ID,
-            entry_year: CURRENT_YEAR,
+            entry_year: RUN_YEAR,
             month_index: index,
             k_made: nextMonth.kMade,
             active: nextMonth.active,
@@ -201,7 +203,7 @@ export default function StonksModal({
   };
 
   const updateMonth = (index: number, changes: Partial<MonthEntry>) => {
-    if (!isEditMode) return;
+    if (!canEditRun) return;
 
     const currentMonth = months[index];
     if (!currentMonth) return;
@@ -219,7 +221,7 @@ export default function StonksModal({
   };
 
   const resetRun = async () => {
-    if (!isEditMode) return;
+    if (!canEditRun) return;
     if (!confirm('Reset all stonks progress?')) return;
 
     const resetMonths = makeDefaultMonths();
@@ -233,7 +235,7 @@ export default function StonksModal({
         .from(STONKS_TABLE)
         .delete()
         .eq('anon_id', SHARED_STONKS_ID)
-        .eq('entry_year', CURRENT_YEAR);
+        .eq('entry_year', RUN_YEAR);
 
       if (deleteError) throw deleteError;
       onLogActivity?.('Reset Stonks', 'Cleared trading progress');
@@ -261,7 +263,12 @@ export default function StonksModal({
           <div>
             <h2 className="text-2xl font-bold">STONKS</h2>
             <p className="text-sm text-gray-600">
-              {CURRENT_YEAR} run. Level up every 20k in active monthly gains.
+              {RUN_YEAR} run. Level up every 20k in active monthly gains.
+              {runArchived && (
+                <span className="block text-xs text-gray-500">
+                  Archived after Dec 31, {RUN_YEAR}.
+                </span>
+              )}
               <span className="block text-xs text-gray-500">Table: {STONKS_TABLE}</span>
             </p>
           </div>
@@ -364,7 +371,7 @@ export default function StonksModal({
                         />
                       </div>
                     </button>
-                    {isEditMode && (
+                    {canEditRun && (
                       <button
                         type="button"
                         onClick={() =>
@@ -399,7 +406,7 @@ export default function StonksModal({
                         : 'Skipped month'}
                   </p>
                 </div>
-                {isEditMode && (
+                {canEditRun && (
                   <button
                     onClick={() =>
                       updateMonth(selectedMonth, { active: !selected.active })
@@ -420,7 +427,7 @@ export default function StonksModal({
                 <div className="text-5xl font-bold">{selected.kMade}k</div>
               </div>
 
-              {isEditMode && (
+              {canEditRun && (
                 <>
                   <input
                     type="range"
@@ -482,29 +489,39 @@ export default function StonksModal({
               <h3 className="text-xl font-bold mb-3">QUESTS</h3>
               <div className="space-y-2 text-sm">
                 <QuestRow
-                  done={stats.level >= 1}
-                  label="First Level"
-                  detail="Reach 20k total active gains"
+                  done={stats.totalK >= 20}
+                  archived={runArchived}
+                  label={`${RUN_YEAR} IRA On Gains`}
+                  detail={`Reach 20k total active ${RUN_YEAR} gains to officially run the IRA account on gains`}
+                />
+                <QuestRow
+                  done={stats.totalK >= 40}
+                  archived={runArchived}
+                  label="Entire Account On Gains"
+                  detail={`Reach 40k total active ${RUN_YEAR} gains to officially run the entire account on gains`}
                 />
                 <QuestRow
                   done={stats.greenMonths >= 3}
+                  archived={runArchived}
                   label="Quarter Green"
                   detail="Log gains in 3 active months"
                 />
                 <QuestRow
                   done={stats.bestMonth.kMade >= 20}
+                  archived={runArchived}
                   label="Boss Month"
                   detail="Hit 20k inside one month"
                 />
                 <QuestRow
                   done={stats.streak >= 4}
+                  archived={runArchived}
                   label="Streak Mode"
-                  detail="Keep the last active run green"
+                  detail="Keep the last active run green for 4 months"
                 />
               </div>
             </div>
 
-            {isEditMode && (
+            {canEditRun && (
               <button
                 onClick={resetRun}
                 disabled={loading}
@@ -522,22 +539,30 @@ export default function StonksModal({
 
 function QuestRow({
   done,
+  archived = false,
   label,
   detail,
 }: {
   done: boolean;
+  archived?: boolean;
   label: string;
   detail: string;
 }) {
+  const status = done ? 'DONE' : archived ? 'ARCHIVED' : 'LOCKED';
+
   return (
     <div
-      className={`border-2 border-gray-900 p-3 ${
-        done ? 'bg-green-200' : 'bg-gray-50 text-gray-500'
+      className={`border-2 p-3 ${
+        done
+          ? 'border-gray-900 bg-green-200'
+          : archived
+            ? 'border-gray-400 bg-gray-100 text-gray-400'
+            : 'border-gray-900 bg-gray-50 text-gray-500'
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-bold">{label}</span>
-        <span>{done ? 'DONE' : 'LOCKED'}</span>
+        <span>{status}</span>
       </div>
       <div className="text-xs mt-1">{detail}</div>
     </div>
