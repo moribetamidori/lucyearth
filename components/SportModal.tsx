@@ -233,6 +233,14 @@ export default function SportModal({
 
   const hasMoreLogs = visibleLogCount < totalEntryCount || visibleLogCount < entries.length;
 
+  const selectedEquipmentOption = useMemo(
+    () =>
+      selectedEquipment === 'all'
+        ? null
+        : equipmentOptions.find((option) => option.name === selectedEquipment) || null,
+    [equipmentOptions, selectedEquipment]
+  );
+
   const currentEquipmentImage = useMemo(() => {
     if (imagePreview) return imagePreview;
     if (existingImageUrl) return existingImageUrl;
@@ -737,6 +745,27 @@ export default function SportModal({
           </div>
 
           <aside className="p-4 sm:p-5 bg-gray-50">
+            {selectedEquipmentOption && (
+              <div className="border-4 border-gray-900 bg-white p-4 mb-4">
+                <div className="relative w-full aspect-square border-2 border-gray-900 bg-gray-100 overflow-hidden mb-3">
+                  {selectedEquipmentOption.imageUrl ? (
+                    <Image
+                      src={selectedEquipmentOption.imageUrl}
+                      alt={selectedEquipmentOption.name}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 340px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl">🏋️</div>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold leading-tight">{selectedEquipmentOption.name}</h3>
+                <div className="mt-2 text-sm text-gray-600">
+                  {selectedEquipmentOption.count} logs / {formatWeight(selectedEquipmentOption.bestWeight)} best
+                </div>
+              </div>
+            )}
             {showForm && isEditMode ? (
               <form onSubmit={handleSubmit} className="border-4 border-gray-900 bg-white p-4">
                 <h3 className="text-lg font-bold mb-4">
