@@ -25,6 +25,20 @@ type EquipmentOption = {
 
 const STORAGE_BUCKET = 'sport-equipment-images';
 const TABLE_NAME = 'sport_entries';
+const LOG_PAGE_SIZE = 10;
+const ENTRY_FETCH_BATCH_SIZE = 200;
+const CHART_COLORS = [
+  '#bef264',
+  '#67e8f9',
+  '#f9a8d4',
+  '#fde047',
+  '#c4b5fd',
+  '#fdba74',
+  '#86efac',
+  '#fca5a5',
+  '#93c5fd',
+  '#d8b4fe',
+];
 
 const todayInputValue = () => new Date().toISOString().slice(0, 10);
 
@@ -74,6 +88,9 @@ export default function SportModal({
   const [selectedEquipment, setSelectedEquipment] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<SportEntry | null>(null);
+  const [visibleLogCount, setVisibleLogCount] = useState(LOG_PAGE_SIZE);
+  const [totalEntryCount, setTotalEntryCount] = useState(0);
+  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
 
   const [sportName, setSportName] = useState('Strength');
   const [equipmentName, setEquipmentName] = useState('');
@@ -112,17 +129,19 @@ export default function SportModal({
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     setError('');
+    setVisibleLogCount(LOG_PAGE_SIZE);
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError, count } = await supabase
         .from(TABLE_NAME)
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('achieved_on', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(200);
+        .range(0, ENTRY_FETCH_BATCH_SIZE - 1);
 
       if (fetchError) throw fetchError;
       setEntries((data ?? []) as SportEntry[]);
+      setTotalEntryCount(count ?? data?.length ?? 0);
     } catch (fetchError) {
       console.warn('Failed to load sports progress', fetchError);
       setError(`Could not load sports progress: ${getErrorMessage(fetchError)}`);
@@ -206,6 +225,13 @@ export default function SportModal({
       sessionCount: selectedEntries.length,
     };
   }, [selectedEntries]);
+
+  const visibleLogEntries = useMemo(
+    () => entries.slice(0, visibleLogCount),
+    [entries, visibleLogCount]
+  );
+
+  const hasMoreLogs = visibleLogCount < totalEntryCount || visibleLogCount < entries.length;
 
   const currentEquipmentImage = useMemo(() => {
     if (imagePreview) return imagePreview;
@@ -311,6 +337,48 @@ export default function SportModal({
     return data.publicUrl;
   };
 
+  const loadMoreLogs = async () => {
+    const nextVisibleCount = visibleLogCount + LOG_PAGE_SIZE;
+
+    if (nextVisibleCount <= entries.length || entries.length >= totalEntryCount) {
+      setVisibleLogCount(nextVisibleCount);
+      return;
+    }
+
+    setLoadingMoreLogs(true);
+    setError('');
+
+    try {
+      const fetchEnd = Math.max(
+        entries.length + ENTRY_FETCH_BATCH_SIZE - 1,
+        nextVisibleCount - 1
+      );
+      const { data, error: fetchError, count } = await supabase
+        .from(TABLE_NAME)
+        .select('*', { count: 'exact' })
+        .order('achieved_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(entries.length, fetchEnd);
+
+      if (fetchError) throw fetchError;
+
+      setEntries((current) => {
+        const existingIds = new Set(current.map((entry) => entry.id));
+        const freshEntries = ((data ?? []) as SportEntry[]).filter(
+          (entry) => !existingIds.has(entry.id)
+        );
+        return [...current, ...freshEntries];
+      });
+      setTotalEntryCount(count ?? totalEntryCount);
+      setVisibleLogCount(nextVisibleCount);
+    } catch (fetchError) {
+      console.warn('Failed to load more sports logs', fetchError);
+      setError(`Could not load more sports logs: ${getErrorMessage(fetchError)}`);
+    } finally {
+      setLoadingMoreLogs(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!isEditMode) return;
@@ -384,6 +452,7 @@ export default function SportModal({
 
         if (insertError || !data) throw insertError || new Error('Insert returned no data');
         setEntries((current) => [data, ...current]);
+        setTotalEntryCount((current) => current + 1);
         onLogActivity?.('Added Sports Entry', `${trimmedEquipment} ${formatWeight(parsedWeight)}${weightUnit}`);
       }
 
@@ -409,6 +478,7 @@ export default function SportModal({
       if (deleteError) throw deleteError;
 
       setEntries((current) => current.filter((item) => item.id !== entry.id));
+      setTotalEntryCount((current) => Math.max(current - 1, 0));
       onLogActivity?.('Deleted Sports Entry', entry.equipment_name);
     } catch (deleteError) {
       console.warn('Failed to delete sports entry', deleteError);
@@ -424,6 +494,8 @@ export default function SportModal({
   };
 
   if (!isOpen) return null;
+
+  const isAllEquipmentSelected = selectedEquipment === 'all';
 
   return (
     <div className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -474,7 +546,7 @@ export default function SportModal({
               </div>
             )}
 
-            <div className="grid sm:grid-cols-4 gap-3 mb-4">
+            <div className={`grid gap-3 mb-4 ${isAllEquipmentSelected ? 'sm:grid-cols-2' : 'sm:grid-cols-4'}`}>
               <StatBox
                 label="LATEST"
                 value={
@@ -485,22 +557,26 @@ export default function SportModal({
                 detail={stats.latest?.equipment_name || 'No logs yet'}
                 tone="bg-cyan-100"
               />
-              <StatBox
-                label="PERSONAL BEST"
-                value={
-                  stats.best
-                    ? `${formatWeight(Number(stats.best.weight_value))}${stats.best.weight_unit}`
-                    : '--'
-                }
-                detail={stats.best?.equipment_name || 'Start tracking'}
-                tone="bg-lime-100"
-              />
-              <StatBox
-                label="CHANGE"
-                value={`${stats.delta > 0 ? '+' : ''}${formatWeight(stats.delta)}`}
-                detail="vs previous log"
-                tone="bg-yellow-100"
-              />
+              {!isAllEquipmentSelected && (
+                <>
+                  <StatBox
+                    label="PERSONAL BEST"
+                    value={
+                      stats.best
+                        ? `${formatWeight(Number(stats.best.weight_value))}${stats.best.weight_unit}`
+                        : '--'
+                    }
+                    detail={stats.best?.equipment_name || 'Start tracking'}
+                    tone="bg-lime-100"
+                  />
+                  <StatBox
+                    label="CHANGE"
+                    value={`${stats.delta > 0 ? '+' : ''}${formatWeight(stats.delta)}`}
+                    detail="vs previous log"
+                    tone="bg-yellow-100"
+                  />
+                </>
+              )}
               <StatBox
                 label="DAYS"
                 value={`${stats.activeDays}`}
@@ -586,7 +662,7 @@ export default function SportModal({
                   No sports entries yet.
                 </div>
               ) : (
-                entries.map((entry) => (
+                visibleLogEntries.map((entry) => (
                   <div
                     key={entry.id}
                     className="border-4 border-gray-900 bg-white p-3 flex flex-col sm:flex-row sm:items-center gap-3"
@@ -646,6 +722,16 @@ export default function SportModal({
                     </div>
                   </div>
                 ))
+              )}
+              {hasMoreLogs && (
+                <button
+                  type="button"
+                  onClick={() => void loadMoreLogs()}
+                  disabled={loadingMoreLogs}
+                  className="w-full border-4 border-gray-900 bg-white hover:bg-cyan-100 py-3 text-sm font-bold disabled:opacity-50"
+                >
+                  {loadingMoreLogs ? 'LOADING...' : 'LOAD MORE'}
+                </button>
               )}
             </div>
           </div>
@@ -865,7 +951,8 @@ function StatBox({
 }
 
 function ProgressDiagram({ entries }: { entries: SportEntry[] }) {
-  const chartEntries = entries.slice(-12);
+  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
+  const chartEntries = entries;
   const maxWeight = Math.max(...chartEntries.map((entry) => Number(entry.weight_value)), 0);
   const chartMax = Math.max(maxWeight, 1);
   const width = 640;
@@ -876,28 +963,41 @@ function ProgressDiagram({ entries }: { entries: SportEntry[] }) {
   const axisY = height - paddingBottom;
   const plotWidth = width - paddingX * 2;
   const plotHeight = axisY - paddingTop;
+  const uniqueDates = Array.from(new Set(chartEntries.map((entry) => entry.achieved_on)));
+  const equipmentColors = Array.from(
+    new Set(chartEntries.map((entry) => entry.equipment_name))
+  ).reduce<Record<string, string>>((colors, equipmentName, index) => {
+    colors[equipmentName] = CHART_COLORS[index % CHART_COLORS.length];
+    return colors;
+  }, {});
   const dateCounts = chartEntries.reduce<Record<string, number>>((counts, entry) => {
     counts[entry.achieved_on] = (counts[entry.achieved_on] || 0) + 1;
     return counts;
   }, {});
-  const seenDates: Record<string, number> = {};
-
-  const points = chartEntries.map((entry, index) => {
-    seenDates[entry.achieved_on] = (seenDates[entry.achieved_on] || 0) + 1;
-    const x =
-      chartEntries.length === 1
+  const dateXPositions = uniqueDates.reduce<Record<string, number>>((positions, date, index) => {
+    positions[date] =
+      uniqueDates.length === 1
         ? width / 2
-        : paddingX + (index / (chartEntries.length - 1)) * plotWidth;
+        : paddingX + (index / (uniqueDates.length - 1)) * plotWidth;
+    return positions;
+  }, {});
+
+  const points = chartEntries.map((entry) => {
+    const x = dateXPositions[entry.achieved_on];
     const y = paddingTop + plotHeight - (Number(entry.weight_value) / chartMax) * plotHeight;
-    const duplicateDate = dateCounts[entry.achieved_on] > 1;
     return {
       x,
       y,
       entry,
-      label: formatChartDate(entry.achieved_on),
-      sublabel: duplicateDate ? `Log ${seenDates[entry.achieved_on]}` : entry.equipment_name,
+      color: equipmentColors[entry.equipment_name],
     };
   });
+  const pointGroups = points.reduce<Record<string, typeof points>>((groups, point) => {
+    const group = groups[point.entry.equipment_name] || [];
+    group.push(point);
+    groups[point.entry.equipment_name] = group;
+    return groups;
+  }, {});
 
   if (chartEntries.length === 0) {
     return (
@@ -923,29 +1023,99 @@ function ProgressDiagram({ entries }: { entries: SportEntry[] }) {
           );
         })}
         <line x1={paddingX} x2={width - paddingX} y1={axisY} y2={axisY} stroke="#111827" strokeWidth="2" />
-        <polyline
-          fill="none"
-          stroke="#06b6d4"
-          strokeWidth="5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-        />
-        {points.map((point) => (
-          <g key={`${point.entry.id}-${point.x}`}>
-            <line x1={point.x} x2={point.x} y1={axisY} y2={axisY + 7} stroke="#111827" strokeWidth="2" />
-            <circle cx={point.x} cy={point.y} r="8" fill="#bef264" stroke="#111827" strokeWidth="3" />
-            <text x={point.x} y={point.y - 14} textAnchor="middle" fontSize="12" fontWeight="700" fill="#111827">
-              {formatWeight(Number(point.entry.weight_value))}
-            </text>
-            <text x={point.x} y={axisY + 22} textAnchor="middle" fontSize="11" fontWeight="700" fill="#111827">
-              {point.label}
-            </text>
-            <text x={point.x} y={axisY + 38} textAnchor="middle" fontSize="10" fill="#6b7280">
-              {point.sublabel}
-            </text>
-          </g>
-        ))}
+        {uniqueDates.map((date) => {
+          const x = dateXPositions[date];
+
+          return (
+            <g key={date}>
+              <line x1={x} x2={x} y1={axisY} y2={axisY + 7} stroke="#111827" strokeWidth="2" />
+              <text x={x} y={axisY + 22} textAnchor="middle" fontSize="11" fontWeight="700" fill="#111827">
+                {formatChartDate(date)}
+              </text>
+              {dateCounts[date] > 1 && (
+                <text x={x} y={axisY + 38} textAnchor="middle" fontSize="10" fill="#6b7280">
+                  {dateCounts[date]} logs
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {Object.entries(pointGroups).map(([equipmentName, groupPoints]) =>
+          groupPoints.length > 1 ? (
+            <polyline
+              key={equipmentName}
+              fill="none"
+              stroke={equipmentColors[equipmentName]}
+              strokeWidth="5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              points={groupPoints.map((point) => `${point.x},${point.y}`).join(' ')}
+            />
+          ) : null
+        )}
+        {points.map((point) => {
+          const isHovered = hoveredPointId === point.entry.id;
+          const visibleEquipmentName =
+            point.entry.equipment_name.length > 22
+              ? `${point.entry.equipment_name.slice(0, 21)}...`
+              : point.entry.equipment_name;
+          const fullTooltipLabel = `${point.entry.equipment_name} - ${formatWeight(Number(point.entry.weight_value))}${point.entry.weight_unit}`;
+          const tooltipLabel = `${visibleEquipmentName} - ${formatWeight(Number(point.entry.weight_value))}${point.entry.weight_unit}`;
+          const tooltipWidth = Math.max(88, Math.min(180, tooltipLabel.length * 7 + 18));
+          const tooltipX = Math.min(Math.max(point.x - tooltipWidth / 2, 6), width - tooltipWidth - 6);
+          const tooltipY = Math.max(point.y - 48, 6);
+
+          return (
+            <g
+              key={`${point.entry.id}-${point.x}`}
+              onMouseEnter={() => setHoveredPointId(point.entry.id)}
+              onMouseLeave={() => setHoveredPointId(null)}
+              onFocus={() => setHoveredPointId(point.entry.id)}
+              onBlur={() => setHoveredPointId(null)}
+              tabIndex={0}
+              role="img"
+              aria-label={fullTooltipLabel}
+              className="outline-none"
+            >
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={isHovered ? '10' : '8'}
+                fill={point.color}
+                stroke="#111827"
+                strokeWidth="3"
+              />
+              <title>{fullTooltipLabel}</title>
+              <text x={point.x} y={point.y - 14} textAnchor="middle" fontSize="12" fontWeight="700" fill="#111827">
+                {formatWeight(Number(point.entry.weight_value))}
+              </text>
+              {isHovered && (
+                <g pointerEvents="none">
+                  <rect
+                    x={tooltipX}
+                    y={tooltipY}
+                    width={tooltipWidth}
+                    height="28"
+                    rx="0"
+                    fill="#ffffff"
+                    stroke="#111827"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={tooltipX + tooltipWidth / 2}
+                    y={tooltipY + 18}
+                    textAnchor="middle"
+                    fontSize="11"
+                    fontWeight="700"
+                    fill="#111827"
+                  >
+                    {tooltipLabel}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
