@@ -215,18 +215,33 @@ export type StonksEntry = {
   updated_at: string;
 };
 
+export type SportEquipment = {
+  id: string;
+  anon_id: string | null;
+  sport_name: string;
+  name: string;
+  normalized_name: string;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SportEntry = {
   id: string;
   anon_id: string | null;
+  sport_equipment_id: string | null;
   sport_name: string;
   equipment_name: string;
   equipment_image_url: string | null;
   achieved_on: string;
   weight_value: number;
   weight_unit: 'lb' | 'kg';
+  sets_count: number | null;
+  reps_count: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  sport_equipment?: SportEquipment | null;
 };
 
 export type WishlistItem = {
