@@ -209,7 +209,7 @@ export type StonksEntry = {
   anon_id: string;
   entry_year: number;
   month_index: number;
-  k_made: number;
+  k_made: number | string;
   active: boolean;
   created_at: string;
   updated_at: string;

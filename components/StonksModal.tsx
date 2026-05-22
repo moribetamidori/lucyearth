@@ -20,6 +20,7 @@ type MonthEntry = {
 };
 
 const LEVEL_SIZE_K = 20;
+const K_STEP = 0.1;
 const RUN_YEAR = 2026;
 const STONKS_TABLE = 'stonks_monthly_entries';
 const SHARED_STONKS_ID = 'shared';
@@ -47,7 +48,18 @@ const makeDefaultMonths = () =>
     recorded: false,
   }));
 
-const clampK = (value: number) => Math.min(999, Math.max(0, Math.round(value)));
+const clampK = (value: number | string) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.min(999, Math.max(0, Math.round(numericValue * 10) / 10));
+};
+
+const roundToTenth = (value: number) => Math.round(value * 10) / 10;
+
+const formatK = (value: number) => {
+  const normalized = roundToTenth(value);
+  return Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toFixed(1);
+};
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -132,9 +144,8 @@ export default function StonksModal({
     const recordedActiveMonths = months.filter(
       (month) => month.recorded && month.active
     );
-    const totalK = recordedActiveMonths.reduce(
-      (sum, month) => sum + month.kMade,
-      0
+    const totalK = roundToTenth(
+      recordedActiveMonths.reduce((sum, month) => sum + month.kMade, 0)
     );
     const level = Math.floor(totalK / LEVEL_SIZE_K);
     const nextLevelTarget = (level + 1) * LEVEL_SIZE_K;
@@ -165,7 +176,7 @@ export default function StonksModal({
       streak,
       averageK:
         recordedActiveMonths.length > 0
-          ? Math.round(totalK / recordedActiveMonths.length)
+          ? roundToTenth(totalK / recordedActiveMonths.length)
           : 0,
       recordedActiveMonths: recordedActiveMonths.length,
     };
@@ -300,7 +311,7 @@ export default function StonksModal({
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-600">TOTAL</div>
-                  <div className="text-3xl font-bold">{stats.totalK}k</div>
+                  <div className="text-3xl font-bold">{formatK(stats.totalK)}k</div>
                 </div>
               </div>
 
@@ -311,15 +322,17 @@ export default function StonksModal({
                 />
               </div>
               <div className="mt-2 flex justify-between text-xs text-gray-700">
-                <span>{stats.progressK}k / 20k to next level</span>
-                <span>{stats.remainingK}k until LVL {stats.level + 1}</span>
+                <span>{formatK(stats.progressK)}k / 20k to next level</span>
+                <span>{formatK(stats.remainingK)}k until LVL {stats.level + 1}</span>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3 mb-5">
               <div className="border-4 border-gray-900 p-4 bg-yellow-200 shadow-[4px_4px_0_0_#000]">
                 <div className="text-xs font-bold text-gray-700">AVG RECORDED MONTH</div>
-                <div className="text-4xl font-bold leading-none mt-1">{stats.averageK}k</div>
+                <div className="text-4xl font-bold leading-none mt-1">
+                  {formatK(stats.averageK)}k
+                </div>
                 <div className="text-xs text-gray-500">
                   {`${stats.recordedActiveMonths} month${
                     stats.recordedActiveMonths === 1 ? '' : 's'
@@ -329,7 +342,7 @@ export default function StonksModal({
               <div className="border-2 border-gray-900 p-3 bg-white">
                 <div className="text-xs text-gray-500">BEST MONTH</div>
                 <div className="text-2xl font-bold">
-                  {stats.bestMonth.label} {stats.bestMonth.kMade}k
+                  {stats.bestMonth.label} {formatK(stats.bestMonth.kMade)}k
                 </div>
               </div>
             </div>
@@ -362,7 +375,7 @@ export default function StonksModal({
                                   : 'SKIPPED'}
                           </div>
                         </div>
-                        <div className="text-2xl font-bold">{month.kMade}k</div>
+                        <div className="text-2xl font-bold">{formatK(month.kMade)}k</div>
                       </div>
                       <div className="h-14 border-2 border-gray-900 bg-gray-100 flex items-end">
                         <div
@@ -424,7 +437,7 @@ export default function StonksModal({
               </div>
 
               <div className="text-center border-4 border-gray-900 bg-white py-5 mb-4">
-                <div className="text-5xl font-bold">{selected.kMade}k</div>
+                <div className="text-5xl font-bold">{formatK(selected.kMade)}k</div>
               </div>
 
               {canEditRun && (
@@ -433,7 +446,7 @@ export default function StonksModal({
                     type="range"
                     min="0"
                     max="100"
-                    step="1"
+                    step={K_STEP}
                     value={selected.kMade}
                     disabled={savingMonth === selectedMonth}
                     onChange={(event) =>
@@ -448,18 +461,18 @@ export default function StonksModal({
                     <button
                       onClick={() =>
                         updateMonth(selectedMonth, {
-                          kMade: clampK(selected.kMade - 1),
+                          kMade: clampK(selected.kMade - K_STEP),
                         })
                       }
                       disabled={savingMonth === selectedMonth}
                       className="border-2 border-gray-900 py-2 hover:bg-gray-100"
                     >
-                      -1k
+                      -0.1k
                     </button>
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step={K_STEP}
                       value={selected.kMade}
                       disabled={savingMonth === selectedMonth}
                       onChange={(event) =>
@@ -472,13 +485,13 @@ export default function StonksModal({
                     <button
                       onClick={() =>
                         updateMonth(selectedMonth, {
-                          kMade: clampK(selected.kMade + 1),
+                          kMade: clampK(selected.kMade + K_STEP),
                         })
                       }
                       disabled={savingMonth === selectedMonth}
                       className="border-2 border-gray-900 py-2 hover:bg-gray-100"
                     >
-                      +1k
+                      +0.1k
                     </button>
                   </div>
                 </>
