@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import PoopCalendar from '@/components/PoopCalendar';
 import ChildCalendar from '@/components/ChildCalendar';
@@ -23,7 +23,48 @@ import StonksModal from '@/components/StonksModal';
 import FindMeModal from '@/components/FindMeModal';
 import WishlistModal from '@/components/WishlistModal';
 import SportModal from '@/components/SportModal';
+import RecipeModal from '@/components/RecipeModal';
 import { supabase } from '@/lib/supabase';
+
+const LAST_VISIT_STORAGE_KEY = 'lucyearth_last_visit_at';
+
+type ContentUpdateSource = {
+  table: string;
+  timestampColumn: 'created_at' | 'updated_at';
+  label: string;
+};
+
+type SiteUpdateSummary = {
+  label: string;
+  count: number;
+};
+
+const CONTENT_UPDATE_SOURCES: ContentUpdateSource[] = [
+  { table: 'calendar_entries', timestampColumn: 'updated_at', label: 'Poop Calendar' },
+  { table: 'poop_images', timestampColumn: 'created_at', label: 'Poop Calendar' },
+  { table: 'child_calendar_entries', timestampColumn: 'updated_at', label: 'Child Calendar' },
+  { table: 'cat_pictures', timestampColumn: 'created_at', label: 'Cats' },
+  { table: 'arena_collections', timestampColumn: 'updated_at', label: 'Are.na' },
+  { table: 'arena_blocks', timestampColumn: 'created_at', label: 'Are.na' },
+  { table: 'journal_entries', timestampColumn: 'updated_at', label: 'Journal' },
+  { table: 'douban_ratings', timestampColumn: 'updated_at', label: 'Douban' },
+  { table: 'substack_articles', timestampColumn: 'updated_at', label: 'Substack' },
+  { table: 'location_pins', timestampColumn: 'updated_at', label: 'Location' },
+  { table: 'location_pin_images', timestampColumn: 'created_at', label: 'Location' },
+  { table: 'songs', timestampColumn: 'created_at', label: 'Spotify' },
+  { table: 'garden_species', timestampColumn: 'updated_at', label: 'Garden' },
+  { table: 'garden_placements', timestampColumn: 'updated_at', label: 'Garden' },
+  { table: 'bookshelf_books', timestampColumn: 'updated_at', label: 'Bookshelf' },
+  { table: 'women_profiles', timestampColumn: 'updated_at', label: 'Women' },
+  { table: 'timeline_entries', timestampColumn: 'updated_at', label: 'Timeline' },
+  { table: 'slot_machine_spins', timestampColumn: 'created_at', label: 'Fortune' },
+  { table: 'stonks_monthly_entries', timestampColumn: 'updated_at', label: 'Stonks' },
+  { table: 'sport_entries', timestampColumn: 'updated_at', label: 'Sports' },
+  { table: 'sport_equipment', timestampColumn: 'updated_at', label: 'Sports' },
+  { table: 'wishlist_items', timestampColumn: 'updated_at', label: 'Wishlist' },
+  { table: 'findme_entries', timestampColumn: 'updated_at', label: 'FindMe' },
+  { table: 'recipes', timestampColumn: 'updated_at', label: 'Recipes' },
+];
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -68,7 +109,10 @@ export default function Home() {
   const [showFindMeModal, setShowFindMeModal] = useState<boolean>(false);
   const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
   const [showSportModal, setShowSportModal] = useState<boolean>(false);
+  const [showRecipeModal, setShowRecipeModal] = useState<boolean>(false);
   const [showMobileApps, setShowMobileApps] = useState<boolean>(false);
+  const [siteUpdateCount, setSiteUpdateCount] = useState<number>(0);
+  const [siteUpdateSummaries, setSiteUpdateSummaries] = useState<SiteUpdateSummary[]>([]);
 
   // Audio player ref - persists across modal open/close
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -83,6 +127,41 @@ export default function Home() {
       }
     },
     [anonId]
+  );
+
+  const markUpdatesSeen = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    localStorage.setItem(LAST_VISIT_STORAGE_KEY, new Date().toISOString());
+    setSiteUpdateCount(0);
+    setSiteUpdateSummaries([]);
+  }, []);
+
+  const siteUpdateCountsByLabel = useMemo(
+    () => new Map(siteUpdateSummaries.map((item) => [item.label, item.count])),
+    [siteUpdateSummaries]
+  );
+
+  const renderUpdateBadge = useCallback(
+    (sourceLabel?: string, className = '') => {
+      const count = sourceLabel
+        ? siteUpdateCountsByLabel.get(sourceLabel) || 0
+        : siteUpdateCount;
+
+      if (count <= 0) return null;
+
+      const badgeLabel = count > 99 ? '99+' : count.toString();
+
+      return (
+        <span
+          aria-label={`${count} ${sourceLabel ? `${sourceLabel} ` : ''}update${count === 1 ? '' : 's'} since your last visit`}
+          className={`pointer-events-none absolute -top-3 -right-3 min-w-6 h-6 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold leading-none flex items-center justify-center border-2 border-white shadow-[0_0_0_2px_#000] z-10 ${className}`}
+        >
+          {badgeLabel}
+        </span>
+      );
+    },
+    [siteUpdateCount, siteUpdateCountsByLabel]
   );
 
   // Initialize anonymous user
@@ -142,6 +221,66 @@ export default function Home() {
 
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const visitStartedAt = new Date().toISOString();
+    const previousVisitAt = localStorage.getItem(LAST_VISIT_STORAGE_KEY);
+
+    const markVisit = () => {
+      localStorage.setItem(LAST_VISIT_STORAGE_KEY, visitStartedAt);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        markVisit();
+      }
+    };
+
+    const loadUpdateCount = async () => {
+      if (!previousVisitAt) {
+        markVisit();
+        return;
+      }
+
+      const countsByLabel = new Map<string, number>();
+
+      await Promise.all(
+        CONTENT_UPDATE_SOURCES.map(async ({ table, timestampColumn, label }) => {
+          const { count, error } = await supabase
+            .from(table)
+            .select('id', { count: 'exact', head: true })
+            .gt(timestampColumn, previousVisitAt);
+
+          if (error) {
+            console.warn(`Could not count updates for ${table}:`, error.message);
+            return;
+          }
+
+          if (count && count > 0) {
+            countsByLabel.set(label, (countsByLabel.get(label) || 0) + count);
+          }
+        })
+      );
+
+      const summaries = Array.from(countsByLabel.entries())
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+      setSiteUpdateSummaries(summaries);
+      setSiteUpdateCount(summaries.reduce((total, item) => total + item.count, 0));
+    };
+
+    window.addEventListener('pagehide', markVisit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    loadUpdateCount();
+
+    return () => {
+      window.removeEventListener('pagehide', markVisit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white overflow-hidden flex flex-col">
       {/* Floating orbs background */}
@@ -168,7 +307,7 @@ export default function Home() {
         <button
           type="button"
           aria-label="Close app launcher"
-          className="hidden max-sm:block fixed inset-0 z-30 bg-transparent"
+          className="hidden max-sm:block fixed inset-0 z-[1] bg-transparent"
           onClick={() => setShowMobileApps(false)}
         />
       )}
@@ -189,12 +328,13 @@ export default function Home() {
                 setShowPoopCalendar(true);
                 logActivity('Opened Poop Calendar', 'Viewed poop tracking calendar');
               }}
-              className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+              className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Poop Calendar')}
               <span className="max-sm:text-lg">💩</span>
               <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">POOP.CAL</span>
             </div>
@@ -208,12 +348,13 @@ export default function Home() {
                 setShowDoubanModal(true);
                 logActivity('Opened Douban', 'Viewed Douban ratings');
               }}
-              className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-green-500 transition-all flex-col pt-1"
+              className="relative w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-green-500 transition-all flex-col pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Douban')}
               <span className="text-green-600 font-bold text-lg">豆</span>
               <span className="text-[8px] leading-none mt-0.5">DOUBAN</span>
             </div>
@@ -226,12 +367,13 @@ export default function Home() {
                 setShowLocationModal(true);
                 logActivity('Opened Location', 'Viewed location map');
               }}
-              className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 transition-all flex-col pt-1"
+              className="relative w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 transition-all flex-col pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Location')}
               <span className="text-lg">📍</span>
               <span className="text-[8px] leading-none mt-0.5">LOCATION</span>
             </div>
@@ -244,12 +386,13 @@ export default function Home() {
                 setShowFindMeModal(true);
                 logActivity('Opened FindMe', 'Planning a highlighted stay');
               }}
-              className="w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 transition-all flex-col pt-1"
+              className="relative w-12 h-12 bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 transition-all flex-col pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('FindMe')}
               <span className="text-lg">🧭</span>
               <span className="text-[8px] leading-none mt-0.5">FINDME</span>
             </div>
@@ -263,12 +406,13 @@ export default function Home() {
               setShowChildCalendar(true);
               logActivity('Opened Child Calendar', 'Viewed child planning calendar');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Child Calendar')}
             <span className="max-sm:text-lg">👶</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CHILD.CAL</span>
           </div>
@@ -282,12 +426,13 @@ export default function Home() {
               setShowDoubanModal(true);
               logActivity('Opened Douban', 'Viewed Douban ratings');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Douban')}
             <span className="text-green-600 font-bold">豆</span>
           </div>
           <div className="text-[15px] text-gray-900">DOUBAN</div>
@@ -300,12 +445,13 @@ export default function Home() {
               setShowSubstackModal(true);
               logActivity('Opened Substack articles', 'Viewed Substack reading list');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Substack')}
             <Image
               src="/substack.webp"
               alt="Substack"
@@ -325,12 +471,13 @@ export default function Home() {
               setShowBookshelfModal(true);
               logActivity('Opened Bookshelf', 'Viewed the pixel bookshelf');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Bookshelf')}
             <span className="max-sm:text-base">📚</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">SHELF</span>
           </div>
@@ -344,16 +491,37 @@ export default function Home() {
               setShowWishlistModal(true);
               logActivity('Opened Wishlist', 'Viewed wishlist items');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-rose-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-rose-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Wishlist')}
             <span className="max-sm:text-base">🎁</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">WISH</span>
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">WISHLIST</div>
+        </div>
+
+        {/* Recipes icon */}
+        <div className="flex flex-col items-center gap-2 max-sm:gap-0">
+          <div
+            onClick={() => {
+              setShowRecipeModal(true);
+              logActivity('Opened Recipes', 'Viewed recipe collection');
+            }}
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-orange-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            {renderUpdateBadge('Recipes')}
+            <span className="max-sm:text-base">🍳</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">RECIPE</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">RECIPE</div>
         </div>
 
         {/* Are.na icon */}
@@ -363,12 +531,13 @@ export default function Home() {
               setShowArenaModal(true);
               logActivity('Opened Are.na', 'Viewed Arena collections');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-blue-500 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Are.na')}
             <span className="max-sm:text-sm">**</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">ARE.NA</span>
           </div>
@@ -382,12 +551,13 @@ export default function Home() {
               setShowLocationModal(true);
               logActivity('Opened Location', 'Viewed location map');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 hover:translate-x-1 hover:translate-y-1 transition-all"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-pink-500 hover:translate-x-1 hover:translate-y-1 transition-all"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Location')}
             <span>📍</span>
           </div>
           <div className="text-[15px] text-gray-900">LOCATION</div>
@@ -400,12 +570,13 @@ export default function Home() {
               setShowFindMeModal(true);
               logActivity('Opened FindMe', 'Planning a highlighted stay');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-sky-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('FindMe')}
             <span className="max-sm:text-lg">🧭</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">FINDME</span>
           </div>
@@ -419,12 +590,13 @@ export default function Home() {
               setShowGardenModal(true);
               logActivity('Opened Garden', 'Viewed backyard species catalog');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-emerald-200 hover:translate-x-1 hover:translate-y-1 transition-all p-1 max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-emerald-200 hover:translate-x-1 hover:translate-y-1 transition-all p-1 max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Garden')}
             <Image
               src="/images/garden/jatree.webp"
               alt="Garden"
@@ -447,12 +619,13 @@ export default function Home() {
               setShowWomenModal(true);
               logActivity('Opened Women Network', 'Viewing women connections');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-violet-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-violet-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Women')}
             <span className="text-xl max-sm:text-lg">👩‍🚀</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               WOMEN
@@ -469,12 +642,13 @@ export default function Home() {
                 setShowCatProfile(true);
                 logActivity('Opened Cat Profile', 'Clicked on the Cat app icon');
               }}
-              className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+              className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-orange-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Cats')}
               <span className="max-sm:text-lg">🐱</span>
               <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">CATS</span>
             </div>
@@ -490,12 +664,13 @@ export default function Home() {
                 setShowMusicModal(true);
                 logActivity('Opened Music Player', 'Viewing music library');
               }}
-              className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
+              className="relative w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Spotify')}
               <Image
                 src="/spotify.png"
                 alt="Spotify"
@@ -515,12 +690,13 @@ export default function Home() {
               setShowJournal(true);
               logActivity('Opened Journal', 'Viewing journal entries');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-amber-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Journal')}
             <span className="max-sm:text-base">📘</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">JOUR</span>
           </div>
@@ -535,12 +711,13 @@ export default function Home() {
                 setShowMusicModal(true);
                 logActivity('Opened Music Player', 'Viewing music library');
               }}
-              className="w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
+              className="relative w-[51px] h-[51px] bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 hover:translate-x-1 hover:translate-y-1 transition-all p-2"
               style={{
                 boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
                 imageRendering: 'pixelated',
               }}
             >
+              {renderUpdateBadge('Spotify')}
               <Image
                 src="/spotify.png"
                 alt="Spotify"
@@ -560,12 +737,13 @@ export default function Home() {
               setShowMusicModal(true);
               logActivity('Opened Music Player', 'Viewing music library');
             }}
-            className="w-12 h-12 bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 transition-all p-2"
+            className="relative w-12 h-12 bg-white flex items-center justify-center cursor-pointer hover:bg-green-500 transition-all p-2"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Spotify')}
             <Image
               src="/spotify.png"
               alt="Spotify"
@@ -583,12 +761,13 @@ export default function Home() {
               setShowTimelineModal(true);
               logActivity('Opened Timeline', 'Viewed personal timeline');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-sky-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-sky-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Timeline')}
             <span className="max-sm:text-base">🕒</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               TIME
@@ -604,12 +783,13 @@ export default function Home() {
               setShowSlotMachineModal(true);
               logActivity('Opened Slot Machine', 'Ready to spin for a fortune');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-rose-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-rose-200 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Fortune')}
             <span className="max-sm:text-lg">🎰</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               FORTUNE
@@ -625,12 +805,13 @@ export default function Home() {
               setShowStonksModal(true);
               logActivity('Opened Stonks', 'Tracking stonk trading levels');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-lime-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Stonks')}
             <span className="max-sm:text-lg">📈</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               STONKS
@@ -646,12 +827,13 @@ export default function Home() {
               setShowSportModal(true);
               logActivity('Opened Sports', 'Tracking sports progress');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-cyan-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-2xl cursor-pointer hover:bg-cyan-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-2xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge('Sports')}
             <span className="max-sm:text-lg">🏋️</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">
               SPORTS
@@ -667,12 +849,13 @@ export default function Home() {
               setShowActivityLog(true);
               logActivity('Opened Activity Log', 'Viewed activity history');
             }}
-            className="w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-purple-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-purple-400 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
             style={{
               boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
               imageRendering: 'pixelated',
             }}
           >
+            {renderUpdateBadge()}
             <span className="max-sm:text-base">📋</span>
             <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">LOG</span>
           </div>
@@ -744,10 +927,11 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setShowMobileApps((current) => !current)}
-            className="hidden max-sm:flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-gray-900 shadow-[3px_3px_0_0_#000] hover:-translate-y-[1px] transition-transform"
+            className="hidden max-sm:flex relative items-center gap-1.5 px-3 py-2 bg-white border-2 border-gray-900 shadow-[3px_3px_0_0_#000] hover:-translate-y-[1px] transition-transform"
             aria-expanded={showMobileApps}
             aria-controls="app-launcher"
           >
+            {renderUpdateBadge(undefined, '-top-2 -right-2 min-w-5 h-5 text-[10px]')}
             <span className="text-lg leading-none">{showMobileApps ? '×' : '▦'}</span>
             <span className="text-gray-900 font-semibold whitespace-nowrap text-xs">APPS</span>
           </button>
@@ -920,9 +1104,16 @@ export default function Home() {
       {/* Activity Log Modal */}
       <ActivityLog
         isOpen={showActivityLog}
-        onClose={() => setShowActivityLog(false)}
+        onClose={() => {
+          setShowActivityLog(false);
+          if (siteUpdateCount > 0) {
+            markUpdatesSeen();
+          }
+        }}
         anonId={anonId}
         userNumber={userNumber}
+        siteUpdateCount={siteUpdateCount}
+        siteUpdateSummaries={siteUpdateSummaries}
       />
 
       {/* Timeline Modal */}
@@ -1067,6 +1258,15 @@ export default function Home() {
       <WishlistModal
         isOpen={showWishlistModal}
         onClose={() => setShowWishlistModal(false)}
+        anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Recipes Modal */}
+      <RecipeModal
+        isOpen={showRecipeModal}
+        onClose={() => setShowRecipeModal(false)}
         anonId={anonId}
         isEditMode={isEditMode}
         onLogActivity={logActivity}

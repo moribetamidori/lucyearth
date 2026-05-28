@@ -8,6 +8,11 @@ interface ActivityLogProps {
   onClose: () => void;
   anonId: string;
   userNumber?: number;
+  siteUpdateCount?: number;
+  siteUpdateSummaries?: Array<{
+    label: string;
+    count: number;
+  }>;
 }
 
 interface LogEntry {
@@ -17,7 +22,14 @@ interface LogEntry {
   created_at: string;
 }
 
-export default function ActivityLog({ isOpen, onClose, anonId, userNumber }: ActivityLogProps) {
+export default function ActivityLog({
+  isOpen,
+  onClose,
+  anonId,
+  userNumber,
+  siteUpdateCount = 0,
+  siteUpdateSummaries = [],
+}: ActivityLogProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -88,6 +100,31 @@ export default function ActivityLog({ isOpen, onClose, anonId, userNumber }: Act
               <div className="text-xs text-gray-600 mt-1">
                 You are visitor number {userNumber} to this website
               </div>
+            </div>
+          )}
+          {siteUpdateCount > 0 && (
+            <div className="mt-3 border-2 border-gray-900 bg-red-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-bold text-sm">
+                  {siteUpdateCount} update{siteUpdateCount === 1 ? '' : 's'} since your last visit
+                </div>
+                <div className="min-w-7 h-7 px-2 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border-2 border-gray-900">
+                  {siteUpdateCount > 99 ? '99+' : siteUpdateCount}
+                </div>
+              </div>
+              {siteUpdateSummaries.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {siteUpdateSummaries.map((item) => (
+                    <span
+                      key={item.label}
+                      className="inline-flex items-center gap-1 border-2 border-gray-900 bg-white px-2 py-1 text-xs font-semibold"
+                    >
+                      {item.label}
+                      <span className="text-red-600">{item.count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

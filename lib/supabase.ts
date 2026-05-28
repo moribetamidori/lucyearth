@@ -255,3 +255,26 @@ export type WishlistItem = {
   created_at: string;
   updated_at: string;
 };
+
+export type RecipeIngredient = {
+  id: string;
+  name: string;
+  amount: number;
+  unit: 'g' | 'lb';
+};
+
+export type RecipeVariation = {
+  id: string;
+  name: string;
+  ingredients: RecipeIngredient[];
+};
+
+export type Recipe = {
+  id: string;
+  name: string;
+  variations: RecipeVariation[];
+  image_url: string | null;
+  anon_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
