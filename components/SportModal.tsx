@@ -1436,9 +1436,6 @@ export default function SportModal({
             <span className="text-3xl leading-none">🏋️</span>
             <div className="min-w-0">
               <h2 className="text-xl sm:text-2xl font-bold">SPORTS</h2>
-              <p className="hidden sm:block text-xs text-gray-500">
-                Record equipment, date, weight, and progress.
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
