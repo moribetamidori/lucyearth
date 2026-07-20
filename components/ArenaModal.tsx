@@ -51,8 +51,6 @@ export default function ArenaModal({
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
   const [showControls, setShowControls] = useState(true);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showMoveDropdown, setShowMoveDropdown] = useState<string | null>(null);
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionTitle, setEditingCollectionTitle] = useState('');
@@ -60,6 +58,11 @@ export default function ArenaModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownSwipeHint = useRef(false);
+  const swipeGestureRef = useRef({
+    startX: null as number | null,
+    endX: null as number | null,
+    isMultiTouch: false,
+  });
 
   // Load collections on mount
   useEffect(() => {
@@ -128,19 +131,66 @@ export default function ArenaModal({
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
     setShowSwipeHint(false);
+
+    if (e.touches.length !== 1) {
+      swipeGestureRef.current = {
+        startX: null,
+        endX: null,
+        isMultiTouch: true,
+      };
+      return;
+    }
+
+    if (!swipeGestureRef.current.isMultiTouch) {
+      swipeGestureRef.current.startX = e.touches[0].clientX;
+      swipeGestureRef.current.endX = null;
+    }
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (e.touches.length !== 1) {
+      swipeGestureRef.current = {
+        startX: null,
+        endX: null,
+        isMultiTouch: true,
+      };
+      return;
+    }
+
+    if (!swipeGestureRef.current.isMultiTouch) {
+      swipeGestureRef.current.endX = e.touches[0].clientX;
+    }
   };
 
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const gesture = swipeGestureRef.current;
 
-    const distance = touchStart - touchEnd;
+    // A pinch produces touchend events too. Wait for both fingers to lift,
+    // then discard the entire gesture instead of treating it as a swipe.
+    if (gesture.isMultiTouch) {
+      if (e.touches.length === 0) {
+        swipeGestureRef.current = {
+          startX: null,
+          endX: null,
+          isMultiTouch: false,
+        };
+      }
+      return;
+    }
+
+    if (e.touches.length > 0) return;
+
+    const { startX, endX } = gesture;
+    swipeGestureRef.current = {
+      startX: null,
+      endX: null,
+      isMultiTouch: false,
+    };
+
+    if (startX === null || endX === null) return;
+
+    const distance = startX - endX;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
@@ -150,6 +200,14 @@ export default function ArenaModal({
     if (isRightSwipe) {
       goToPreviousBlock();
     }
+  };
+
+  const onTouchCancel = () => {
+    swipeGestureRef.current = {
+      startX: null,
+      endX: null,
+      isMultiTouch: false,
+    };
   };
 
   const loadCollections = async () => {
@@ -817,9 +875,11 @@ export default function ArenaModal({
           {/* Image container with swipe support */}
           <div
             className="relative flex flex-col items-center gap-4 flex-1 mx-2 md:mx-4"
+            style={{ touchAction: 'pinch-zoom' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
+            onTouchCancel={onTouchCancel}
           >
             {/* Swipe hint animation - Mobile only */}
             {showSwipeHint && (
