@@ -24,6 +24,7 @@ import FindMeModal from '@/components/FindMeModal';
 import WishlistModal from '@/components/WishlistModal';
 import SportModal from '@/components/SportModal';
 import RecipeModal from '@/components/RecipeModal';
+import KanbanBoardModal from '@/components/KanbanBoardModal';
 import { supabase } from '@/lib/supabase';
 
 const LAST_VISIT_STORAGE_KEY = 'lucyearth_last_visit_at';
@@ -64,6 +65,8 @@ const CONTENT_UPDATE_SOURCES: ContentUpdateSource[] = [
   { table: 'wishlist_items', timestampColumn: 'updated_at', label: 'Wishlist' },
   { table: 'findme_entries', timestampColumn: 'updated_at', label: 'FindMe' },
   { table: 'recipes', timestampColumn: 'updated_at', label: 'Recipes' },
+  { table: 'kanban_projects', timestampColumn: 'updated_at', label: 'Kanban' },
+  { table: 'kanban_cards', timestampColumn: 'updated_at', label: 'Kanban' },
 ];
 
 export default function Home() {
@@ -110,6 +113,7 @@ export default function Home() {
   const [showWishlistModal, setShowWishlistModal] = useState<boolean>(false);
   const [showSportModal, setShowSportModal] = useState<boolean>(false);
   const [showRecipeModal, setShowRecipeModal] = useState<boolean>(false);
+  const [showKanbanModal, setShowKanbanModal] = useState<boolean>(false);
   const [showMobileApps, setShowMobileApps] = useState<boolean>(false);
   const [siteUpdateCount, setSiteUpdateCount] = useState<number>(0);
   const [siteUpdateSummaries, setSiteUpdateSummaries] = useState<SiteUpdateSummary[]>([]);
@@ -523,6 +527,31 @@ export default function Home() {
           </div>
           <div className="text-[15px] text-gray-900 max-sm:hidden">RECIPE</div>
         </div>
+
+        {/* Kanban icon */}
+        <button
+          type="button"
+          aria-label="Open Kanban Board"
+          onClick={() => {
+            setShowKanbanModal(true);
+            setShowMobileApps(false);
+            logActivity('Opened Kanban Board', 'Viewed Kanban projects');
+          }}
+          className="flex flex-col items-center gap-2 max-sm:gap-0"
+        >
+          <div
+            className="relative w-[51px] h-[51px] bg-white flex items-center justify-center text-xl cursor-pointer hover:bg-violet-300 hover:translate-x-1 hover:translate-y-1 transition-all max-sm:w-12 max-sm:h-12 max-sm:text-xl max-sm:flex-col max-sm:pt-1"
+            style={{
+              boxShadow: '0 0 0 4px #000, 4px 4px 0 4px #000',
+              imageRendering: 'pixelated',
+            }}
+          >
+            {renderUpdateBadge('Kanban')}
+            <span className="max-sm:text-base">🗂️</span>
+            <span className="hidden max-sm:block max-sm:text-[8px] max-sm:leading-none max-sm:mt-0.5">KANBAN</span>
+          </div>
+          <div className="text-[15px] text-gray-900 max-sm:hidden">KANBAN</div>
+        </button>
 
         {/* Are.na icon */}
         <div className="flex flex-col items-center gap-2 max-sm:gap-0">
@@ -1268,6 +1297,14 @@ export default function Home() {
         isOpen={showRecipeModal}
         onClose={() => setShowRecipeModal(false)}
         anonId={anonId}
+        isEditMode={isEditMode}
+        onLogActivity={logActivity}
+      />
+
+      {/* Kanban Board Modal */}
+      <KanbanBoardModal
+        isOpen={showKanbanModal}
+        onClose={() => setShowKanbanModal(false)}
         isEditMode={isEditMode}
         onLogActivity={logActivity}
       />

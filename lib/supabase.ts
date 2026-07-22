@@ -278,3 +278,27 @@ export type Recipe = {
   created_at: string;
   updated_at: string;
 };
+
+export type KanbanStatus = 'todo' | 'in_progress' | 'done' | 'later';
+
+export type KanbanColor = 'yellow' | 'pink' | 'blue' | 'green';
+
+export type KanbanProject = {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KanbanCard = {
+  id: string;
+  project_id: string;
+  title: string;
+  notes: string | null;
+  completed_line_items: number[];
+  status: KanbanStatus;
+  color: KanbanColor;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
