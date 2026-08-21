@@ -1,0 +1,1334 @@
+.page {
+  --ink: #eafff8;
+  --muted: #739296;
+  --cyan: #7ff7ff;
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(18, 78, 84, 0.17), transparent 34%),
+    linear-gradient(145deg, #030507 0%, #071014 55%, #030507 100%);
+  color: var(--ink);
+  font-family: var(--font-courier), monospace;
+  letter-spacing: 0.02em;
+}
+
+.page,
+.page * {
+  box-sizing: border-box;
+}
+
+.page button,
+.page a {
+  font: inherit;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.scene::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: '';
+  background: radial-gradient(circle at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.48) 100%);
+}
+
+.scene canvas {
+  touch-action: none;
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0.14;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    rgba(115, 248, 255, 0.08) 4px
+  );
+  mix-blend-mode: screen;
+}
+
+.arriving .solarHud,
+.arriving .roomNav,
+.arriving .intro,
+.arriving .controlsGuide,
+.arriving .sourceNote,
+.returning .solarHud,
+.returning .roomNav,
+.returning .intro,
+.returning .roomBrief,
+.returning .memoryPanel,
+.returning .portalCallout,
+.returning .controlsGuide,
+.returning .sourceNote {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.portalTransit {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.portalTransit span {
+  position: absolute;
+  bottom: 10%;
+  z-index: 2;
+  color: rgba(174, 241, 255, 0.88);
+  font-family: var(--font-pixel), monospace;
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  text-shadow: 0 0 13px rgba(127, 247, 255, 0.72);
+  white-space: nowrap;
+}
+
+.portalAperture {
+  position: relative;
+  z-index: 1;
+  width: 16vmin;
+  aspect-ratio: 1;
+  border: 2px solid rgba(255, 226, 127, 0.74);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 5px rgba(24, 34, 39, 0.86),
+    0 0 40px rgba(127, 247, 255, 0.38),
+    inset 0 0 25px rgba(127, 247, 255, 0.18);
+}
+
+.portalArriving {
+  animation: observatoryArrival 5200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.portalArriving .portalAperture {
+  box-shadow:
+    0 0 0 5px rgba(24, 34, 39, 0.86),
+    0 0 0 100vmax rgba(1, 4, 9, 0.97),
+    0 0 40px rgba(127, 247, 255, 0.38),
+    inset 0 0 25px rgba(127, 247, 255, 0.18);
+  animation: arrivalAperture 5200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.portalArriving span {
+  animation: arrivalStatus 5200ms ease both;
+}
+
+.portalReturning {
+  background: radial-gradient(circle, transparent 0 8vmin, rgba(1, 4, 9, 0.97) 8.8vmin);
+  animation: observatoryReturn 1900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.portalReturning::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  content: '';
+  background: #01040a;
+  animation: returnBlackout 1900ms ease both;
+}
+
+.portalReturning .portalAperture {
+  animation: returnAperture 1900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.portalReturning span {
+  animation: returnStatus 1900ms ease both;
+}
+
+@keyframes observatoryArrival {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes arrivalAperture {
+  0%, 38% { width: 78vmin; opacity: 1; }
+  72% { width: 112vmin; opacity: 0.84; }
+  100% { width: 150vmax; opacity: 0; }
+}
+
+@keyframes arrivalStatus {
+  0% { opacity: 0; transform: translateY(8px); }
+  12%, 65% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; }
+}
+
+@keyframes observatoryReturn {
+  0% { opacity: 0; }
+  28%, 100% { opacity: 1; }
+}
+
+@keyframes returnAperture {
+  0% { width: 150vmax; opacity: 0; }
+  38% { opacity: 0.8; }
+  100% { width: 16vmin; opacity: 1; }
+}
+
+@keyframes returnBlackout {
+  0%, 82% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes returnStatus {
+  0%, 14% { opacity: 0; transform: translateY(8px); }
+  30%, 74% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; }
+}
+
+.solarHud {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  left: 20px;
+  z-index: 30;
+  height: 30px;
+  pointer-events: none;
+}
+
+.solarTitle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 30px;
+  margin: 0;
+  color: #dceef2;
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(10px, 0.9vw, 14px);
+  font-weight: 400;
+  line-height: 30px;
+  letter-spacing: 0.18em;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 0 18px rgba(127, 247, 255, 0.2);
+  transform: translateX(-50%);
+}
+
+.solarTitle span {
+  color: var(--cyan);
+}
+
+.soundButton {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  height: 30px;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(127, 247, 255, 0.22);
+  color: #a2b7c0;
+  background: rgba(4, 13, 24, 0.56);
+  font-size: 7px;
+  letter-spacing: 0.15em;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.soundButton:hover,
+.soundButton:focus-visible {
+  border-color: var(--cyan);
+  outline: 0;
+  color: var(--cyan);
+  background: rgba(127, 247, 255, 0.06);
+}
+
+.soundButton span {
+  color: var(--cyan);
+  letter-spacing: 0;
+}
+
+.roomNav {
+  position: absolute;
+  top: 72px;
+  left: 20px;
+  z-index: 25;
+  display: flex;
+  width: 214px;
+  max-height: calc(100vh - 142px);
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(127, 247, 255, 0.14);
+  background: rgba(2, 7, 9, 0.6);
+  scrollbar-color: rgba(127, 247, 255, 0.24) transparent;
+  scrollbar-width: thin;
+  backdrop-filter: blur(9px);
+}
+
+.navLabel {
+  padding: 9px 11px;
+  border-bottom: 1px solid rgba(127, 247, 255, 0.12);
+  color: #526c70;
+  font-size: 8px;
+  letter-spacing: 0.25em;
+}
+
+.planetItem {
+  border-bottom: 1px solid rgba(127, 247, 255, 0.08);
+}
+
+.planetItem:last-child {
+  border-bottom: 0;
+}
+
+.planetButton {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px 24px 1fr 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 39px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: 0;
+  color: #71898c;
+  background: transparent;
+  text-align: left;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.planetButton::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  content: '';
+  background: var(--cluster-color);
+  opacity: 0;
+  box-shadow: 0 0 12px var(--cluster-color);
+}
+
+.planetButton:not(:disabled):hover,
+.planetButton:focus-visible,
+.roomNav .activeRoom,
+.roomNav .activeSystem {
+  outline: 0;
+  color: var(--cluster-color);
+  background: color-mix(in srgb, var(--cluster-color) 8%, transparent);
+}
+
+.planetButton:not(:disabled):hover::before,
+.planetButton:focus-visible::before,
+.roomNav .activeRoom::before,
+.roomNav .activeSystem::before {
+  opacity: 1;
+}
+
+.roomNav .activeSystem:not(.activeRoom)::before {
+  opacity: 0.45;
+}
+
+.planetButton:disabled,
+.dormantPlanet {
+  color: #3f5356;
+}
+
+.planetButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.planetButton:disabled .roomSigil {
+  color: #425558;
+}
+
+.dormantPlanet:not(:disabled):hover,
+.dormantPlanet:focus-visible {
+  color: var(--cluster-color);
+}
+
+.roomNumber,
+.planetStatus {
+  font-size: 8px;
+}
+
+.roomSigil {
+  color: var(--cluster-color);
+  font-size: 15px;
+}
+
+.roomName {
+  overflow: hidden;
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planetStatus {
+  color: var(--cluster-color);
+  text-align: right;
+}
+
+.moonMenu {
+  display: grid;
+  gap: 2px;
+  padding: 4px 7px 6px 42px;
+  border-top: 1px solid rgba(127, 247, 255, 0.06);
+  background: rgba(0, 0, 0, 0.22);
+  animation: moonMenuIn 180ms ease both;
+}
+
+.moonButton {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 27px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  color: #647c7f;
+  background: transparent;
+  font-size: 7px;
+  letter-spacing: 0.13em;
+  text-align: left;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.moonButton > span:first-child,
+.moonButton > span:last-child {
+  color: var(--cluster-color);
+}
+
+.moonButton > span:last-child {
+  text-align: right;
+}
+
+.moonButton:not(:disabled):hover,
+.moonButton:focus-visible,
+.activeMoon {
+  border-color: color-mix(in srgb, var(--cluster-color) 35%, transparent);
+  outline: 0;
+  color: var(--cluster-color);
+  background: color-mix(in srgb, var(--cluster-color) 7%, transparent);
+}
+
+.moonButton:disabled {
+  color: #354649;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.moonButton:disabled > span {
+  color: #354649;
+}
+
+@keyframes moonMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.intro {
+  position: absolute;
+  top: 50%;
+  left: clamp(250px, 23vw, 370px);
+  z-index: 12;
+  width: min(400px, 34vw);
+  pointer-events: none;
+  transform: translateY(-45%);
+  animation: introIn 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.introKicker {
+  color: var(--cyan);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+}
+
+.intro h1 {
+  margin: 17px 0 14px;
+  color: #c4d8d5;
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(45px, 5vw, 76px);
+  font-weight: 400;
+  line-height: 0.76;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+}
+
+.intro h1 span {
+  color: var(--cyan);
+  text-shadow: 0 0 24px rgba(127, 247, 255, 0.34);
+}
+
+.intro p {
+  max-width: 330px;
+  margin: 0;
+  color: #779093;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.introRule {
+  width: 96px;
+  height: 1px;
+  margin: 20px 0 14px;
+  background: linear-gradient(to right, var(--cyan), transparent);
+}
+
+.intro small {
+  color: #4f6c70;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+}
+
+.roomBrief {
+  position: absolute;
+  bottom: 68px;
+  left: 22px;
+  z-index: 24;
+  width: min(350px, calc(100vw - 44px));
+  padding: 17px 18px 15px;
+  border-left: 2px solid var(--cluster-color);
+  background: linear-gradient(90deg, rgba(2, 7, 9, 0.9), rgba(2, 7, 9, 0.46));
+  backdrop-filter: blur(8px);
+  animation: panelIn 360ms ease both;
+}
+
+.roomBrief > span,
+.panelEyebrow {
+  color: var(--cluster-color);
+  font-size: 8px;
+  letter-spacing: 0.22em;
+}
+
+.roomBrief h1 {
+  margin: 7px 0 6px;
+  color: var(--cluster-color);
+  font-family: var(--font-pixel), monospace;
+  font-size: 27px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--cluster-color) 45%, transparent);
+}
+
+.roomBrief p {
+  margin: 0;
+  color: #82989a;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.roomMemoryList {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.roomBrief .roomMemoryList button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cluster-color) 18%, transparent);
+  color: #71888b;
+  background: rgba(0, 0, 0, 0.2);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roomBrief .roomMemoryList button span {
+  color: var(--cluster-color);
+  font-size: 7px;
+}
+
+.roomBrief .roomMemoryList button:hover,
+.roomBrief .roomMemoryList button:focus-visible,
+.roomBrief .roomMemoryList .activeMemoryLink {
+  border-color: color-mix(in srgb, var(--cluster-color) 58%, transparent);
+  outline: 0;
+  color: var(--cluster-color);
+  background: color-mix(in srgb, var(--cluster-color) 8%, rgba(0, 0, 0, 0.2));
+}
+
+.roomBrief button {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  color: #5e777a;
+  background: transparent;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.roomBrief button:hover,
+.roomBrief button:focus-visible {
+  outline: 0;
+  color: var(--cluster-color);
+}
+
+.memoryPanel {
+  position: absolute;
+  top: 72px;
+  right: 20px;
+  bottom: 56px;
+  z-index: 45;
+  width: min(420px, calc(100vw - 40px));
+  padding: 25px 24px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--cluster-color) 42%, transparent);
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--cluster-color) 8%, transparent), transparent 44%),
+    rgba(3, 8, 10, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    0 0 40px color-mix(in srgb, var(--cluster-color) 12%, transparent);
+  backdrop-filter: blur(16px);
+  animation: memoryIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.memoryPanel::before,
+.memoryPanel::after {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  content: '';
+}
+
+.memoryPanel::before {
+  top: 7px;
+  left: 7px;
+  border-top: 1px solid var(--cluster-color);
+  border-left: 1px solid var(--cluster-color);
+}
+
+.memoryPanel::after {
+  right: 7px;
+  bottom: 7px;
+  border-right: 1px solid var(--cluster-color);
+  border-bottom: 1px solid var(--cluster-color);
+}
+
+.closeButton {
+  position: absolute;
+  top: 15px;
+  right: 16px;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #789092;
+  background: transparent;
+  font-size: 21px;
+  line-height: 1;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  border-color: var(--cluster-color);
+  outline: 0;
+  color: var(--cluster-color);
+}
+
+.panelEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 40px;
+}
+
+.panelEyebrow span {
+  font-size: 17px;
+}
+
+.memoryPanel h2 {
+  margin: 14px 0 6px;
+  padding-right: 24px;
+  color: var(--ink);
+  font-family: var(--font-pixel), monospace;
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.memoryPanel time {
+  color: #597275;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.panelRule {
+  height: 1px;
+  margin: 20px 0;
+  background: linear-gradient(to right, var(--cluster-color), transparent);
+  opacity: 0.6;
+}
+
+.memoryText {
+  margin: 0;
+  color: #d3e1df;
+  font-size: 13px;
+  line-height: 1.72;
+  letter-spacing: 0.01em;
+  white-space: pre-wrap;
+}
+
+.visualTransmission {
+  margin: 0 0 14px;
+  color: #607b7e;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.memoryImage {
+  position: relative;
+  margin-top: 20px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--cluster-color) 34%, transparent);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.memoryImage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: contain;
+  filter: saturate(0.82) contrast(1.06);
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cluster-color) 36%, transparent);
+  color: var(--cluster-color);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.sourceLink:hover,
+.sourceLink:focus-visible {
+  outline: 0;
+  color: white;
+  border-bottom-color: white;
+}
+
+.portalCallout {
+  position: absolute;
+  right: 22px;
+  bottom: 66px;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 30px auto;
+  padding: 13px 16px;
+  border: 1px solid rgba(255, 243, 163, 0.56);
+  color: #fff3a3;
+  background: rgba(16, 15, 8, 0.86);
+  box-shadow: 0 0 28px rgba(255, 243, 163, 0.16);
+  text-align: left;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: portalPulse 2.4s ease-in-out infinite;
+}
+
+.portalCallout > span {
+  grid-row: 1 / 3;
+  align-self: center;
+  font-size: 19px;
+}
+
+.portalCallout small {
+  margin-top: 4px;
+  color: #988f58;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+.portalCallout:hover,
+.portalCallout:focus-visible {
+  outline: 0;
+  color: #071014;
+  background: #fff3a3;
+}
+
+.finalReveal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 70;
+  width: min(670px, calc(100vw - 40px));
+  min-height: 430px;
+  padding: 76px 58px 45px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 243, 163, 0.68);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 243, 163, 0.12), transparent 40%),
+    rgba(3, 7, 9, 0.97);
+  box-shadow: 0 0 80px rgba(255, 243, 163, 0.16), 0 0 0 100vmax rgba(0, 0, 0, 0.68);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  animation: finalIn 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.finalKicker {
+  position: relative;
+  z-index: 2;
+  color: #a89e63;
+  font-size: 9px;
+  letter-spacing: 0.28em;
+}
+
+.finalReveal h1 {
+  position: relative;
+  z-index: 2;
+  margin: 25px 0 8px;
+  color: #fff9cf;
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(46px, 7vw, 82px);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 30px rgba(255, 243, 163, 0.4);
+}
+
+.finalReveal > p {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  color: #c8cfb0;
+  font-size: 15px;
+}
+
+.signature {
+  position: relative;
+  z-index: 2;
+  margin-top: 22px;
+  color: #fff3a3;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+}
+
+.finalStats {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 38px 0 27px;
+  padding: 13px 0;
+  border-top: 1px solid rgba(255, 243, 163, 0.16);
+  border-bottom: 1px solid rgba(255, 243, 163, 0.16);
+  color: #6e745d;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.finalReveal > button {
+  position: relative;
+  z-index: 2;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 243, 163, 0.42);
+  color: #fff3a3;
+  background: transparent;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.finalReveal > button:hover,
+.finalReveal > button:focus-visible {
+  outline: 0;
+  color: #05070a;
+  background: #fff3a3;
+}
+
+.finalOrbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 420px;
+  height: 420px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.finalOrbit i {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 243, 163, 0.13);
+  border-radius: 50%;
+  animation: orbit 14s linear infinite;
+}
+
+.finalOrbit i:nth-child(2) {
+  inset: 44px -44px;
+  transform: rotate(60deg);
+  animation-duration: 19s;
+  animation-direction: reverse;
+}
+
+.finalOrbit i:nth-child(3) {
+  inset: -28px 82px;
+  transform: rotate(-45deg);
+  animation-duration: 11s;
+}
+
+.controlsGuide {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  color: #3f595d;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.controlsGuide span {
+  margin-left: 8px;
+  color: #6d8588;
+}
+
+.sourceNote {
+  position: absolute;
+  bottom: 18px;
+  left: 22px;
+  z-index: 20;
+  max-width: 480px;
+  color: #30484c;
+  font-size: 7px;
+  letter-spacing: 0.06em;
+}
+
+.sceneLoader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #527276;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.sceneLoader span {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--cyan);
+  animation: loaderSpin 1.6s linear infinite;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  padding: 72px 34px 100px 250px;
+  overflow: auto;
+  overflow-x: hidden;
+}
+
+.fallbackIntro span {
+  color: var(--cyan);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.fallbackIntro h1 {
+  max-width: 650px;
+  margin: 10px 0 35px;
+  font-family: var(--font-pixel), monospace;
+  font-size: 38px;
+  font-weight: 400;
+}
+
+.fallbackGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.fallbackRoom {
+  min-width: 0;
+  min-height: 235px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--cluster-color) 32%, transparent);
+  background: color-mix(in srgb, var(--cluster-color) 5%, rgba(2, 7, 9, 0.9));
+}
+
+.fallbackRoom > button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  width: 100%;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cluster-color) 25%, transparent);
+  color: var(--cluster-color);
+  background: transparent;
+  text-align: left;
+}
+
+.fallbackRoom > button span {
+  grid-row: 1 / 3;
+  font-size: 20px;
+}
+
+.fallbackRoom > button strong {
+  font-family: var(--font-pixel), monospace;
+  font-size: 19px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.fallbackRoom > button small {
+  color: #617578;
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.fallbackRoom > p {
+  min-height: 48px;
+  color: #71888b;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.fallbackRoom > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fallbackRoom > div button {
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #91a4a5;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 8px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fallbackRoom button:hover,
+.fallbackRoom button:focus-visible {
+  outline: 1px solid var(--cluster-color);
+  color: var(--cluster-color);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes introIn {
+  from { opacity: 0; transform: translateY(-39%); }
+  to { opacity: 1; transform: translateY(-45%); }
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes memoryIn {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes finalIn {
+  from { opacity: 0; transform: translate(-50%, -47%) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loaderSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes statusPulse {
+  50% { opacity: 0.38; }
+}
+
+@keyframes portalPulse {
+  50% { box-shadow: 0 0 42px rgba(255, 243, 163, 0.3); }
+}
+
+@media (max-width: 980px) {
+  .intro {
+    left: 235px;
+    width: 330px;
+  }
+
+  .memoryPanel {
+    width: 370px;
+  }
+
+  .fallbackGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .solarHud {
+    top: 11px;
+    right: 13px;
+    left: 13px;
+  }
+
+  .soundButton {
+    position: static;
+    padding: 0 8px;
+    font-size: 7px;
+  }
+
+  .solarTitle {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+  }
+
+  .roomNav {
+    top: auto;
+    right: 9px;
+    bottom: 9px;
+    left: 9px;
+    width: auto;
+    max-height: none;
+    flex-direction: row;
+    border-color: rgba(127, 247, 255, 0.2);
+    overflow: visible;
+  }
+
+  .navLabel,
+  .roomNumber,
+  .roomName,
+  .planetStatus {
+    display: none;
+  }
+
+  .planetItem {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 0;
+    border-right: 1px solid rgba(127, 247, 255, 0.08);
+    border-bottom: 0;
+  }
+
+  .planetItem:last-child {
+    border-right: 0;
+  }
+
+  .planetButton {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0;
+  }
+
+  .planetButton::before {
+    inset: auto 0 0;
+    width: auto;
+    height: 2px;
+  }
+
+  .roomSigil {
+    font-size: 17px;
+  }
+
+  .moonMenu {
+    position: fixed;
+    right: 0;
+    bottom: 48px;
+    left: 0;
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    overflow-x: auto;
+    border: 1px solid rgba(127, 247, 255, 0.16);
+    background: rgba(2, 7, 9, 0.94);
+    backdrop-filter: blur(10px);
+  }
+
+  .moonButton {
+    display: flex;
+    min-width: max-content;
+    min-height: 31px;
+    gap: 6px;
+    padding: 0 9px;
+  }
+
+  .intro {
+    top: auto;
+    right: 20px;
+    bottom: 92px;
+    left: 20px;
+    width: auto;
+    padding: 16px;
+    background: linear-gradient(90deg, rgba(3, 7, 9, 0.86), rgba(3, 7, 9, 0.15));
+    transform: none;
+    animation-name: panelIn;
+  }
+
+  .intro h1 {
+    margin: 12px 0 9px;
+    font-size: 45px;
+  }
+
+  .intro p {
+    font-size: 9px;
+  }
+
+  .introRule {
+    margin: 13px 0 10px;
+  }
+
+  .roomBrief {
+    top: 99px;
+    bottom: auto;
+    left: 11px;
+    width: min(285px, calc(100vw - 22px));
+    padding: 11px 13px;
+  }
+
+  .roomBrief h1 {
+    margin: 4px 0;
+    font-size: 22px;
+  }
+
+  .roomBrief p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 8px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .roomBrief button {
+    margin-top: 7px;
+    font-size: 8px;
+  }
+
+  .memoryPanel {
+    top: auto;
+    right: 9px;
+    bottom: 60px;
+    left: 9px;
+    width: auto;
+    max-height: min(64vh, 570px);
+    padding: 23px 18px 20px;
+    border-radius: 14px 14px 0 0;
+    animation-name: mobilePanelIn;
+  }
+
+  .memoryPanel h2 {
+    font-size: 29px;
+  }
+
+  .memoryText {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .memoryImage img {
+    max-height: 250px;
+  }
+
+  .portalCallout {
+    right: 11px;
+    bottom: 62px;
+    font-size: 8px;
+  }
+
+  .finalReveal {
+    width: calc(100vw - 22px);
+    min-height: 410px;
+    padding: 70px 22px 32px;
+  }
+
+  .finalReveal h1 {
+    font-size: 54px;
+  }
+
+  .finalStats {
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .finalOrbit {
+    width: 290px;
+    height: 290px;
+  }
+
+  .controlsGuide,
+  .sourceNote {
+    display: none;
+  }
+
+  .fallback {
+    inset: 0;
+    padding: 66px 12px 80px;
+  }
+
+  .fallbackGrid {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .fallbackIntro h1 {
+    font-size: 29px;
+  }
+}
+
+@keyframes mobilePanelIn {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

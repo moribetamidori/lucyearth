@@ -1,0 +1,114 @@
+{
+  "version": 2,
+  "revealThreshold": 5,
+  "zones": [
+    {
+      "id": "cycle-bridge",
+      "architecturalName": "Cycle Bridge",
+      "shortName": "BRIDGE",
+      "description": "A narrow crossing beneath transmissions about models, agents, and the moral weather of machine intelligence.",
+      "sigil": "△",
+      "clusterId": "machine-minds",
+      "position": [0, 0, 15],
+      "spawn": [0, 1.2, 19],
+      "radius": 5.8,
+      "revealPhase": 0.04
+    },
+    {
+      "id": "heaven-gate",
+      "architecturalName": "Heaven Gate",
+      "shortName": "GATE",
+      "description": "A vast communal game table for Mars College, connection cards, gatherings, and worlds people agree to play into being.",
+      "sigil": "⬡",
+      "clusterId": "worlds-and-play",
+      "position": [0, 0, 6],
+      "spawn": [0, 1.2, 8.5],
+      "radius": 4.8,
+      "revealPhase": 0.2
+    },
+    {
+      "id": "central-ubosot",
+      "architecturalName": "Ubosot of Synthesis",
+      "shortName": "UBOSOT",
+      "description": "The central chamber. Its inner sanctum waits for five rooms to align.",
+      "sigil": "✦",
+      "clusterId": null,
+      "position": [0, 0, -8],
+      "spawn": [0, 1.2, -1.5],
+      "radius": 7,
+      "revealPhase": 0.52
+    },
+    {
+      "id": "art-gallery",
+      "architecturalName": "Gallery of Working Glitches",
+      "shortName": "GALLERY",
+      "description": "A side hall woven from code that is useful, illegible, funny, and occasionally covered in sauce.",
+      "sigil": "⌁",
+      "clusterId": "code-and-craft",
+      "position": [-13, 0, -1],
+      "spawn": [-10, 1.2, 1],
+      "radius": 6,
+      "revealPhase": 0.36
+    },
+    {
+      "id": "meditation-hall",
+      "architecturalName": "Mnemonic Library",
+      "shortName": "LIBRARY",
+      "description": "A chronological library of local files, second brains, personal interfaces, and the enduring question: what next?",
+      "sigil": "◇",
+      "clusterId": "memory-and-interface",
+      "position": [13, 0, -1],
+      "spawn": [10, 1.2, 1],
+      "radius": 6,
+      "revealPhase": 0.4
+    },
+    {
+      "id": "relic-hall",
+      "architecturalName": "Relic Hall",
+      "shortName": "RELICS",
+      "description": "A cabinet of Eden-born images, creative machines, artistic arguments, and internet-native artifacts.",
+      "sigil": "✧",
+      "clusterId": "creative-machines",
+      "position": [-13, 0, -14],
+      "spawn": [-10, 1.2, -11],
+      "radius": 6,
+      "revealPhase": 0.7
+    },
+    {
+      "id": "golden-pavilion",
+      "architecturalName": "Golden Pavilion",
+      "shortName": "MARKETS",
+      "description": "A chandelier of crypto, commitments, startups, money, and the incentive machines people build together.",
+      "sigil": "◎",
+      "clusterId": "markets-and-protocols",
+      "position": [13, 0, -14],
+      "spawn": [10, 1.2, -11],
+      "radius": 6,
+      "revealPhase": 0.74
+    },
+    {
+      "id": "garden-shrine",
+      "architecturalName": "Attention Carillon",
+      "shortName": "WEATHER",
+      "description": "A garden of hanging bells rung by feeds, ads, paywalls, engagement bait, and the invisible pressure of the timeline.",
+      "sigil": "☴",
+      "clusterId": "attention-weather",
+      "position": [-12, 0, 12],
+      "spawn": [-9, 1.2, 14],
+      "radius": 5.6,
+      "revealPhase": 0.27
+    },
+    {
+      "id": "reflection-court",
+      "architecturalName": "Reflection Court",
+      "shortName": "REFLECT",
+      "description": "A mirror of food, bodies, music, travel, friendship, jokes, and the ordinary magic between projects.",
+      "sigil": "◌",
+      "clusterId": "ordinary-magic",
+      "position": [12, 0, 12],
+      "spawn": [9, 1.2, 14],
+      "radius": 5.6,
+      "revealPhase": 0.3
+    }
+  ]
+}

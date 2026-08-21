@@ -1,0 +1,242 @@
+{
+  "generatedAt": "2026-08-20T20:00:00-04:00",
+  "profile": {
+    "name": "jmill",
+    "handle": "jmilldotdev",
+    "bio": "tech bro in the streets, utopian mystic in the sheets",
+    "avatarUrl": "https://pbs.twimg.com/profile_images/1592515392601264129/PdePKRBD_400x400.jpg"
+  },
+  "stats": {
+    "tweetCount": 7,
+    "projectCount": 7,
+    "note": "A best-effort public-web snapshot: seven verified authored posts, six public project anchors, and one place anchor."
+  },
+  "clusters": [
+    {
+      "id": "autonomous-signals",
+      "name": "Autonomous Signals",
+      "shortName": "SIGNALS",
+      "description": "Agents, strange intelligence, and transmissions from the near future.",
+      "color": "#7ff7ff",
+      "sigil": "△",
+      "position": [0, 6, -12],
+      "anchorProjectId": "project-self-driving-jazz",
+      "memoryIds": ["project-self-driving-jazz", "tweet-1600624362394091523", "tweet-2080667229251592249"]
+    },
+    {
+      "id": "temporary-worlds",
+      "name": "Temporary Worlds",
+      "shortName": "WORLDS",
+      "description": "Villages, Martians, and places that exist because somebody decided they should.",
+      "color": "#b9ff72",
+      "sigil": "⬡",
+      "position": [11, 3, -5],
+      "anchorProjectId": "project-mars-college",
+      "memoryIds": ["project-mars-college", "tweet-2089047403005370595"]
+    },
+    {
+      "id": "deliciously-broken-code",
+      "name": "Deliciously Broken Code",
+      "shortName": "SPAGHETTI",
+      "description": "Code as material: useful, illegible, funny, and occasionally covered in sauce.",
+      "color": "#ff79ca",
+      "sigil": "⌁",
+      "position": [10, -5, 7],
+      "anchorProjectId": "project-spaghettify",
+      "memoryIds": ["project-spaghettify", "tweet-2090494513324195991"]
+    },
+    {
+      "id": "tools-for-thought",
+      "name": "Tools for Thought",
+      "shortName": "TOOLS",
+      "description": "Small machines for remembering, prompting, linking, and thinking more clearly.",
+      "color": "#8aa8ff",
+      "sigil": "◇",
+      "position": [-2, -7, 11],
+      "anchorProjectId": "project-obsidian-tools",
+      "memoryIds": ["project-obsidian-tools", "tweet-2090468626583138468"]
+    },
+    {
+      "id": "desert-internet",
+      "name": "Desert Internet Objects",
+      "shortName": "DESERT",
+      "description": "Artifacts where network culture, physical jokes, ritual, and the Salton Sea meet.",
+      "color": "#ffac61",
+      "sigil": "☼",
+      "position": [-12, -2, 5],
+      "anchorProjectId": "project-bbyi",
+      "memoryIds": ["project-bbyi", "tweet-2090423273943138502"]
+    },
+    {
+      "id": "coordination-machines",
+      "name": "Coordination Machines",
+      "shortName": "SYSTEMS",
+      "description": "Money, commitments, networks, and the little protocols people build around one another.",
+      "color": "#ffe66d",
+      "sigil": "◎",
+      "position": [-10, 5, -7],
+      "anchorProjectId": "project-pepperstake",
+      "memoryIds": ["project-pepperstake", "tweet-2090425796351447255"]
+    },
+    {
+      "id": "second-street",
+      "name": "Second Street",
+      "shortName": "NILAND",
+      "description": "A desert address held at the far edge of the archive.",
+      "color": "#c6a98c",
+      "sigil": "♇",
+      "position": [0, -3, -14],
+      "anchorProjectId": "place-2174-second-street",
+      "memoryIds": ["place-2174-second-street"]
+    }
+  ],
+  "memories": [
+    {
+      "id": "project-self-driving-jazz",
+      "kind": "project",
+      "clusterId": "autonomous-signals",
+      "title": "Self-Driving Jazz",
+      "text": "An autonomous media empire broadcasting from the intersection of agents, art, and the near future.",
+      "sourceUrl": "https://selfdrivingjazz.com"
+    },
+    {
+      "id": "project-mars-college",
+      "kind": "project",
+      "clusterId": "temporary-worlds",
+      "title": "Mars College",
+      "text": "An annual temporary village exploring future technology and self-preservation.",
+      "sourceUrl": "https://mars.college"
+    },
+    {
+      "id": "project-spaghettify",
+      "kind": "project",
+      "clusterId": "deliciously-broken-code",
+      "title": "Spaghettify",
+      "text": "A Visual Studio Code extension for making code worse with AI: introduce a bug, obscure the logic, or document the whole thing in emoji.",
+      "sourceUrl": "https://www.spaghettify.dev"
+    },
+    {
+      "id": "project-obsidian-tools",
+      "kind": "project",
+      "clusterId": "tools-for-thought",
+      "title": "Obsidian Tool Ecosystem",
+      "text": "Wikipedia capture, frontmatter tag suggestions, and language-model completions built directly into a personal knowledge vault.",
+      "sourceUrl": "https://github.com/jmilldotdev"
+    },
+    {
+      "id": "project-bbyi",
+      "kind": "project",
+      "clusterId": "desert-internet",
+      "title": "Bombay Beachy Yami-Ichi",
+      "text": "Keygen keychains, domain squatting, diffusion cola, printer-test books, and other internet objects made physical in the desert.",
+      "sourceUrl": "https://www.bbyi.fyi"
+    },
+    {
+      "id": "project-pepperstake",
+      "kind": "project",
+      "clusterId": "coordination-machines",
+      "title": "PepperStake",
+      "text": "A coordination protocol for turning public goals, commitments, and group accountability into programmable systems.",
+      "sourceUrl": "https://gov.push.org/t/pgp-proposal-pepperstake-push-protocol/932"
+    },
+    {
+      "id": "place-2174-second-street",
+      "kind": "project",
+      "clusterId": "second-street",
+      "title": "2174 2nd St.",
+      "text": "2174 2nd St., Niland, California, 92257",
+      "sourceUrl": "https://www.google.com/maps/search/?api=1&query=2174%202nd%20St%2C%20Niland%2C%20CA%2092257",
+      "media": [
+        {
+          "type": "image",
+          "src": "/hb/2026/pluto.png",
+          "alt": "Street View of 2174 2nd St. in Niland, California."
+        }
+      ]
+    },
+    {
+      "id": "tweet-1600624362394091523",
+      "kind": "tweet",
+      "clusterId": "autonomous-signals",
+      "text": "@perplexity_ai hackerman",
+      "sourceUrl": "https://x.com/jmilldotdev/status/1600624362394091523",
+      "publishedAt": "2022-12-07T22:52:40.000Z",
+      "media": [
+        {
+          "type": "image",
+          "src": "https://pbs.twimg.com/media/FjaPWaDX0AECC3W?format=jpg&name=large",
+          "alt": "Screenshot attached to the Perplexity reply"
+        }
+      ]
+    },
+    {
+      "id": "tweet-2080667229251592249",
+      "kind": "tweet",
+      "clusterId": "autonomous-signals",
+      "text": "job applications getting ridiculous these days",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2080667229251592249",
+      "publishedAt": "2026-07-24T14:51:39.000Z",
+      "media": [
+        {
+          "type": "image",
+          "src": "https://pbs.twimg.com/media/HOADxb3WQAA22HJ?format=jpg&name=large",
+          "alt": "Job application asking whether the applicant solved an open frontier mathematics problem in the last week"
+        }
+      ]
+    },
+    {
+      "id": "tweet-2089047403005370595",
+      "kind": "tweet",
+      "clusterId": "temporary-worlds",
+      "text": "to all of my AI & agent tinkerer friends: this is the place to be in early 2027. this is where your people will be. we are leveling up massively every year.\n\ni'm happy to chat with anyone about the program. DMs open.",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2089047403005370595",
+      "publishedAt": "2026-08-16T17:51:28.000Z"
+    },
+    {
+      "id": "tweet-2090494513324195991",
+      "kind": "tweet",
+      "clusterId": "deliciously-broken-code",
+      "text": "the emdash of the world wide web",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2090494513324195991",
+      "publishedAt": "2026-08-20T17:41:46.000Z",
+      "media": [
+        {
+          "type": "image",
+          "src": "https://pbs.twimg.com/media/HQLtom-WAAEuzNc?format=jpg&name=large",
+          "alt": "A close crop of the word seriously"
+        }
+      ]
+    },
+    {
+      "id": "tweet-2090468626583138468",
+      "kind": "tweet",
+      "clusterId": "tools-for-thought",
+      "text": "Almost all prompting ‘technique’ is fake and a waste of time\n\nIt is almost strictly worse than just asking clearly for what you want.\n\nBuilding a better library of reference material is an infinitely better use of your time than any prompting technique refinement.",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2090468626583138468",
+      "publishedAt": "2026-08-20T15:58:54.000Z"
+    },
+    {
+      "id": "tweet-2090423273943138502",
+      "kind": "tweet",
+      "clusterId": "desert-internet",
+      "text": "",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2090423273943138502",
+      "publishedAt": "2026-08-20T12:58:41.000Z",
+      "media": [
+        {
+          "type": "image",
+          "src": "https://pbs.twimg.com/media/HQKs24AW0AAJKvM?format=jpg&name=large",
+          "alt": "A surreal ayahuasca-themed internet collage"
+        }
+      ]
+    },
+    {
+      "id": "tweet-2090425796351447255",
+      "kind": "tweet",
+      "clusterId": "coordination-machines",
+      "text": "a centralized payments processor skimming 3% off the top will be crucial for superintelligent exchanges of value, as we all know",
+      "sourceUrl": "https://x.com/jmilldotdev/status/2090425796351447255",
+      "publishedAt": "2026-08-20T13:08:42.000Z"
+    }
+  ]
+}
