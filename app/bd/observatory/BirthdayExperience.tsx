@@ -128,9 +128,11 @@ function MemoryPanel({
           />
         </div>
       ))}
-      <a className={styles.sourceLink} href={memory.sourceUrl} target="_blank" rel="noreferrer">
-        open original source <span aria-hidden="true">↗</span>
-      </a>
+      {memory.sourceUrl && (
+        <a className={styles.sourceLink} href={memory.sourceUrl} target="_blank" rel="noreferrer">
+          open original source <span aria-hidden="true">↗</span>
+        </a>
+      )}
     </aside>
   );
 }
@@ -556,7 +558,7 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
             <br />
             <span>solar archive</span>
           </h1>
-          <p>Nine worlds. 438 moons. Seven recovered archives. One solar core waiting for alignment.</p>
+          <p>Nine worlds. 438 moons. Eighteen recovered archives. One solar core waiting for alignment.</p>
           <div className={styles.introRule} />
           <small>DRAG TO ORBIT · SCROLL TO TRAVEL · SELECT A PLANET</small>
         </section>
@@ -624,7 +626,10 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
           </div>
           <div className={styles.finalKicker}>CORE TRANSMISSION // DELIVERED</div>
           <h1>happy birthday, jmill</h1>
-          <p>I love you and let&apos;s live a long long life together.</p>
+          <p>
+            I love you. Let&apos;s live a long, long life together. May we always find the path
+            toward love and expansion in every moment.
+          </p>
           <div className={styles.signature}>love, lucy · 2026</div>
           <div className={styles.finalStats}>
             <span>{dataset.stats.tweetCount} recovered tweets</span>

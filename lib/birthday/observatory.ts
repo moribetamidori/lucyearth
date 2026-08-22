@@ -56,18 +56,30 @@ export const OBSERVATORY_PLANETS: readonly ObservatoryPlanet[] = [
 export type ObservatoryLocation = {
   planetId: ObservatoryPlanetId;
   moonName?: string;
+  archiveName?: string;
 };
 
 // The archive still uses clusters internally, but every visible destination is
 // a real body in the solar-system model.
 export const CLUSTER_LOCATIONS: Readonly<Record<string, ObservatoryLocation>> = {
-  'autonomous-signals': { planetId: 'saturn' },
+  'autonomous-signals': { planetId: 'jupiter' },
   'temporary-worlds': { planetId: 'mars' },
-  'deliciously-broken-code': { planetId: 'saturn', moonName: 'IAPETUS' },
+  lucyearth: { planetId: 'earth' },
+  'florida-rest': { planetId: 'earth', moonName: 'MOON', archiveName: 'FLORIDA' },
+  'deliciously-broken-code': { planetId: 'jupiter', moonName: 'IO' },
   'tools-for-thought': { planetId: 'mercury' },
-  'desert-internet': { planetId: 'jupiter' },
+  'desert-internet': { planetId: 'jupiter', moonName: 'CALLISTO' },
   'coordination-machines': { planetId: 'saturn', moonName: 'DIONE' },
+  'personal-site': { planetId: 'saturn' },
+  eden: { planetId: 'saturn', moonName: 'TITAN' },
+  introverse: { planetId: 'jupiter', moonName: 'EUROPA' },
+  overemployed: { planetId: 'jupiter', moonName: 'GANYMEDE' },
   'second-street': { planetId: 'pluto' },
+  'pluto-garage': { planetId: 'pluto', moonName: 'CHARON' },
+  'pluto-future-garden': { planetId: 'pluto', moonName: 'STYX' },
+  'pluto-yellow-tree': { planetId: 'pluto', moonName: 'NIX' },
+  'pluto-globetrot': { planetId: 'pluto', moonName: 'KERBEROS' },
+  'pluto-big-tree': { planetId: 'pluto', moonName: 'HYDRA' },
 };
 
 export function getObservatoryDestination(clusterId: string) {
@@ -80,7 +92,7 @@ export function getObservatoryDestination(clusterId: string) {
   return {
     ...location,
     planet,
-    name: location.moonName ?? planet.name,
+    name: location.archiveName ?? location.moonName ?? planet.name,
     symbol: location.moonName ? '·' : planet.symbol,
   };
 }

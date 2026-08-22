@@ -12,7 +12,7 @@ export type BirthdayMemory = {
   clusterId: string;
   title?: string;
   text: string;
-  sourceUrl: string;
+  sourceUrl?: string;
   publishedAt?: string;
   media?: BirthdayMedia[];
 };

@@ -8,8 +8,8 @@
   },
   "stats": {
     "tweetCount": 7,
-    "projectCount": 7,
-    "note": "A best-effort public-web snapshot: seven verified authored posts, six public project anchors, and one place anchor."
+    "projectCount": 18,
+    "note": "A best-effort public-web snapshot: seven verified authored posts, ten public project anchors, one project placeholder, and seven place and site anchors."
   },
   "clusters": [
     {
@@ -33,6 +33,28 @@
       "position": [11, 3, -5],
       "anchorProjectId": "project-mars-college",
       "memoryIds": ["project-mars-college", "tweet-2089047403005370595"]
+    },
+    {
+      "id": "lucyearth",
+      "name": "Lucy Earth",
+      "shortName": "LUCYEARTH",
+      "description": "A living personal system for logs, collections, rituals, and small internet worlds.",
+      "color": "#70d6a3",
+      "sigil": "♁",
+      "position": [7, 2, -9],
+      "anchorProjectId": "project-lucyearth",
+      "memoryIds": ["project-lucyearth"]
+    },
+    {
+      "id": "florida-rest",
+      "name": "Florida",
+      "shortName": "FLORIDA",
+      "description": "A place where Juicy can always come back to and rest.",
+      "color": "#a9d7c2",
+      "sigil": "·",
+      "position": [8, 2, -8],
+      "anchorProjectId": "place-florida-rest",
+      "memoryIds": ["place-florida-rest"]
     },
     {
       "id": "deliciously-broken-code",
@@ -79,15 +101,114 @@
       "memoryIds": ["project-pepperstake", "tweet-2090425796351447255"]
     },
     {
+      "id": "personal-site",
+      "name": "Personal Website",
+      "shortName": "JMILL.DEV",
+      "description": "The personal homepage at the center of jmill's public web.",
+      "color": "#d9c289",
+      "sigil": "♄",
+      "position": [8, 4, -10],
+      "anchorProjectId": "project-jmill-dev",
+      "memoryIds": ["project-jmill-dev"]
+    },
+    {
+      "id": "eden",
+      "name": "Eden",
+      "shortName": "EDEN",
+      "description": "A garden of autonomous generative spirits creating with people and with each other.",
+      "color": "#d4a34c",
+      "sigil": "◈",
+      "position": [11, 4, -8],
+      "anchorProjectId": "project-eden",
+      "memoryIds": ["project-eden"]
+    },
+    {
+      "id": "introverse",
+      "name": "Introverse",
+      "shortName": "INTROVERSE",
+      "description": "A newly discovered project transmitting from introverse.one.",
+      "color": "#8cc9ff",
+      "sigil": "◉",
+      "position": [13, 1, -7],
+      "anchorProjectId": "project-introverse",
+      "memoryIds": ["project-introverse"]
+    },
+    {
+      "id": "overemployed",
+      "name": "Overemployed",
+      "shortName": "OVEREMPLOYED",
+      "description": "A newly sighted project with public coordinates still pending.",
+      "color": "#c4c9d6",
+      "sigil": "□",
+      "position": [14, -2, -4],
+      "anchorProjectId": "project-overemployed",
+      "memoryIds": ["project-overemployed"]
+    },
+    {
       "id": "second-street",
       "name": "Second Street",
       "shortName": "NILAND",
-      "description": "A desert address held at the far edge of the archive.",
+      "description": "Juicy's art studio at Bombay Beach while they orbit around Mars.",
       "color": "#c6a98c",
       "sigil": "♇",
       "position": [0, -3, -14],
       "anchorProjectId": "place-2174-second-street",
       "memoryIds": ["place-2174-second-street"]
+    },
+    {
+      "id": "pluto-garage",
+      "name": "Garage at Pluto",
+      "shortName": "GARAGE",
+      "description": "A gathering place for Thai massage sessions shared with the town.",
+      "color": "#b9ada2",
+      "sigil": "·",
+      "position": [2, -3, -14],
+      "anchorProjectId": "place-pluto-garage",
+      "memoryIds": ["place-pluto-garage"]
+    },
+    {
+      "id": "pluto-future-garden",
+      "name": "Future Garden",
+      "shortName": "GARDEN",
+      "description": "A boundary of water and a passage into another realm.",
+      "color": "#8fbf9b",
+      "sigil": "·",
+      "position": [3, -4, -13],
+      "anchorProjectId": "place-pluto-future-garden",
+      "memoryIds": ["place-pluto-future-garden"]
+    },
+    {
+      "id": "pluto-yellow-tree",
+      "name": "Small Yellow-Flowering Tree",
+      "shortName": "YELLOW TREE",
+      "description": "A night goddess beneath little bright stars of flowers.",
+      "color": "#e0cc68",
+      "sigil": "·",
+      "position": [4, -3, -12],
+      "anchorProjectId": "place-pluto-yellow-tree",
+      "memoryIds": ["place-pluto-yellow-tree"]
+    },
+    {
+      "id": "pluto-globetrot",
+      "name": "Globetrot",
+      "shortName": "TRAILER",
+      "description": "A trailer in Pluto for temporary travelers.",
+      "color": "#aa9886",
+      "sigil": "·",
+      "position": [5, -2, -11],
+      "anchorProjectId": "place-pluto-globetrot",
+      "memoryIds": ["place-pluto-globetrot"]
+    },
+    {
+      "id": "pluto-big-tree",
+      "name": "Big Tree",
+      "shortName": "BIG TREE",
+      "description": "A super tall tree at the corner of Pluto.",
+      "color": "#769a78",
+      "sigil": "·",
+      "position": [6, -1, -10],
+      "anchorProjectId": "place-pluto-big-tree",
+      "memoryIds": ["place-pluto-big-tree"]
     }
   ],
   "memories": [
@@ -98,6 +219,52 @@
       "title": "Self-Driving Jazz",
       "text": "An autonomous media empire broadcasting from the intersection of agents, art, and the near future.",
       "sourceUrl": "https://selfdrivingjazz.com"
+    },
+    {
+      "id": "project-jmill-dev",
+      "kind": "project",
+      "clusterId": "personal-site",
+      "title": "jmill.dev",
+      "text": "Jmill's personal website.",
+      "sourceUrl": "https://jmill.dev"
+    },
+    {
+      "id": "project-eden",
+      "kind": "project",
+      "clusterId": "eden",
+      "title": "Eden",
+      "text": "A garden of autonomous generative spirits that create with people and with each other.",
+      "sourceUrl": "https://eden.art"
+    },
+    {
+      "id": "project-lucyearth",
+      "kind": "project",
+      "clusterId": "lucyearth",
+      "title": "lucyearth.com",
+      "text": "Lucy Earth — jmill's best friend and the love of his life. A living personal operating system for journals, calendars, collections, cats, music, places, and other ongoing experiments.",
+      "sourceUrl": "https://lucyearth.com"
+    },
+    {
+      "id": "place-florida-rest",
+      "kind": "project",
+      "clusterId": "florida-rest",
+      "title": "Florida",
+      "text": "A place where Juicy can always come back to and rest."
+    },
+    {
+      "id": "project-introverse",
+      "kind": "project",
+      "clusterId": "introverse",
+      "title": "Introverse",
+      "text": "A new project at introverse.one.",
+      "sourceUrl": "https://introverse.one"
+    },
+    {
+      "id": "project-overemployed",
+      "kind": "project",
+      "clusterId": "overemployed",
+      "title": "Overemployed",
+      "text": "Project placeholder. More details and an official link are still to come."
     },
     {
       "id": "project-mars-college",
@@ -111,7 +278,7 @@
       "id": "project-spaghettify",
       "kind": "project",
       "clusterId": "deliciously-broken-code",
-      "title": "Spaghettify",
+      "title": "Spaghettify 🍝",
       "text": "A Visual Studio Code extension for making code worse with AI: introduce a bug, obscure the logic, or document the whole thing in emoji.",
       "sourceUrl": "https://www.spaghettify.dev"
     },
@@ -127,7 +294,7 @@
       "id": "project-bbyi",
       "kind": "project",
       "clusterId": "desert-internet",
-      "title": "Bombay Beachy Yami-Ichi",
+      "title": "BBYI — Bombay Beach Yami-Ichi",
       "text": "Keygen keychains, domain squatting, diffusion cola, printer-test books, and other internet objects made physical in the desert.",
       "sourceUrl": "https://www.bbyi.fyi"
     },
@@ -153,6 +320,41 @@
           "alt": "Street View of 2174 2nd St. in Niland, California."
         }
       ]
+    },
+    {
+      "id": "place-pluto-garage",
+      "kind": "project",
+      "clusterId": "pluto-garage",
+      "title": "Garage at Pluto",
+      "text": "Hosted many Thai massage sessions for the town by one of jmill's friends."
+    },
+    {
+      "id": "place-pluto-future-garden",
+      "kind": "project",
+      "clusterId": "pluto-future-garden",
+      "title": "Future Garden",
+      "text": "Boundary, water, and passage into another realm."
+    },
+    {
+      "id": "place-pluto-yellow-tree",
+      "kind": "project",
+      "clusterId": "pluto-yellow-tree",
+      "title": "Small Yellow-Flowering Tree",
+      "text": "Night goddess and little bright stars of flowers."
+    },
+    {
+      "id": "place-pluto-globetrot",
+      "kind": "project",
+      "clusterId": "pluto-globetrot",
+      "title": "Globetrot",
+      "text": "A trailer in Pluto for temporary travelers."
+    },
+    {
+      "id": "place-pluto-big-tree",
+      "kind": "project",
+      "clusterId": "pluto-big-tree",
+      "title": "Big Tree",
+      "text": "A super tall tree at the corner of Pluto."
     },
     {
       "id": "tweet-1600624362394091523",

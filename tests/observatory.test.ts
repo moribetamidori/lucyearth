@@ -25,3 +25,62 @@ test('maps every archive to a planet or one of its visible moons', () => {
     }
   }
 });
+
+test('maps the repository projects to Jupiter, Saturn, and the Galilean moons', () => {
+  assert.deepEqual(CLUSTER_LOCATIONS.lucyearth, { planetId: 'earth' });
+  assert.deepEqual(CLUSTER_LOCATIONS['autonomous-signals'], { planetId: 'jupiter' });
+  assert.deepEqual(CLUSTER_LOCATIONS['personal-site'], { planetId: 'saturn' });
+  assert.deepEqual(CLUSTER_LOCATIONS.eden, {
+    planetId: 'saturn',
+    moonName: 'TITAN',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['deliciously-broken-code'], {
+    planetId: 'jupiter',
+    moonName: 'IO',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS.introverse, {
+    planetId: 'jupiter',
+    moonName: 'EUROPA',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS.overemployed, {
+    planetId: 'jupiter',
+    moonName: 'GANYMEDE',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['desert-internet'], {
+    planetId: 'jupiter',
+    moonName: 'CALLISTO',
+  });
+});
+
+test('maps every Pluto moon to its Bombay Beach site', () => {
+  assert.deepEqual(CLUSTER_LOCATIONS['pluto-garage'], {
+    planetId: 'pluto',
+    moonName: 'CHARON',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['pluto-future-garden'], {
+    planetId: 'pluto',
+    moonName: 'STYX',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['pluto-yellow-tree'], {
+    planetId: 'pluto',
+    moonName: 'NIX',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['pluto-globetrot'], {
+    planetId: 'pluto',
+    moonName: 'KERBEROS',
+  });
+  assert.deepEqual(CLUSTER_LOCATIONS['pluto-big-tree'], {
+    planetId: 'pluto',
+    moonName: 'HYDRA',
+  });
+});
+
+test('maps Florida as Earth\'s resting-place moon', () => {
+  const earth = OBSERVATORY_PLANETS.find((planet) => planet.id === 'earth');
+  assert.deepEqual(earth?.moons, ['MOON']);
+  assert.deepEqual(CLUSTER_LOCATIONS['florida-rest'], {
+    planetId: 'earth',
+    moonName: 'MOON',
+    archiveName: 'FLORIDA',
+  });
+});

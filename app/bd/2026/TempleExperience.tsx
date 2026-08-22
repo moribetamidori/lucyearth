@@ -824,7 +824,10 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
           <div className={styles.finalHalo} aria-hidden="true"><i /><i /><i /></div>
           <div className={styles.finalKicker}>INNER SANCTUM // SIGNAL DELIVERED</div>
           <h1>happy birthday, jmill</h1>
-          <p>I love you and let&apos;s live a long long life together.</p>
+          <p>
+            I love you. Let&apos;s live a long, long life together. May we always find the path
+            toward love and expansion in every moment.
+          </p>
           <div className={styles.signature}>love, lucy · 2026</div>
           <div className={styles.finalStats}>
             <span>{dataset.stats.tweetCount} recovered tweets</span>
