@@ -36,6 +36,7 @@ import type {
   TempleDataset,
   TempleFocus,
   TempleInstallationKind,
+  TempleLetter,
   TempleMaterialMode,
   TempleTweetMemory,
   TempleZone,
@@ -59,11 +60,15 @@ type TempleSceneProps = {
   mobile: boolean;
   reducedMotion: boolean;
   finalUnlocked: boolean;
+  collectedLetterCount: number;
+  letterAssignments: TempleLetter[];
+  collectedLetterZoneIds: Set<string>;
   focused: TempleFocus;
   teleport: TempleTeleport | null;
   mobileInput: MutableRefObject<MobileMovementInput>;
   onFocus: (focus: TempleFocus) => void;
   onMemorySelect: (memoryId: string) => void;
+  onLetterCollect: (zoneId: string) => void;
   onZoneEnter: (zoneId: string | null) => void;
   onFinalSelect: () => void;
   onObservatorySelect: () => void;
@@ -1836,10 +1841,233 @@ function Exhibits({
   );
 }
 
+const LETTER_SELECT_DISTANCE = 12;
+const LETTER_HIT_RADIUS = 1.18;
+
+function LetterCollectible({
+  zone,
+  letter,
+  active,
+  collected,
+  focused,
+  mobile,
+  onFocus,
+}: {
+  zone: TempleZone;
+  letter: string;
+  active: boolean;
+  collected: boolean;
+  focused: boolean;
+  mobile: boolean;
+  onFocus: (focus: TempleFocus) => void;
+}) {
+  const visual = useRef<THREE.Group>(null);
+  const hitArea = useRef<THREE.Mesh>(null);
+  const raycaster = useRef(new THREE.Raycaster());
+  const raycastElapsed = useRef(0);
+  const worldPosition = useRef(new THREE.Vector3());
+  const { camera, gl } = useThree();
+  const position = useMemo<[number, number, number]>(() => {
+    if (zone.id === 'central-ubosot') return [-3.1, 1.55, -1.8];
+    const dx = zone.spawn[0] - zone.position[0];
+    const dz = zone.spawn[2] - zone.position[2];
+    const length = Math.hypot(dx, dz) || 1;
+    const offset = 1.15;
+    return [
+      zone.spawn[0] - dz / length * offset,
+      1.55,
+      zone.spawn[2] + dx / length * offset,
+    ];
+  }, [zone]);
+
+  useEffect(() => {
+    if (collected && focused) onFocus(null);
+  }, [collected, focused, onFocus]);
+
+  useFrame((state, delta) => {
+    if (visual.current) {
+      visual.current.position.y = Math.sin(state.clock.elapsedTime * 1.8 + zone.revealPhase * 9) * 0.12;
+      visual.current.rotation.y += delta * 0.55;
+    }
+    if (collected || !hitArea.current) return;
+    const crosshairAiming = mobile || document.pointerLockElement === gl.domElement;
+    if (!crosshairAiming) return;
+    raycastElapsed.current += delta;
+    if (raycastElapsed.current < 1 / 20) return;
+    raycastElapsed.current = 0;
+    hitArea.current.getWorldPosition(worldPosition.current);
+    const withinSelectionRange = camera.position.distanceTo(worldPosition.current) <= LETTER_SELECT_DISTANCE;
+    if (!withinSelectionRange) {
+      if (focused) onFocus(null);
+      return;
+    }
+    raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const aimedAtLetter = raycaster.current.intersectObject(hitArea.current, false).length > 0;
+    if (aimedAtLetter && !focused) onFocus({ kind: 'letter', id: zone.id });
+    if (!aimedAtLetter && focused) onFocus(null);
+  });
+
+  if (collected) return null;
+
+  return (
+    <group position={position}>
+      <group ref={visual}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.46, 0.045, 8, 40]} />
+          <meshBasicMaterial
+            color={focused ? '#fff0a6' : '#71efff'}
+            transparent
+            opacity={focused ? 1 : 0.72}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh>
+          <octahedronGeometry args={[0.3, 1]} />
+          <meshPhysicalMaterial
+            color="#dffaff"
+            emissive={focused ? '#fff0a6' : '#39bdd2'}
+            emissiveIntensity={focused ? 2.4 : 1.25}
+            metalness={0.45}
+            roughness={0.16}
+            transparent
+            opacity={0.82}
+          />
+        </mesh>
+        <mesh
+          ref={hitArea}
+          onPointerMove={(event) => {
+            if (
+              mobile
+              || document.pointerLockElement === gl.domElement
+              || event.distance > LETTER_SELECT_DISTANCE
+            ) return;
+            event.stopPropagation();
+            onFocus({ kind: 'letter', id: zone.id });
+          }}
+          onPointerOut={() => {
+            if (!mobile && document.pointerLockElement !== gl.domElement && focused) onFocus(null);
+          }}
+        >
+          <sphereGeometry args={[LETTER_HIT_RADIUS, 14, 10]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        </mesh>
+        {focused && (
+          <group>
+            <mesh raycast={() => undefined}>
+              <icosahedronGeometry args={[0.88, 2]} />
+              <meshBasicMaterial
+                color="#e9fdff"
+                wireframe
+                transparent
+                opacity={0.56}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </mesh>
+            <mesh rotation={[Math.PI / 2, 0, 0]} raycast={() => undefined}>
+              <torusGeometry args={[0.96, 0.018, 8, 54]} />
+              <meshBasicMaterial
+                color="#fff0a6"
+                transparent
+                opacity={0.72}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </mesh>
+          </group>
+        )}
+        <Html position={[0, 0.02, 0]} center distanceFactor={7} style={{ pointerEvents: 'none' }}>
+          <div
+            style={{
+              color: focused ? '#fff0a6' : '#e8fcff',
+              fontFamily: 'var(--font-pixel), monospace',
+              fontSize: 26,
+              lineHeight: 1,
+              textShadow: focused ? '0 0 16px #fff0a6' : '0 0 12px #71efff',
+            }}
+          >
+            {letter}
+          </div>
+        </Html>
+        <Sparkles
+          count={12}
+          scale={[1.4, 1.4, 1.4]}
+          size={1.4}
+          speed={0.35}
+          color={focused ? '#fff0a6' : '#71efff'}
+          opacity={focused ? 0.92 : 0.5}
+        />
+        <pointLight
+          color={focused ? '#fff0a6' : '#71efff'}
+          intensity={focused ? 4.5 : 2.2}
+          distance={5}
+        />
+        {active && (
+          <Html position={[0, 0.86, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+            <div
+              style={{
+                color: focused ? '#fff0a6' : '#86c8d2',
+                fontFamily: 'var(--font-pixel), monospace',
+                fontSize: 9,
+                letterSpacing: '.16em',
+                textAlign: 'center',
+                textShadow: focused ? '0 0 14px #fff0a6' : 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              LOST LETTER // PICK UP
+            </div>
+          </Html>
+        )}
+      </group>
+    </group>
+  );
+}
+
+function TempleLetters({
+  zones,
+  assignments,
+  collectedZoneIds,
+  activeZoneId,
+  focused,
+  mobile,
+  onFocus,
+}: {
+  zones: TempleZone[];
+  assignments: TempleLetter[];
+  collectedZoneIds: Set<string>;
+  activeZoneId: string | null;
+  focused: TempleFocus;
+  mobile: boolean;
+  onFocus: (focus: TempleFocus) => void;
+}) {
+  const zonesById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone])), [zones]);
+  return assignments.map((assignment) => {
+    const zone = zonesById.get(assignment.zoneId);
+    if (!zone) return null;
+    return (
+      <LetterCollectible
+        key={assignment.zoneId}
+        zone={zone}
+        letter={assignment.letter}
+        active={activeZoneId === zone.id}
+        collected={collectedZoneIds.has(zone.id)}
+        focused={focused?.kind === 'letter' && focused.id === zone.id}
+        mobile={mobile}
+        onFocus={onFocus}
+      />
+    );
+  });
+}
+
 function SanctumDoor({
   unlocked,
+  collectedLetterCount,
+  requiredCount,
 }: {
   unlocked: boolean;
+  collectedLetterCount: number;
+  requiredCount: number;
 }) {
   const door = useRef<THREE.Group>(null);
 
@@ -1892,7 +2120,11 @@ function SanctumDoor({
             whiteSpace: 'nowrap',
           }}
         >
-          {unlocked ? 'SANCTUM OPEN // ENTER' : 'SANCTUM // 05 SIGNALS REQUIRED'}
+          {unlocked
+            ? 'SANCTUM OPEN // ENTER'
+            : collectedLetterCount >= requiredCount
+              ? 'SANCTUM LOCK // SPELL THE KEY'
+              : `SANCTUM LOCK // ${String(collectedLetterCount).padStart(2, '0')} / ${String(requiredCount).padStart(2, '0')} LETTERS`}
         </div>
       </Html>
     </group>
@@ -2170,6 +2402,7 @@ function Player({
   focused,
   onFocus,
   onMemorySelect,
+  onLetterCollect,
   onFinalSelect,
   onObservatorySelect,
 }: {
@@ -2182,6 +2415,7 @@ function Player({
   focused: TempleFocus;
   onFocus: (focus: TempleFocus) => void;
   onMemorySelect: (id: string) => void;
+  onLetterCollect: (zoneId: string) => void;
   onFinalSelect: () => void;
   onObservatorySelect: () => void;
 }) {
@@ -2212,6 +2446,7 @@ function Player({
       }
       if (pressed && event.code === 'KeyE') {
         if (focused?.kind === 'memory') onMemorySelect(focused.id);
+        if (focused?.kind === 'letter') onLetterCollect(focused.id);
         if (focused?.kind === 'cake') onFinalSelect();
         if (focused?.kind === 'telescope') onObservatorySelect();
       }
@@ -2224,7 +2459,7 @@ function Player({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [focused, onFinalSelect, onMemorySelect, onObservatorySelect]);
+  }, [focused, onFinalSelect, onLetterCollect, onMemorySelect, onObservatorySelect]);
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -2236,12 +2471,13 @@ function Player({
         transporting
       ) return;
       if (focused?.kind === 'memory') onMemorySelect(focused.id);
+      if (focused?.kind === 'letter') onLetterCollect(focused.id);
       if (focused?.kind === 'cake') onFinalSelect();
       if (focused?.kind === 'telescope') onObservatorySelect();
     };
     canvas.addEventListener('pointerdown', activateFocused);
     return () => canvas.removeEventListener('pointerdown', activateFocused);
-  }, [focused, gl, onFinalSelect, onMemorySelect, onObservatorySelect, panelOpen, transporting]);
+  }, [focused, gl, onFinalSelect, onLetterCollect, onMemorySelect, onObservatorySelect, panelOpen, transporting]);
 
   useEffect(() => {
     const syncPointerLock = () => {
@@ -2620,8 +2856,19 @@ function TempleWorld(props: TempleSceneProps) {
         focused={props.focused}
         onFocus={props.onFocus}
       />
+      <TempleLetters
+        zones={props.dataset.temple.zones}
+        assignments={props.letterAssignments}
+        collectedZoneIds={props.collectedLetterZoneIds}
+        activeZoneId={props.activeZoneId}
+        focused={props.focused}
+        mobile={props.mobile}
+        onFocus={props.onFocus}
+      />
       <SanctumDoor
         unlocked={props.finalUnlocked}
+        collectedLetterCount={props.collectedLetterCount}
+        requiredCount={props.dataset.temple.sanctumWord.length}
       />
       {props.finalUnlocked && (
         <BirthdayCakeAltar
@@ -2650,6 +2897,7 @@ function TempleWorld(props: TempleSceneProps) {
             focused={props.focused}
             onFocus={props.onFocus}
             onMemorySelect={props.onMemorySelect}
+            onLetterCollect={props.onLetterCollect}
             onFinalSelect={props.onFinalSelect}
             onObservatorySelect={props.onObservatorySelect}
           />

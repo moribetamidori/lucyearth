@@ -39,7 +39,6 @@ const MemoryPalaceScene = dynamic(() => import('./MemoryPalaceScene'), {
 });
 
 const VISITED_KEY = 'jmill_memory_palace_visited_rooms';
-const REVEAL_THRESHOLD = 4;
 
 function PortalTransit({ direction }: { direction: 'arriving' | 'returning' }) {
   return (
@@ -336,7 +335,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
   const [activeMemoryId, setActiveMemoryId] = useState<string | null>(null);
   const [visited, setVisited] = useState<Set<string>>(new Set());
   const [visitedHydrated, setVisitedHydrated] = useState(false);
-  const [finalOpen, setFinalOpen] = useState(false);
   const [arrivalAnimating, setArrivalAnimating] = useState(true);
   const [returningToTemple, setReturningToTemple] = useState(false);
   const transitTimer = useRef<number | null>(null);
@@ -358,7 +356,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
   const activeDestination = activeCluster
     ? getObservatoryDestination(activeCluster.id)
     : null;
-  const finalUnlocked = visited.size >= REVEAL_THRESHOLD;
   const showingArrival = webglSupported === true && arrivalAnimating;
 
   useEffect(() => {
@@ -428,7 +425,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
     (clusterId: string) => {
       const cluster = clustersById.get(clusterId);
       if (!cluster) return;
-      setFinalOpen(false);
       setActiveClusterId(clusterId);
       setActiveMemoryId(cluster.anchorProjectId);
       markVisited(clusterId);
@@ -441,7 +437,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
     (memoryId: string) => {
       const memory = memoriesById.get(memoryId);
       if (!memory) return;
-      setFinalOpen(false);
       setActiveClusterId(memory.clusterId);
       setActiveMemoryId(memoryId);
       markVisited(memory.clusterId);
@@ -450,23 +445,13 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
   );
 
   const returnToCore = () => {
-    setFinalOpen(false);
     setActiveClusterId(null);
     setActiveMemoryId(null);
-  };
-
-  const openFinal = () => {
-    if (!finalUnlocked) return;
-    setActiveClusterId(null);
-    setActiveMemoryId(null);
-    setFinalOpen(true);
-    chime(8, 196);
   };
 
   const returnToTemple = useCallback(() => {
     if (returningToTemple) return;
     void selectTrack('temple');
-    setFinalOpen(false);
     setActiveClusterId(null);
     setActiveMemoryId(null);
     setReturningToTemple(true);
@@ -499,13 +484,11 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
             dataset={dataset}
             activeClusterId={activeClusterId}
             activeMemoryId={activeMemoryId}
-            finalUnlocked={finalUnlocked}
             reducedMotion={reducedMotion}
             arriving={arrivalAnimating}
             departing={returningToTemple}
             onClusterSelect={selectCluster}
             onMemorySelect={selectMemory}
-            onPortalSelect={openFinal}
             onTempleReturn={returnToTemple}
             onArrivalComplete={() => setArrivalAnimating(false)}
             onInteract={() => undefined}
@@ -548,7 +531,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
       {webglSupported !== false &&
         !activeClusterId &&
         visited.size === 0 &&
-        !finalOpen &&
         !arrivalAnimating &&
         !returningToTemple && (
         <section className={styles.intro}>
@@ -609,39 +591,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
         />
       )}
 
-      {finalUnlocked && !finalOpen && (
-        <button type="button" className={styles.portalCallout} onClick={openFinal}>
-          <span>✦</span>
-          birthday signal unlocked
-          <small>open the central portal</small>
-        </button>
-      )}
-
-      {finalOpen && (
-        <section className={styles.finalReveal} role="dialog" aria-modal="true" aria-label="Birthday message">
-          <div className={styles.finalOrbit} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className={styles.finalKicker}>CORE TRANSMISSION // DELIVERED</div>
-          <h1>happy birthday, jmill</h1>
-          <p>
-            I love you. Let&apos;s live a long, long life together. May we always find the path
-            toward love and expansion in every moment.
-          </p>
-          <div className={styles.signature}>love, lucy · 2026</div>
-          <div className={styles.finalStats}>
-            <span>{dataset.stats.tweetCount} recovered tweets</span>
-            <span>{dataset.stats.projectCount} project anchors</span>
-            <span>∞ more signals pending</span>
-          </div>
-          <button type="button" onClick={returnToCore}>
-            keep exploring
-          </button>
-        </section>
-      )}
-
       <div className={styles.controlsGuide} aria-hidden="true">
         <span>ORBIT</span> drag
         <span>ZOOM</span> wheel / pinch
@@ -655,7 +604,6 @@ export default function BirthdayExperience({ dataset }: { dataset: BirthdayDatas
         {activeCluster
           ? `${activeDestination?.name ?? 'Archive'} selected.`
           : 'Memory system core selected.'}
-        {finalUnlocked ? ' Birthday portal unlocked.' : ''}
       </div>
     </main>
   );

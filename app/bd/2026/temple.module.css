@@ -58,6 +58,8 @@
 .transporting .crosshair,
 .transporting .desktopControls,
 .transporting .zoneHud,
+.transporting .sanctumProgress,
+.transporting .discoveryNotice,
 .transporting .sanctumCallout,
 .transporting .mobileControls {
   opacity: 0;
@@ -315,6 +317,148 @@
   color: var(--cyan);
 }
 
+.sanctumProgress {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  z-index: 44;
+  width: min(270px, calc(100vw - 40px));
+  padding: 8px 11px 7px;
+  border: 1px solid rgba(113, 239, 255, 0.22);
+  color: var(--cyan);
+  background: rgba(3, 12, 23, 0.72);
+  box-shadow: 0 0 24px rgba(113, 239, 255, 0.07);
+  pointer-events: none;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+}
+
+.sanctumProgressHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 7px;
+  letter-spacing: 0.17em;
+}
+
+.sanctumProgressHeading strong {
+  color: #e7fbff;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.sanctumProgressTrack {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: 6px 0 5px;
+}
+
+.sanctumProgressTrack i {
+  height: 2px;
+  background: rgba(113, 239, 255, 0.14);
+  box-shadow: none;
+}
+
+.sanctumProgressTrack .discoveredStep {
+  background: var(--cyan);
+  box-shadow: 0 0 8px rgba(113, 239, 255, 0.7);
+}
+
+.sanctumProgress > small {
+  display: block;
+  color: #66828d;
+  font-size: 6px;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.wordLockButton {
+  width: 100%;
+  margin-top: 7px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 240, 166, 0.6);
+  color: #07101d;
+  background: var(--gold);
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  pointer-events: auto;
+  animation: sanctumPulse 2.3s ease-in-out infinite;
+}
+
+.wordLockButton:hover,
+.wordLockButton:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+  background: #fff8d1;
+}
+
+.sanctumProgressUnlocked {
+  border-color: rgba(255, 240, 166, 0.5);
+  color: var(--gold);
+  box-shadow: 0 0 28px rgba(255, 240, 166, 0.12);
+}
+
+.sanctumProgressUnlocked .sanctumProgressTrack .discoveredStep {
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(255, 240, 166, 0.75);
+}
+
+.sanctumProgressUnlocked > small,
+.sanctumProgressUnlocked .sanctumProgressHeading strong {
+  color: var(--gold);
+}
+
+.discoveryNotice {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 60;
+  display: grid;
+  width: min(430px, calc(100vw - 32px));
+  padding: 13px 18px;
+  border: 1px solid rgba(113, 239, 255, 0.5);
+  color: var(--cyan);
+  background: rgba(3, 12, 23, 0.92);
+  box-shadow: 0 0 35px rgba(113, 239, 255, 0.13);
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+  animation: discoveryNoticeIn 4.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.discoveryNotice > span,
+.discoveryNotice > small {
+  font-size: 7px;
+  letter-spacing: 0.16em;
+}
+
+.discoveryNotice > strong {
+  margin: 6px 0;
+  color: #e7fbff;
+  font-family: var(--font-pixel), monospace;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discoveryNotice > small {
+  color: #6f909a;
+}
+
+.discoveryNoticeUnlocked {
+  border-color: rgba(255, 240, 166, 0.68);
+  color: var(--gold);
+  box-shadow: 0 0 42px rgba(255, 240, 166, 0.18);
+}
+
+.discoveryNoticeUnlocked > strong,
+.discoveryNoticeUnlocked > small {
+  color: var(--gold);
+}
+
 .entryPrompt {
   position: absolute;
   top: 50%;
@@ -484,9 +628,10 @@
 
 .drawer {
   position: absolute;
-  top: 82px;
-  right: 18px;
+  top: 58px;
+  right: auto;
   bottom: 18px;
+  left: 20px;
   z-index: 70;
   width: min(460px, calc(100vw - 36px));
   padding: 24px;
@@ -873,6 +1018,186 @@
   font-size: 7px;
 }
 
+.wordLock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 96;
+  width: min(650px, calc(100vw - 36px));
+  padding: 34px 38px 30px;
+  border: 1px solid rgba(255, 240, 166, 0.68);
+  color: #e9f9fb;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 240, 166, 0.09), transparent 34%),
+    rgba(4, 11, 19, 0.97);
+  box-shadow: 0 0 70px rgba(0, 0, 0, 0.6), 0 0 38px rgba(255, 240, 166, 0.1);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(18px);
+  animation: wordLockIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.wordLock::before,
+.wordLock::after {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  pointer-events: none;
+  content: '';
+}
+
+.wordLock::before {
+  top: 8px;
+  left: 8px;
+  border-top: 1px solid var(--gold);
+  border-left: 1px solid var(--gold);
+}
+
+.wordLock::after {
+  right: 8px;
+  bottom: 8px;
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+}
+
+.wordLockClose {
+  position: absolute;
+  top: 12px;
+  right: 13px;
+  z-index: 2;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid rgba(255, 240, 166, 0.24);
+  color: #8e8b70;
+  background: transparent;
+  font-size: 20px;
+}
+
+.wordLockClose:hover,
+.wordLockClose:focus-visible {
+  border-color: var(--gold);
+  outline: 0;
+  color: var(--gold);
+}
+
+.wordLockKicker {
+  color: var(--gold);
+  font-size: 7px;
+  letter-spacing: 0.23em;
+}
+
+.wordLock h2 {
+  margin: 12px 0 10px;
+  color: #fff8d5;
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wordLock > p {
+  max-width: 470px;
+  margin: 0 auto 25px;
+  color: #7f9298;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.wordLockSlots,
+.wordLockTray {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.wordLockSlots button,
+.wordLockTray button {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 240, 166, 0.2);
+  color: #6f746b;
+  background: rgba(255, 240, 166, 0.025);
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(17px, 3vw, 27px);
+}
+
+.wordLockSlots button:hover,
+.wordLockSlots button:focus-visible,
+.wordLockTray button:hover,
+.wordLockTray button:focus-visible {
+  border-color: var(--gold);
+  outline: 0;
+  color: var(--gold);
+}
+
+.wordLockSlots .filledWordSlot {
+  border-color: rgba(255, 240, 166, 0.56);
+  color: var(--gold);
+  background: rgba(255, 240, 166, 0.08);
+  box-shadow: inset 0 0 15px rgba(255, 240, 166, 0.06);
+}
+
+.wordLockTray {
+  width: min(430px, 100%);
+  margin: 15px auto 0;
+  gap: 8px;
+}
+
+.wordLockTray button {
+  border-color: rgba(113, 239, 255, 0.28);
+  color: var(--cyan);
+  background: rgba(113, 239, 255, 0.05);
+  font-size: clamp(15px, 2.5vw, 22px);
+}
+
+.wordLockTray button:disabled {
+  border-color: rgba(113, 239, 255, 0.07);
+  color: rgba(113, 239, 255, 0.12);
+  background: transparent;
+}
+
+.wordLockStatus {
+  min-height: 13px;
+  margin: 17px 0 14px;
+  color: #817e66;
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+
+.wordLockActions {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+}
+
+.wordLockActions button {
+  min-width: 120px;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 240, 166, 0.34);
+  color: #aaa37a;
+  background: transparent;
+  font-size: 7px;
+  letter-spacing: 0.15em;
+}
+
+.wordLockActions button:last-child {
+  border-color: var(--gold);
+  color: #07101d;
+  background: var(--gold);
+}
+
+.wordLockActions button:hover,
+.wordLockActions button:focus-visible {
+  outline: 0;
+  border-color: #fff8d1;
+  color: #07101d;
+  background: #fff8d1;
+}
+
 .finalReveal {
   position: absolute;
   top: 50%;
@@ -1195,8 +1520,13 @@
 }
 
 @keyframes drawerIn {
-  from { opacity: 0; transform: translateX(26px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wordLockIn {
+  from { opacity: 0; transform: translate(-50%, calc(-50% - 12px)) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes entryIn {
@@ -1225,6 +1555,12 @@
 
 @keyframes sanctumPulse {
   50% { box-shadow: 0 0 48px rgba(255, 240, 166, 0.3); }
+}
+
+@keyframes discoveryNoticeIn {
+  0% { opacity: 0; transform: translate(-50%, -12px); }
+  10%, 82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
 }
 
 @media (max-width: 900px) {
@@ -1288,6 +1624,48 @@
     left: 10px;
     width: min(285px, calc(100vw - 20px));
     padding: 10px 12px;
+  }
+
+  .sanctumProgress {
+    bottom: 158px;
+    width: min(245px, calc(100vw - 24px));
+  }
+
+  .discoveryNotice {
+    top: 174px;
+    padding: 11px 13px;
+  }
+
+  .discoveryNotice > strong {
+    font-size: 16px;
+  }
+
+  .wordLock {
+    width: calc(100vw - 18px);
+    padding: 31px 13px 22px;
+  }
+
+  .wordLock > p {
+    margin-bottom: 18px;
+    padding: 0 12px;
+    font-size: 8px;
+  }
+
+  .wordLockSlots,
+  .wordLockTray {
+    gap: 3px;
+  }
+
+  .wordLockTray {
+    gap: 5px;
+  }
+
+  .wordLockStatus {
+    font-size: 6px;
+  }
+
+  .wordLockActions button {
+    min-width: 105px;
   }
 
   .zoneHud strong {

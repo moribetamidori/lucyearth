@@ -23,6 +23,7 @@ import type {
   TempleCluster,
   TempleDataset,
   TempleFocus,
+  TempleLetter,
   TempleMaterialMode,
   TempleTweetMemory,
   TempleZone,
@@ -47,7 +48,37 @@ const ARCHIVE_PAGE_SIZE = 50;
 type SavedProgress = {
   visited: string[];
   mode: TempleMaterialMode;
+  letterOrder?: string[];
+  collectedLetterZoneIds?: string[];
+  sanctumSolved?: boolean;
 };
+
+type LetterNotice = {
+  id: string;
+  kind: 'collected' | 'unlocked';
+  zoneName?: string;
+  letter?: string;
+  count: number;
+};
+
+function isValidLetterOrder(order: unknown, word: string) {
+  if (!Array.isArray(order) || order.some((letter) => typeof letter !== 'string')) return false;
+  return order.length === word.length
+    && [...order].sort().join('') === [...word].sort().join('');
+}
+
+function shuffleLetters(word: string) {
+  const letters = [...word];
+  for (let index = letters.length - 1; index > 0; index -= 1) {
+    const random = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+    const swapIndex = Math.floor(random * (index + 1));
+    [letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]];
+  }
+  if (letters.join('') === word && letters.length > 2) {
+    [letters[0], letters[1]] = [letters[1], letters[0]];
+  }
+  return letters;
+}
 
 function TelescopeTransit() {
   return (
@@ -186,10 +217,12 @@ function MemoryPanel({
 function MobileControls({
   input,
   canInteract,
+  interactionLabel,
   onInteract,
 }: {
   input: MutableRefObject<MobileMovementInput>;
   canInteract: boolean;
+  interactionLabel: string;
   onInteract: () => void;
 }) {
   const lookPoint = useRef<{ x: number; y: number } | null>(null);
@@ -249,7 +282,7 @@ function MobileControls({
         disabled={!canInteract}
         onClick={onInteract}
       >
-        OPEN
+        {interactionLabel}
       </button>
     </div>
   );
@@ -258,14 +291,18 @@ function MobileControls({
 function TempleMapFallback({
   dataset,
   visited,
+  collectedLetterZoneIds,
   finalUnlocked,
   onZoneSelect,
+  onLetterCollect,
   onFinalSelect,
 }: {
   dataset: TempleDataset;
   visited: Set<string>;
+  collectedLetterZoneIds: Set<string>;
   finalUnlocked: boolean;
   onZoneSelect: (zone: TempleZone) => void;
+  onLetterCollect: (zoneId: string) => void;
   onFinalSelect: () => void;
 }) {
   return (
@@ -287,12 +324,21 @@ function TempleMapFallback({
                 '--zone-top': `${50 - zone.position[2] * 1.75}%`,
               } as CSSProperties
             }
-            onClick={() => onZoneSelect(zone)}
+            onClick={() => {
+              onZoneSelect(zone);
+              onLetterCollect(zone.id);
+            }}
           >
             <span>{zone.sigil}</span>
             <strong>{zone.shortName}</strong>
             <small>
-              {!zone.clusterId ? 'birthday sanctum' : visited.has(zone.id) ? 'visited' : 'enter'}
+              {collectedLetterZoneIds.has(zone.id)
+                ? 'letter found'
+                : !zone.clusterId
+                  ? 'outer sanctum · letter waiting'
+                  : visited.has(zone.id)
+                    ? 'letter waiting'
+                    : 'enter · letter waiting'}
             </small>
           </button>
         ))}
@@ -347,7 +393,15 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
   const [teleport, setTeleport] = useState<TempleTeleport | null>(null);
   const [returningFromObservatory, setReturningFromObservatory] = useState<boolean | null>(null);
   const [observatoryTransit, setObservatoryTransit] = useState(false);
+  const [letterOrder, setLetterOrder] = useState<string[]>([]);
+  const [collectedLetterZoneIds, setCollectedLetterZoneIds] = useState<Set<string>>(new Set());
+  const [sanctumSolved, setSanctumSolved] = useState(false);
+  const [letterNotice, setLetterNotice] = useState<LetterNotice | null>(null);
+  const [puzzleOpen, setPuzzleOpen] = useState(false);
+  const [puzzleSlots, setPuzzleSlots] = useState<Array<string | null>>([]);
+  const [puzzleError, setPuzzleError] = useState<string | null>(null);
   const transitTimer = useRef<number | null>(null);
+  const letterNoticeTimer = useRef<number | null>(null);
 
   const clusters = useMemo(
     () => new Map(dataset.clusters.map((cluster) => [cluster.id, cluster])),
@@ -368,7 +422,22 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
   const activeZone = activeZoneId ? zones.get(activeZoneId) ?? null : null;
   const activeMemory = activeMemoryId ? memories.get(activeMemoryId) ?? null : null;
   const activeCluster = activeMemory ? clusters.get(activeMemory.clusterId) ?? null : null;
-  const finalUnlocked = visited.size >= dataset.temple.revealThreshold;
+  const sanctumWord = dataset.temple.sanctumWord.toUpperCase();
+  const requiredLetterCount = sanctumWord.length;
+  const collectedLetterCount = collectedLetterZoneIds.size;
+  const lettersRemaining = Math.max(0, requiredLetterCount - collectedLetterCount);
+  const finalUnlocked = sanctumSolved;
+  const letterAssignments = useMemo<TempleLetter[]>(
+    () => dataset.temple.zones.map((zone, index) => ({
+      zoneId: zone.id,
+      letter: letterOrder[index] ?? '',
+    })).filter((assignment) => assignment.letter),
+    [dataset.temple.zones, letterOrder]
+  );
+  const letterAssignmentsByZone = useMemo(
+    () => new Map(letterAssignments.map((assignment) => [assignment.zoneId, assignment])),
+    [letterAssignments]
+  );
 
   const search = useMemo(() => {
     const index = new MiniSearch({
@@ -459,6 +528,7 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
   useEffect(
     () => () => {
       if (transitTimer.current !== null) window.clearTimeout(transitTimer.current);
+      if (letterNoticeTimer.current !== null) window.clearTimeout(letterNoticeTimer.current);
     },
     []
   );
@@ -466,35 +536,55 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as SavedProgress | null;
+      const allZoneIds = new Set(dataset.temple.zones.map((zone) => zone.id));
       if (saved?.visited && Array.isArray(saved.visited)) {
         const valid = new Set(dataset.temple.zones.filter((zone) => zone.clusterId).map((zone) => zone.id));
         setVisited(new Set(saved.visited.filter((id) => valid.has(id))));
       }
       if (saved?.mode === 'wireframe' || saved?.mode === 'pearl') setMode(saved.mode);
+      const nextLetterOrder = isValidLetterOrder(saved?.letterOrder, sanctumWord)
+        ? saved?.letterOrder as string[]
+        : shuffleLetters(sanctumWord);
+      const nextCollected = new Set(
+        (saved?.collectedLetterZoneIds ?? []).filter((id) => allZoneIds.has(id))
+      );
+      setLetterOrder(nextLetterOrder);
+      setCollectedLetterZoneIds(nextCollected);
+      setSanctumSolved(Boolean(saved?.sanctumSolved) && nextCollected.size === requiredLetterCount);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      setLetterOrder(shuffleLetters(sanctumWord));
+      setCollectedLetterZoneIds(new Set());
+      setSanctumSolved(false);
     } finally {
       setHydrated(true);
     }
-  }, [dataset.temple.zones]);
+  }, [dataset.temple.zones, requiredLetterCount, sanctumWord]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    const value: SavedProgress = { visited: [...visited], mode };
+    if (!hydrated || letterOrder.length !== requiredLetterCount) return;
+    const value: SavedProgress = {
+      visited: [...visited],
+      mode,
+      letterOrder,
+      collectedLetterZoneIds: [...collectedLetterZoneIds],
+      sanctumSolved,
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-  }, [hydrated, mode, visited]);
+  }, [collectedLetterZoneIds, hydrated, letterOrder, mode, requiredLetterCount, sanctumSolved, visited]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (event.code === 'Tab') {
+      if (event.code === 'Tab' && !puzzleOpen) {
         event.preventDefault();
         setDrawerOpen((current) => !current);
       }
       if (event.code === 'Escape' && activeMemoryId) setActiveMemoryId(null);
+      if (event.code === 'Escape' && puzzleOpen) setPuzzleOpen(false);
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [activeMemoryId]);
+  }, [activeMemoryId, puzzleOpen]);
 
   const enterZone = useCallback(
     (zoneId: string | null) => {
@@ -506,12 +596,84 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
         if (current.has(zoneId)) return current;
         const next = new Set(current);
         next.add(zoneId);
-        chime(next.size);
         return next;
       });
     },
-    [chime, zones]
+    [zones]
   );
+
+  const showLetterNotice = useCallback((notice: LetterNotice) => {
+    setLetterNotice(notice);
+    if (letterNoticeTimer.current !== null) window.clearTimeout(letterNoticeTimer.current);
+    letterNoticeTimer.current = window.setTimeout(() => {
+      setLetterNotice((current) => current?.id === notice.id ? null : current);
+    }, 4200);
+  }, []);
+
+  const collectLetter = useCallback((zoneId: string) => {
+    const assignment = letterAssignmentsByZone.get(zoneId);
+    const zone = zones.get(zoneId);
+    if (!assignment || !zone || collectedLetterZoneIds.has(zoneId)) return;
+    const next = new Set(collectedLetterZoneIds);
+    next.add(zoneId);
+    setCollectedLetterZoneIds(next);
+    chime(next.size);
+    showLetterNotice({
+      id: `letter-${zoneId}`,
+      kind: 'collected',
+      zoneName: zone.architecturalName,
+      letter: assignment.letter,
+      count: next.size,
+    });
+    setFocused(null);
+  }, [chime, collectedLetterZoneIds, letterAssignmentsByZone, showLetterNotice, zones]);
+
+  const openWordLock = useCallback(() => {
+    if (collectedLetterCount < requiredLetterCount || sanctumSolved) return;
+    setPuzzleSlots((current) => current.length === requiredLetterCount
+      ? current
+      : Array.from({ length: requiredLetterCount }, () => null));
+    setPuzzleError(null);
+    setPuzzleOpen(true);
+  }, [collectedLetterCount, requiredLetterCount, sanctumSolved]);
+
+  const placePuzzleLetter = useCallback((zoneId: string) => {
+    setPuzzleError(null);
+    setPuzzleSlots((current) => {
+      if (current.includes(zoneId)) return current;
+      const emptyIndex = current.indexOf(null);
+      if (emptyIndex < 0) return current;
+      const next = [...current];
+      next[emptyIndex] = zoneId;
+      return next;
+    });
+  }, []);
+
+  const removePuzzleLetter = useCallback((slotIndex: number) => {
+    setPuzzleError(null);
+    setPuzzleSlots((current) => current.map((zoneId, index) => index === slotIndex ? null : zoneId));
+  }, []);
+
+  const submitWordLock = useCallback(() => {
+    const attempt = puzzleSlots
+      .map((zoneId) => zoneId ? letterAssignmentsByZone.get(zoneId)?.letter ?? '' : '')
+      .join('');
+    if (attempt !== sanctumWord) {
+      setPuzzleError(puzzleSlots.some((zoneId) => zoneId === null)
+        ? 'PLACE ALL NINE LETTERS INTO THE LOCK'
+        : 'THE GLYPHS DO NOT ALIGN // TRY ANOTHER ORDER');
+      return;
+    }
+    setSanctumSolved(true);
+    setPuzzleOpen(false);
+    setPuzzleError(null);
+    chime(requiredLetterCount);
+    showLetterNotice({
+      id: 'sanctum-unlocked',
+      kind: 'unlocked',
+      count: requiredLetterCount,
+    });
+  }, [chime, letterAssignmentsByZone, puzzleSlots, requiredLetterCount, sanctumWord, showLetterNotice]);
 
   const selectMemory = useCallback(
     (memoryId: string) => {
@@ -531,6 +693,7 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
       setStarted(true);
       setFinalOpen(false);
       setDrawerOpen(false);
+      setPuzzleOpen(false);
       setActiveMemoryId(null);
       setTeleport({ nonce: Date.now(), position: zone.spawn });
       enterZone(zone.id);
@@ -542,6 +705,7 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
     if (!finalUnlocked) return;
     setActiveMemoryId(null);
     setDrawerOpen(false);
+    setPuzzleOpen(false);
     setFinalOpen(true);
     chime(9);
   }, [chime, finalUnlocked]);
@@ -553,6 +717,7 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
     setActiveMemoryId(null);
     setDrawerOpen(false);
     setFinalOpen(false);
+    setPuzzleOpen(false);
     setFocused(null);
 
     const navigate = () => {
@@ -566,15 +731,18 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
 
   const interact = () => {
     if (focused?.kind === 'memory') selectMemory(focused.id);
+    if (focused?.kind === 'letter') collectLetter(focused.id);
     if (focused?.kind === 'cake') openFinal();
     if (focused?.kind === 'telescope') enterObservatory();
   };
 
-  const focusPrompt = focused?.kind === 'cake'
-    ? 'E / CLICK · OPEN BIRTHDAY MESSAGE'
-    : focused?.kind === 'telescope'
-      ? 'E / CLICK · ENTER OBSERVATORY'
-      : 'E / CLICK · OPEN SIGNAL';
+  const focusPrompt = focused?.kind === 'letter'
+    ? 'E / CLICK · PICK UP LETTER'
+    : focused?.kind === 'cake'
+      ? 'E / CLICK · OPEN BIRTHDAY MESSAGE'
+      : focused?.kind === 'telescope'
+        ? 'E / CLICK · ENTER OBSERVATORY'
+        : 'E / CLICK · OPEN SIGNAL';
 
   return (
     <main className={`${styles.page} ${observatoryTransit ? styles.transporting : ''}`}>
@@ -593,15 +761,19 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
             started={started}
             transporting={observatoryTransit}
             skipReveal={returningFromObservatory}
-            panelOpen={Boolean(activeMemory || finalOpen || drawerOpen)}
+            panelOpen={Boolean(activeMemory || finalOpen || drawerOpen || puzzleOpen)}
             mobile={mobile}
             reducedMotion={reducedMotion}
             finalUnlocked={finalUnlocked}
+            collectedLetterCount={collectedLetterCount}
+            letterAssignments={letterAssignments}
+            collectedLetterZoneIds={collectedLetterZoneIds}
             focused={focused}
             teleport={teleport}
             mobileInput={mobileInput}
             onFocus={setFocused}
             onMemorySelect={selectMemory}
+            onLetterCollect={collectLetter}
             onZoneEnter={enterZone}
             onFinalSelect={openFinal}
             onObservatorySelect={enterObservatory}
@@ -611,8 +783,10 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
           <TempleMapFallback
             dataset={dataset}
             visited={visited}
+            collectedLetterZoneIds={collectedLetterZoneIds}
             finalUnlocked={finalUnlocked}
             onZoneSelect={teleportToZone}
+            onLetterCollect={collectLetter}
             onFinalSelect={openFinal}
           />
         )}
@@ -620,6 +794,28 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
 
       {observatoryTransit && <TelescopeTransit />}
       {returningFromObservatory && <TempleReturnArrival />}
+
+      {letterNotice && (
+        <section
+          className={`${styles.discoveryNotice} ${letterNotice.kind === 'unlocked' ? styles.discoveryNoticeUnlocked : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span>
+            {letterNotice.kind === 'unlocked'
+              ? '✦ WORD ACCEPTED // SANCTUM UNLOCKED'
+              : `✦ LETTER RECOVERED // ${letterNotice.zoneName}`}
+          </span>
+          <strong>{letterNotice.kind === 'unlocked' ? sanctumWord : letterNotice.letter}</strong>
+          <small>
+            {letterNotice.kind === 'unlocked'
+              ? 'THE GOLDEN RING AND BIRTHDAY CAKE ARE WAITING IN THE UBOSOT'
+              : letterNotice.count >= requiredLetterCount
+                ? `${letterNotice.count} / ${requiredLetterCount} // ALL LETTERS FOUND // OPEN THE WORD LOCK`
+                : `${letterNotice.count} / ${requiredLetterCount} // ${requiredLetterCount - letterNotice.count} ${requiredLetterCount - letterNotice.count === 1 ? 'LETTER' : 'LETTERS'} STILL HIDDEN`}
+          </small>
+        </section>
+      )}
 
       <header className={styles.topHud}>
         <div className={styles.materialControls} aria-label="View and sound controls">
@@ -680,6 +876,39 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
         </button>
       </header>
 
+      {hydrated && started && !finalOpen && !drawerOpen && !puzzleOpen && (
+        <section
+          className={`${styles.sanctumProgress} ${finalUnlocked ? styles.sanctumProgressUnlocked : ''}`}
+          aria-label={`${collectedLetterCount} of ${requiredLetterCount} hidden letters recovered`}
+        >
+          <div className={styles.sanctumProgressHeading}>
+            <span>{finalUnlocked ? 'SANCTUM UNLOCKED' : 'LOST LETTERS'}</span>
+            <strong>{collectedLetterCount}/{requiredLetterCount}</strong>
+          </div>
+          <div
+            className={styles.sanctumProgressTrack}
+            style={{ gridTemplateColumns: `repeat(${requiredLetterCount}, 1fr)` }}
+            aria-hidden="true"
+          >
+            {Array.from({ length: requiredLetterCount }, (_, index) => (
+              <i key={index} className={index < collectedLetterCount ? styles.discoveredStep : ''} />
+            ))}
+          </div>
+          <small>
+            {finalUnlocked
+              ? 'CAKE REVEALED IN THE UBOSOT'
+              : lettersRemaining > 0
+                ? `FIND ${lettersRemaining} MORE // ONE AT EACH LANDMARK`
+                : 'ALL LETTERS FOUND // SPELL THE NINE-LETTER KEY'}
+          </small>
+          {!finalUnlocked && collectedLetterCount === requiredLetterCount && (
+            <button type="button" className={styles.wordLockButton} onClick={openWordLock}>
+              OPEN WORD LOCK
+            </button>
+          )}
+        </section>
+      )}
+
       {!started && webglSupported !== false && (
         <div
           className={`${styles.entryPrompt} ${cinematicComplete ? styles.entryPromptVisible : ''}`}
@@ -696,14 +925,14 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
         </div>
       )}
 
-      {webglSupported === true && started && !activeMemory && !finalOpen && !drawerOpen && (
+      {webglSupported === true && started && !activeMemory && !finalOpen && !drawerOpen && !puzzleOpen && (
         <div className={styles.crosshair} aria-hidden="true">
           <i className={focused ? styles.focusedCrosshair : ''} />
           {focused && <span>{focusPrompt}</span>}
         </div>
       )}
 
-      {webglSupported === true && !mobile && started && !activeMemory && !finalOpen && !drawerOpen && (
+      {webglSupported === true && !mobile && started && !activeMemory && !finalOpen && !drawerOpen && !puzzleOpen && (
         <div className={styles.desktopControls} aria-hidden="true">
           <span><b>WASD</b> MOVE</span>
           <span><b>MOUSE / TRACKPAD</b> LOOK</span>
@@ -712,12 +941,16 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
         </div>
       )}
 
-      {activeZone && started && !drawerOpen && (
+      {activeZone && started && !drawerOpen && !puzzleOpen && (
         <section className={styles.zoneHud}>
           <span>{activeZone.sigil} CURRENT LANDMARK</span>
           <strong>{activeZone.architecturalName}</strong>
           <p>{activeZone.description}</p>
-          {!activeZone.clusterId && <small>INNER SANCTUM // FIVE TEMPLES REQUIRED</small>}
+          <small>
+            {collectedLetterZoneIds.has(activeZone.id)
+              ? `LOST LETTER RECOVERED // ${letterAssignmentsByZone.get(activeZone.id)?.letter ?? ''}`
+              : 'LOST LETTER NEARBY // FIND THE GLOWING GLYPH'}
+          </small>
         </section>
       )}
 
@@ -726,8 +959,10 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
           <button type="button" className={styles.drawerClose} onClick={() => setDrawerOpen(false)} aria-label="Close temple index">
             ×
           </button>
-          <div className={styles.drawerKicker}>TEMPLE INDEX // EIGHT INSTALLATIONS + SANCTUM</div>
-          <h2>where do you want to remember?</h2>
+          <div className={styles.drawerKicker}>
+            LETTER PILGRIMAGE // {collectedLetterCount}/{requiredLetterCount} RECOVERED // ONE LETTER AT EACH OF 9 LANDMARKS
+          </div>
+          <h2>where is the next letter?</h2>
           <div className={styles.zoneList}>
             {dataset.temple.zones.map((zone, index) => (
               <button
@@ -740,7 +975,13 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
                 <i>{zone.sigil}</i>
                 <strong>{zone.shortName}</strong>
                 <small>
-                  {!zone.clusterId ? 'sanctum' : visited.has(zone.id) ? 'visited' : 'walk there'}
+                  {collectedLetterZoneIds.has(zone.id)
+                    ? `${letterAssignmentsByZone.get(zone.id)?.letter ?? ''} · recovered`
+                    : !zone.clusterId
+                      ? 'outer sanctum · letter waiting'
+                      : visited.has(zone.id)
+                        ? 'letter waiting'
+                        : 'walk there · letter waiting'}
                 </small>
               </button>
             ))}
@@ -819,6 +1060,76 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
         />
       )}
 
+      {puzzleOpen && (
+        <section
+          className={styles.wordLock}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sanctum word lock"
+        >
+          <button
+            type="button"
+            className={styles.wordLockClose}
+            onClick={() => setPuzzleOpen(false)}
+            aria-label="Close word lock"
+          >
+            ×
+          </button>
+          <div className={styles.wordLockKicker}>UBOSOT // NINE-GLYPH SANCTUM LOCK</div>
+          <h2>spell the key</h2>
+          <p>
+            Place every recovered letter into the lock. The key means playful trouble,
+            in the plural.
+          </p>
+          <div className={styles.wordLockSlots} aria-label="Letter slots">
+            {puzzleSlots.map((zoneId, index) => (
+              <button
+                type="button"
+                key={index}
+                className={zoneId ? styles.filledWordSlot : ''}
+                onClick={() => removePuzzleLetter(index)}
+                aria-label={zoneId ? `Remove ${letterAssignmentsByZone.get(zoneId)?.letter} from slot ${index + 1}` : `Empty slot ${index + 1}`}
+              >
+                {zoneId ? letterAssignmentsByZone.get(zoneId)?.letter : '·'}
+              </button>
+            ))}
+          </div>
+          <div className={styles.wordLockTray} aria-label="Recovered letters">
+            {[...collectedLetterZoneIds].map((zoneId) => {
+              const assignment = letterAssignmentsByZone.get(zoneId);
+              if (!assignment) return null;
+              const used = puzzleSlots.includes(zoneId);
+              return (
+                <button
+                  type="button"
+                  key={zoneId}
+                  disabled={used}
+                  onClick={() => placePuzzleLetter(zoneId)}
+                  aria-label={`${used ? 'Placed' : 'Place'} letter ${assignment.letter}`}
+                >
+                  {assignment.letter}
+                </button>
+              );
+            })}
+          </div>
+          <div className={styles.wordLockStatus} role="status" aria-live="polite">
+            {puzzleError ?? 'SELECT A LETTER, THEN SELECT A FILLED SLOT TO REMOVE IT'}
+          </div>
+          <div className={styles.wordLockActions}>
+            <button
+              type="button"
+              onClick={() => {
+                setPuzzleSlots(Array.from({ length: requiredLetterCount }, () => null));
+                setPuzzleError(null);
+              }}
+            >
+              CLEAR
+            </button>
+            <button type="button" onClick={submitWordLock}>TURN THE KEY</button>
+          </div>
+        </section>
+      )}
+
       {finalOpen && (
         <section className={styles.finalReveal} role="dialog" aria-modal="true" aria-label="Birthday sanctum">
           <div className={styles.finalHalo} aria-hidden="true"><i /><i /><i /></div>
@@ -826,28 +1137,31 @@ export default function TempleExperience({ dataset }: { dataset: TempleDataset }
           <h1>happy birthday, jmill</h1>
           <p>
             I love you. Let&apos;s live a long, long life together. May we always find the path
-            toward love and expansion in every moment.
+            toward love and expansion in every moment. You have mischief in your soul—never
+            forget it. Live up to it.
           </p>
           <div className={styles.signature}>love, lucy · 2026</div>
           <div className={styles.finalStats}>
             <span>{dataset.stats.tweetCount} recovered tweets</span>
             <span>{dataset.stats.replyCount} conversations</span>
-            <span>8 living installations</span>
+            <span>9 lost letters recovered</span>
           </div>
           <button type="button" onClick={() => setFinalOpen(false)}>return to the grounds</button>
         </section>
       )}
 
-      {webglSupported === true && mobile && started && !activeMemory && !finalOpen && !drawerOpen && (
+      {webglSupported === true && mobile && started && !activeMemory && !finalOpen && !drawerOpen && !puzzleOpen && (
         <MobileControls
           input={mobileInput}
           canInteract={Boolean(focused)}
+          interactionLabel={focused?.kind === 'letter' ? 'PICK UP' : 'OPEN'}
           onInteract={interact}
         />
       )}
 
       <div className={styles.srOnly} aria-live="polite">
         {activeZone ? `${activeZone.architecturalName}. ${activeZone.description}` : 'Temple entrance.'}
+        {` ${collectedLetterCount} of ${requiredLetterCount} lost letters recovered.`}
         {finalUnlocked ? ' Birthday cake waiting inside the sanctum.' : ''}
       </div>
     </main>

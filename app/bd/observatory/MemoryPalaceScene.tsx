@@ -21,13 +21,11 @@ type SceneProps = {
   dataset: BirthdayDataset;
   activeClusterId: string | null;
   activeMemoryId: string | null;
-  finalUnlocked: boolean;
   reducedMotion: boolean;
   arriving: boolean;
   departing: boolean;
   onClusterSelect: (clusterId: string) => void;
   onMemorySelect: (memoryId: string) => void;
-  onPortalSelect: () => void;
   onTempleReturn: () => void;
   onArrivalComplete: () => void;
   onInteract: () => void;
@@ -825,14 +823,10 @@ function PlanetOrbit({
 }
 
 function SunPortal({
-  finalUnlocked,
   reducedMotion,
-  onPortalSelect,
   onTempleReturn,
 }: {
-  finalUnlocked: boolean;
   reducedMotion: boolean;
-  onPortalSelect: () => void;
   onTempleReturn: () => void;
 }) {
   const spinner = useRef<THREE.Group>(null);
@@ -841,7 +835,6 @@ function SunPortal({
   const wireMaterial = useRef<THREE.MeshBasicMaterial>(null);
   const [hovered, setHovered] = useState(false);
   const texture = useMemo(() => makeSurfaceTexture('sun'), []);
-  usePointerCursor(hovered, finalUnlocked);
 
   useEffect(() => () => texture.dispose(), [texture]);
 
@@ -858,18 +851,7 @@ function SunPortal({
 
   return (
     <group>
-      <group
-        ref={spinner}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (finalUnlocked) onPortalSelect();
-        }}
-        onPointerOver={(event) => {
-          event.stopPropagation();
-          if (finalUnlocked) setHovered(true);
-        }}
-        onPointerOut={() => setHovered(false)}
-      >
+      <group ref={spinner}>
         <mesh>
           <sphereGeometry args={[2.15, 56, 40]} />
           <meshBasicMaterial ref={surfaceMaterial} map={texture} color="#fff3bd" transparent />
@@ -878,7 +860,7 @@ function SunPortal({
           <sphereGeometry args={[2.15, 30, 22]} />
           <meshBasicMaterial
             ref={wireMaterial}
-            color={finalUnlocked ? '#fff3a3' : '#7ff7ff'}
+            color="#7ff7ff"
             wireframe
             transparent
             depthWrite={false}
@@ -888,7 +870,7 @@ function SunPortal({
       <mesh ref={corona} scale={1.08}>
         <sphereGeometry args={[2.15, 32, 24]} />
         <meshBasicMaterial
-          color={finalUnlocked ? '#fff0a0' : '#ff9d2e'}
+          color="#ff9d2e"
           transparent
           opacity={hovered ? 0.14 : 0.07}
           side={THREE.BackSide}
@@ -900,15 +882,15 @@ function SunPortal({
         <div
           aria-hidden="true"
           style={{
-            color: finalUnlocked ? '#fff3a3' : '#dbb067',
+            color: '#dbb067',
             fontFamily: 'var(--font-pixel), monospace',
             fontSize: 14,
             letterSpacing: '.24em',
             whiteSpace: 'nowrap',
-            textShadow: finalUnlocked ? '0 0 18px #fff3a3' : '0 0 12px rgba(255,164,63,.45)',
+            textShadow: '0 0 12px rgba(255,164,63,.45)',
           }}
         >
-          SUN // {finalUnlocked ? 'PORTAL READY' : 'SOLAR CORE'}
+          SUN // SOLAR CORE
         </div>
       </Html>
       <Html position={[0, -3.7, 0]} center distanceFactor={14}>
@@ -1226,9 +1208,7 @@ function SolarSystemWorld(props: SceneProps) {
         simulationTime={simulationTime}
       />
       <SunPortal
-        finalUnlocked={props.finalUnlocked}
         reducedMotion={props.reducedMotion}
-        onPortalSelect={props.onPortalSelect}
         onTempleReturn={props.onTempleReturn}
       />
       <AsteroidBelt reducedMotion={props.reducedMotion} />

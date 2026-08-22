@@ -28,10 +28,9 @@ test('each populated temple room maps to a valid memory cluster', () => {
   assert.equal(new Set(populated.map((zone) => zone.clusterId)).size, 8);
 });
 
-test('the sanctum threshold is achievable from the populated rooms', () => {
-  const populatedCount = temple.zones.filter((zone) => zone.clusterId !== null).length;
-  assert.equal(temple.revealThreshold, 5);
-  assert.ok(temple.revealThreshold <= populatedCount);
+test('the sanctum word assigns one letter to every landmark', () => {
+  assert.equal(temple.sanctumWord, 'MISCHIEFS');
+  assert.equal(temple.sanctumWord.length, temple.zones.length);
   assert.ok(temple.zones.some((zone) => zone.id === 'central-ubosot'));
 });
 

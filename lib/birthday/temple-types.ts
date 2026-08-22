@@ -70,8 +70,13 @@ export type TempleZone = {
 
 export type TempleConfiguration = {
   version: number;
-  revealThreshold: number;
+  sanctumWord: string;
   zones: TempleZone[];
+};
+
+export type TempleLetter = {
+  zoneId: string;
+  letter: string;
 };
 
 export type TempleDataset = TempleArchiveDataset & {
@@ -82,6 +87,7 @@ export type TempleMaterialMode = 'wireframe' | 'pearl';
 
 export type TempleFocus =
   | { kind: 'memory'; id: string }
+  | { kind: 'letter'; id: string }
   | { kind: 'cake'; id: 'birthday-cake' }
   | { kind: 'telescope'; id: 'observatory-telescope' }
   | null;
