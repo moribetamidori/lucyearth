@@ -1,0 +1,8 @@
+{
+  "name": "Momentum Baseline", "version": 1, "universe": ["SPY", "QQQ"], "timeframe": "15m",
+  "features": ["EMA20", "EMA50", "ATR14", "volume_ratio", "return5"],
+  "entry_rules": ["ema20_above_ema50", "close_above_ema20", "volume_ratio_above_1", "positive_return5"],
+  "exit_rules": ["close_below_ema20", "stop_1_5_atr", "target_3_atr"],
+  "position_sizing_rules": "fixed_25_usd_within_risk_limits",
+  "notes": "Infrastructure baseline, not a profitability claim. Evaluate only closed bars. Abstaining is valid. Exit levels are manual targets until supported protective broker orders are implemented."
+}

@@ -16,6 +16,9 @@
     "bd:enrich-media": "node --import tsx scripts/birthday/enrich-tweet-media.ts",
     "bd:build-temple": "node --import tsx scripts/birthday/build-temple-archive.ts",
     "test:bd": "node --import tsx --test tests/*.test.ts",
+    "test:trade": "node --conditions=react-server --import tsx --test tests/trade/*.test.ts",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:trade:ui": "playwright test --config tests/trade/playwright.config.ts",
     "storage:migrate": "tsx scripts/migrate-supabase-storage-to-s3.ts",
     "storage:test": "tsx scripts/test-s3-upload.ts"
   },
@@ -26,6 +29,7 @@
     "@react-three/fiber": "^9.7.0",
     "@react-three/postprocessing": "^3.0.4",
     "@react-three/rapier": "^2.2.0",
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.75.1",
     "browser-image-compression": "^2.0.2",
     "heic2any": "^0.0.4",
@@ -36,11 +40,15 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-leaflet": "^5.0.0",
-    "three": "^0.185.1"
+    "server-only": "^0.0.1",
+    "three": "^0.185.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/eslintrc": "^3",
     "@huggingface/transformers": "^4.2.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/geojson": "^7946.0.16",
     "@types/leaflet": "^1.9.21",

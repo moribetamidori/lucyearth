@@ -279,6 +279,36 @@ export type Recipe = {
   updated_at: string;
 };
 
+export type PlantbookEntry = {
+  id: string;
+  anon_id: string | null;
+  plant_title: string;
+  plant_image_url: string | null;
+  plant_image_path: string | null;
+  element_title: string;
+  element_image_url: string | null;
+  element_image_path: string | null;
+  element_id: string | null;
+  condition_text: string | null;
+  notes: string | null;
+  result_title: string;
+  result_image_url: string | null;
+  result_image_path: string | null;
+  created_at: string;
+  updated_at: string;
+  element?: PlantbookElement | null;
+};
+
+export type PlantbookElement = {
+  id: string;
+  anon_id: string | null;
+  title: string;
+  image_url: string | null;
+  image_path: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type KanbanStatus = 'todo' | 'in_progress' | 'done' | 'later';
 
 export type KanbanColor = 'yellow' | 'pink' | 'blue' | 'green';

@@ -4,6 +4,8 @@ const s3PublicBaseUrl = process.env.AWS_S3_PUBLIC_BASE_URL;
 const s3PublicUrl = s3PublicBaseUrl ? new URL(s3PublicBaseUrl) : null;
 
 const nextConfig: NextConfig = {
+  // Keep trading verification from racing an existing website dev server's .next files.
+  distDir: process.env.TRADE_BUILD_ISOLATED === "1" ? ".next-trade" : ".next",
   outputFileTracingRoot: process.cwd(),
   images: {
     remotePatterns: [

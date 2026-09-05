@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+The paper-only Autonomous Quant Lab lives at `/trade`. See [trading setup and architecture](docs/trade.md) for sandbox credentials, the isolated database migration, operator access, safety limits, and milestone status.
+
 First, run the development server:
 
 ```bash
