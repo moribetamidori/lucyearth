@@ -38,6 +38,7 @@ type UploadedImage = {
 };
 
 type ElementMode = 'existing' | 'new';
+type ViewMode = 'cards' | 'list';
 
 const PARTS: Array<{
   key: PartKey;
@@ -224,6 +225,7 @@ export default function Plantbook() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [elementMode, setElementMode] = useState<ElementMode>('new');
   const [selectedElementId, setSelectedElementId] = useState('');
   const [condition, setCondition] = useState('');
@@ -867,6 +869,24 @@ export default function Plantbook() {
           </div>
           <div className={styles.collectionTools}>
             <span>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</span>
+            <div className={styles.viewSwitch} role="group" aria-label="Collection view">
+              <button
+                type="button"
+                className={viewMode === 'cards' ? styles.viewSwitchActive : ''}
+                aria-pressed={viewMode === 'cards'}
+                onClick={() => setViewMode('cards')}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className={viewMode === 'list' ? styles.viewSwitchActive : ''}
+                aria-pressed={viewMode === 'list'}
+                onClick={() => setViewMode('list')}
+              >
+                List
+              </button>
+            </div>
             <label className={styles.searchBox}>
               <span aria-hidden="true">⌕</span>
               <span className={styles.srOnly}>Search the collection</span>
@@ -895,9 +915,74 @@ export default function Plantbook() {
             {!search && <button type="button" onClick={openNew}>Create the first formula</button>}
           </div>
         ) : (
-          <div className={styles.entryList}>
+          <div className={viewMode === 'cards' ? styles.entryList : styles.compactList}>
+            {viewMode === 'list' && (
+              <div className={styles.compactListHeader} aria-hidden="true">
+                <span>No.</span>
+                <span>Plant</span>
+                <span>Element</span>
+                <span>End result</span>
+                <span>Field notes</span>
+                <span>Recorded</span>
+                <span>Actions</span>
+              </div>
+            )}
             {filteredEntries.map((entry, index) => {
               const element = elementForEntry(entry);
+              const entryNumber = String(entries.length - index).padStart(3, '0');
+
+              if (viewMode === 'list') {
+                return (
+                  <article
+                    className={styles.compactRow}
+                    key={entry.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${entry.plant_title} plus ${element.title} formula`}
+                    onClick={() => setSelectedEntry(entry)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedEntry(entry);
+                      }
+                    }}
+                  >
+                    <span className={styles.compactNumber}>{entryNumber}</span>
+                    <div className={styles.compactPart}>
+                      <PartImage url={entry.plant_image_url} label={entry.plant_title} mark="⌇" />
+                      <div><span>Plant</span><strong>{entry.plant_title}</strong></div>
+                    </div>
+                    <div className={styles.compactPart}>
+                      <PartImage url={element.imageUrl} label={element.title} mark="✦" />
+                      <div><span>Element</span><strong>{element.title}</strong></div>
+                    </div>
+                    <div className={`${styles.compactPart} ${styles.compactResult}`}>
+                      <PartImage url={entry.result_image_url} label={entry.result_title} mark="✺" large />
+                      <div><span>Result</span><strong>{entry.result_title}</strong></div>
+                    </div>
+                    <div className={styles.compactNotes}>
+                      {entry.condition_text && <p><span>Condition</span>{entry.condition_text}</p>}
+                      {entry.notes && <p><span>Notes</span>{entry.notes}</p>}
+                      {!entry.condition_text && !entry.notes && <span className={styles.compactEmpty}>—</span>}
+                    </div>
+                    <time className={styles.compactDate} dateTime={entry.created_at}>
+                      {displayDate(entry.created_at)}
+                    </time>
+                    <div className={styles.compactActions}>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(entry); }}>Edit</button>
+                      <button
+                        type="button"
+                        disabled={deletingId === entry.id}
+                        onClick={(event) => { event.stopPropagation(); void deleteEntry(entry); }}
+                      >
+                        {deletingId === entry.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              }
+
               return (
               <article
                 className={styles.entryCard}
@@ -914,7 +999,7 @@ export default function Plantbook() {
                   }
                 }}
               >
-                <div className={styles.cardNumber}>{String(entries.length - index).padStart(3, '0')}</div>
+                <div className={styles.cardNumber}>{entryNumber}</div>
                 <div className={styles.cardEquation}>
                   <div className={styles.cardPart}>
                     <PartImage url={entry.plant_image_url} label={entry.plant_title} mark="⌇" />

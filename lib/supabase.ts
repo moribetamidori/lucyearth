@@ -309,6 +309,55 @@ export type PlantbookElement = {
   updated_at: string;
 };
 
+export type Plantbook2Plant = {
+  id: string;
+  anon_id: string | null;
+  title: string;
+  tier: number;
+  image_url: string | null;
+  image_path: string | null;
+  parent_plant_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Plantbook2Element = {
+  id: string;
+  anon_id: string | null;
+  title: string;
+  tier: number;
+  image_url: string | null;
+  image_path: string | null;
+  parent_element_id: string | null;
+  second_parent_element_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Plantbook2Character = {
+  id: string;
+  anon_id: string | null;
+  name: string;
+  base_plant_id: string;
+  created_at: string;
+  updated_at: string;
+  base_plant?: Plantbook2Plant | null;
+};
+
+export type Plantbook2Craft = {
+  id: string;
+  anon_id: string | null;
+  plant_id: string;
+  element_id: string;
+  result_plant_id: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  plant?: Plantbook2Plant | null;
+  element?: Plantbook2Element | null;
+  result_plant?: Plantbook2Plant | null;
+};
+
 export type KanbanStatus = 'todo' | 'in_progress' | 'done' | 'later';
 
 export type KanbanColor = 'yellow' | 'pink' | 'blue' | 'green';
