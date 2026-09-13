@@ -27,6 +27,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 type ImageDraft = { file: File | null; preview: string | null };
 type ElementMode = 'base' | 'fusion';
 type EditKind = 'plant' | 'element' | 'character' | 'craft';
+type BookView = 'workbench' | 'tree';
 type Editor = {
   kind: EditKind;
   id: string;
@@ -110,6 +111,74 @@ function ImagePicker({
   );
 }
 
+function PlantFamilyBranch({
+  plant,
+  childrenByPlant,
+  craftByResult,
+  charactersByPlant,
+  lineage = new Set<string>(),
+  onEditCraft,
+}: {
+  plant: Plantbook2Plant;
+  childrenByPlant: Map<string, Plantbook2Plant[]>;
+  craftByResult: Map<string, Plantbook2Craft>;
+  charactersByPlant: Map<string, Plantbook2Character[]>;
+  lineage?: Set<string>;
+  onEditCraft: (craft: Plantbook2Craft) => void;
+}) {
+  const craft = craftByResult.get(plant.id);
+  const familyCharacters = charactersByPlant.get(plant.id) || [];
+  const nextLineage = new Set(lineage);
+  nextLineage.add(plant.id);
+  const children = (childrenByPlant.get(plant.id) || []).filter((child) => !nextLineage.has(child.id));
+
+  return (
+    <li className={styles.treeBranch}>
+      <article className={`${styles.treeNode} ${craft ? styles.hybridNode : styles.rootNode}`}>
+        <div className={styles.treeNodeTop}>
+          <span>{craft ? 'Hybrid plant' : 'Base plant'}</span>
+          <b>T{plant.tier}</b>
+        </div>
+        <div className={styles.treePlant}>
+          <Specimen image={plant.image_url} name={plant.title} kind="plant" size="normal" />
+          <h3>{plant.title}</h3>
+        </div>
+        {familyCharacters.length > 0 && (
+          <div className={styles.treeCharacters}>
+            <span>Family of</span>
+            <strong>{familyCharacters.map((character) => character.name).join(' · ')}</strong>
+          </div>
+        )}
+        {craft && (
+          <div className={styles.treeCatalyst}>
+            <span>hybridized with</span>
+            <div>
+              <Specimen image={craft.element?.image_url || null} name={craft.element?.title || 'Element'} kind="element" size="small" />
+              <strong>{craft.element?.title || 'Unknown element'}</strong>
+            </div>
+            <button type="button" onClick={() => onEditCraft(craft)}>Edit recipe</button>
+          </div>
+        )}
+      </article>
+      {children.length > 0 && (
+        <ul>
+          {children.map((child) => (
+            <PlantFamilyBranch
+              key={child.id}
+              plant={child}
+              childrenByPlant={childrenByPlant}
+              craftByResult={craftByResult}
+              charactersByPlant={charactersByPlant}
+              lineage={nextLineage}
+              onEditCraft={onEditCraft}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 export default function Plantbook2() {
   const [plants, setPlants] = useState<Plantbook2Plant[]>([]);
   const [elements, setElements] = useState<Plantbook2Element[]>([]);
@@ -120,6 +189,8 @@ export default function Plantbook2() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState<'element' | 'character' | 'craft' | 'edit' | 'delete' | ''>('');
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [bookView, setBookView] = useState<BookView>('workbench');
+  const [treeCharacterFilter, setTreeCharacterFilter] = useState('');
 
   const [elementName, setElementName] = useState('');
   const [elementMode, setElementMode] = useState<ElementMode>('base');
@@ -134,6 +205,8 @@ export default function Plantbook2() {
   const [resultName, setResultName] = useState('');
   const [resultImage, setResultImage] = useState<ImageDraft>(blankImage);
   const [notes, setNotes] = useState('');
+  const [characterFilter, setCharacterFilter] = useState('');
+  const [elementFilter, setElementFilter] = useState('');
   const previewUrls = useRef<Set<string>>(new Set());
 
   const fetchBook = useCallback(async () => {
@@ -353,6 +426,83 @@ export default function Plantbook2() {
     crafts.forEach((craft) => counts.set(craft.element_id, (counts.get(craft.element_id) || 0) + 1));
     return counts;
   }, [crafts]);
+  const craftNumbers = useMemo(() => {
+    const numbers = new Map<string, number>();
+    crafts.forEach((craft, index) => numbers.set(craft.id, crafts.length - index));
+    return numbers;
+  }, [crafts]);
+  const characterPlantIds = useMemo(() => {
+    const lineages = new Map<string, Set<string>>();
+    characters.forEach((character) => {
+      const ids = new Set<string>([character.base_plant_id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        plants.forEach((plant) => {
+          if (plant.parent_plant_id && ids.has(plant.parent_plant_id) && !ids.has(plant.id)) {
+            ids.add(plant.id);
+            changed = true;
+          }
+        });
+      }
+      lineages.set(character.id, ids);
+    });
+    return lineages;
+  }, [characters, plants]);
+  const filteredCrafts = useMemo(() => {
+    const characterPlants = characterFilter ? characterPlantIds.get(characterFilter) : null;
+    return crafts.filter((craft) => {
+      const matchesCharacter = !characterPlants
+        || characterPlants.has(craft.plant_id)
+        || characterPlants.has(craft.result_plant_id);
+      const matchesElement = !elementFilter || craft.element_id === elementFilter;
+      return matchesCharacter && matchesElement;
+    });
+  }, [characterFilter, characterPlantIds, crafts, elementFilter]);
+  const familyTree = useMemo(() => {
+    const plantIds = new Set(plants.map((plant) => plant.id));
+    const childrenByPlant = new Map<string, Plantbook2Plant[]>();
+    const craftByResult = new Map(crafts.map((craft) => [craft.result_plant_id, craft]));
+    const charactersByPlant = new Map<string, Plantbook2Character[]>();
+
+    plants.forEach((plant) => {
+      if (!plant.parent_plant_id || !plantIds.has(plant.parent_plant_id)) return;
+      const siblings = childrenByPlant.get(plant.parent_plant_id) || [];
+      siblings.push(plant);
+      childrenByPlant.set(plant.parent_plant_id, siblings);
+    });
+    childrenByPlant.forEach((children) => children.sort((a, b) => a.tier - b.tier || a.title.localeCompare(b.title)));
+    characters.forEach((character) => {
+      const family = charactersByPlant.get(character.base_plant_id) || [];
+      family.push(character);
+      charactersByPlant.set(character.base_plant_id, family);
+    });
+
+    const roots = sortLibrary(plants.filter((plant) => !plant.parent_plant_id || !plantIds.has(plant.parent_plant_id)));
+    const visited = new Set<string>();
+    const visit = (plant: Plantbook2Plant, path = new Set<string>()) => {
+      if (path.has(plant.id)) return;
+      visited.add(plant.id);
+      const nextPath = new Set(path);
+      nextPath.add(plant.id);
+      (childrenByPlant.get(plant.id) || []).forEach((child) => visit(child, nextPath));
+    };
+    roots.forEach((root) => visit(root));
+    plants.forEach((plant) => {
+      if (!visited.has(plant.id)) {
+        roots.push(plant);
+        visit(plant);
+      }
+    });
+
+    return { roots, childrenByPlant, craftByResult, charactersByPlant };
+  }, [characters, crafts, plants]);
+  const visibleFamilyRoots = useMemo(() => {
+    if (!treeCharacterFilter) return familyTree.roots;
+    const character = characters.find((item) => item.id === treeCharacterFilter);
+    const basePlant = character ? plants.find((plant) => plant.id === character.base_plant_id) : null;
+    return basePlant ? [basePlant] : [];
+  }, [characters, familyTree.roots, plants, treeCharacterFilter]);
   const elementParentOneRecord = elements.find((element) => element.id === elementParentOne);
   const elementParentTwoRecord = elements.find((element) => element.id === elementParentTwo);
   const nextElementTier = elementMode === 'base'
@@ -456,9 +606,18 @@ export default function Plantbook2() {
         <Link href="/plantbook" className={styles.previous}>Vol. I</Link>
       </header>
 
+      <nav className={styles.viewBar} aria-label="Plantbook view">
+        <div className={styles.viewSwitcher} role="group" aria-label="Choose a Plantbook view">
+          <button type="button" className={bookView === 'workbench' ? styles.viewActive : ''} aria-pressed={bookView === 'workbench'} onClick={() => setBookView('workbench')}>Workbench</button>
+          <button type="button" className={bookView === 'tree' ? styles.viewActive : ''} aria-pressed={bookView === 'tree'} onClick={() => setBookView('tree')}>Family tree</button>
+        </div>
+        <span>{bookView === 'workbench' ? 'Create and record hybrids' : 'Trace every plant lineage'}</span>
+      </nav>
+
       {pageError && <div className={styles.alert}>{pageError} <button onClick={() => void fetchBook()}>Try again</button></div>}
       {notice && <div className={styles.notice} role="status"><span>✦</span>{notice}<button onClick={() => setNotice('')} aria-label="Dismiss">×</button></div>}
 
+      {bookView === 'workbench' ? <>
       <div className={styles.workspace}>
         <section className={styles.setupPanel}>
           <div className={styles.sectionHeading}><span>01</span><div><p>Origin stories</p><h2>Character + base plant</h2></div></div>
@@ -541,17 +700,53 @@ export default function Plantbook2() {
       </section>
 
       <section className={styles.ledger}>
-        <div className={styles.ledgerHeading}><div><p>04 / Recorded transformations</p><h2>Recipe ledger</h2></div><span>{crafts.length.toString().padStart(2, '0')} entries</span></div>
-        {loading ? <div className={styles.empty}>Opening the specimen drawers…</div> : crafts.length ? <div className={styles.tableWrap}><table><thead><tr><th>No.</th><th>Source plant</th><th></th><th>Element</th><th></th><th>Result plant</th><th>Tier</th><th>Field note</th><th>Manage</th></tr></thead><tbody>{crafts.map((craft, index) => <tr key={craft.id}>
-          <td className={styles.rowNumber}>{String(crafts.length - index).padStart(2, '0')}</td>
+        <div className={styles.ledgerHeading}>
+          <div><p>04 / Recorded transformations</p><h2>Recipe ledger</h2></div>
+          <div className={styles.ledgerTools}>
+            <label>Character<select value={characterFilter} onChange={(event) => setCharacterFilter(event.target.value)}><option value="">All characters</option>{characters.map((character) => <option key={character.id} value={character.id}>{character.name}</option>)}</select></label>
+            <label>Element<select value={elementFilter} onChange={(event) => setElementFilter(event.target.value)}><option value="">All elements</option>{elements.map((element) => <option key={element.id} value={element.id}>T{element.tier} · {element.title}</option>)}</select></label>
+            <span>{filteredCrafts.length.toString().padStart(2, '0')} {filteredCrafts.length === 1 ? 'entry' : 'entries'}</span>
+          </div>
+        </div>
+        {loading ? <div className={styles.empty}>Opening the specimen drawers…</div> : filteredCrafts.length ? <div className={styles.tableWrap}><table><thead><tr><th>No.</th><th>Source plant</th><th></th><th>Element</th><th></th><th>Result plant</th><th>Tier</th><th>Field note</th><th>Manage</th></tr></thead><tbody>{filteredCrafts.map((craft) => <tr key={craft.id}>
+          <td className={styles.rowNumber}>{String(craftNumbers.get(craft.id) || 0).padStart(2, '0')}</td>
           <td><div className={styles.tableSpecimen}><Specimen image={craft.plant?.image_url || null} name={craft.plant?.title || ''} kind="plant" size="small" /><b>{craft.plant?.title}</b></div></td>
           <td className={styles.symbol}>+</td>
           <td><div className={styles.tableSpecimen}><Specimen image={craft.element?.image_url || null} name={craft.element?.title || ''} kind="element" size="small" /><b>{craft.element?.title}</b></div></td>
           <td className={styles.symbol}>→</td>
           <td><div className={styles.tableSpecimen}><Specimen image={craft.result_plant?.image_url || null} name={craft.result_plant?.title || ''} kind="plant" size="small" /><b>{craft.result_plant?.title}</b></div></td>
           <td><span className={styles.tierBadge}>T{craft.result_plant?.tier}</span></td><td className={styles.noteCell}>{craft.notes || '—'}</td><td><div className={styles.itemActions}><button type="button" onClick={() => openCraftEditor(craft)}>Edit</button><button type="button" disabled={busy === 'delete'} onClick={() => void deleteItem('craft', craft.id, craft.result_plant?.title || 'recipe')}>Delete</button></div></td>
-        </tr>)}</tbody></table></div> : <div className={styles.empty}><span>♧ + ✦</span><h3>Your first recipe begins above.</h3><p>Every result will be kept here and returned to your plant library.</p></div>}
+        </tr>)}</tbody></table></div> : <div className={styles.empty}><span>♧ + ✦</span><h3>{crafts.length ? 'No recipes match these filters.' : 'Your first recipe begins above.'}</h3><p>{crafts.length ? 'Choose another character or element to see more plants.' : 'Every result will be kept here and returned to your plant library.'}</p>{crafts.length > 0 && <button type="button" onClick={() => { setCharacterFilter(''); setElementFilter(''); }}>Clear filters</button>}</div>}
       </section>
+      </> : <section className={styles.familyView}>
+        <div className={styles.familyHeading}>
+          <div><p>Lineage atlas</p><h1>Plant family trees</h1><span>Follow each base plant through every element-led hybrid.</span></div>
+          <label>Character family
+            <select value={treeCharacterFilter} onChange={(event) => setTreeCharacterFilter(event.target.value)}>
+              <option value="">All families</option>
+              {characters.map((character) => <option key={character.id} value={character.id}>{character.name} · {character.base_plant?.title || 'Base plant'}</option>)}
+            </select>
+          </label>
+        </div>
+        {loading ? <div className={styles.empty}>Growing the family trees…</div> : visibleFamilyRoots.length > 0 ? (
+          <div className={styles.familyCanvas}>
+            <div className={styles.familyForest}>
+              {visibleFamilyRoots.map((root) => (
+                <ul className={styles.treeRoot} key={root.id}>
+                  <PlantFamilyBranch
+                    plant={root}
+                    childrenByPlant={familyTree.childrenByPlant}
+                    craftByResult={familyTree.craftByResult}
+                    charactersByPlant={familyTree.charactersByPlant}
+                    onEditCraft={openCraftEditor}
+                  />
+                </ul>
+              ))}
+            </div>
+          </div>
+        ) : <div className={styles.empty}><span>♧</span><h3>No plant families yet.</h3><p>Return to the workbench to add a character and their base plant.</p><button type="button" onClick={() => setBookView('workbench')}>Open workbench</button></div>}
+        {!loading && visibleFamilyRoots.length > 0 && <p className={styles.treeHint}>Scroll sideways to explore wide families. Each connector follows a plant into its next hybrid.</p>}
+      </section>}
 
       {editor && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
         <section className={styles.editorModal} role="dialog" aria-modal="true" aria-labelledby="edit-title">
