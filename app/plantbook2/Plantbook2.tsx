@@ -27,7 +27,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 type ImageDraft = { file: File | null; preview: string | null };
 type ElementMode = 'base' | 'fusion';
 type EditKind = 'plant' | 'element' | 'character' | 'craft';
-type BookView = 'workbench' | 'tree';
+type BookView = 'workbench' | 'plant-tree' | 'element-tree';
 type Editor = {
   kind: EditKind;
   id: string;
@@ -179,6 +179,61 @@ function PlantFamilyBranch({
   );
 }
 
+function ElementFamilyBranch({
+  element,
+  elementById,
+  lineage = new Set<string>(),
+  onEditElement,
+}: {
+  element: Plantbook2Element;
+  elementById: Map<string, Plantbook2Element>;
+  lineage?: Set<string>;
+  onEditElement: (element: Plantbook2Element) => void;
+}) {
+  const nextLineage = new Set(lineage);
+  nextLineage.add(element.id);
+  const parentIds = [element.parent_element_id, element.second_parent_element_id].filter((id): id is string => Boolean(id));
+  const parents = parentIds
+    .map((id) => elementById.get(id))
+    .filter((parent): parent is Plantbook2Element => parent !== undefined && !nextLineage.has(parent.id));
+  const isFusion = parentIds.length > 0;
+
+  return (
+    <li className={styles.treeBranch}>
+      <article className={`${styles.treeNode} ${styles.elementTreeNode} ${isFusion ? styles.hybridNode : styles.rootNode}`}>
+        <div className={styles.treeNodeTop}>
+          <span>{isFusion ? 'Fused element' : 'Base element'}</span>
+          <b>T{element.tier}</b>
+        </div>
+        <div className={styles.treePlant}>
+          <Specimen image={element.image_url} name={element.title} kind="element" size="normal" />
+          <h3>{element.title}</h3>
+        </div>
+        {isFusion && (
+          <div className={styles.elementFormula}>
+            <span>fused from</span>
+            <strong>{parents.map((parent) => parent.title).join(' + ') || 'Unknown ingredients'}</strong>
+          </div>
+        )}
+        <button className={styles.treeEditButton} type="button" onClick={() => onEditElement(element)}>Edit element</button>
+      </article>
+      {parents.length > 0 && (
+        <ul>
+          {parents.map((parent, index) => (
+            <ElementFamilyBranch
+              key={`${parent.id}-${index}`}
+              element={parent}
+              elementById={elementById}
+              lineage={nextLineage}
+              onEditElement={onEditElement}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 export default function Plantbook2() {
   const [plants, setPlants] = useState<Plantbook2Plant[]>([]);
   const [elements, setElements] = useState<Plantbook2Element[]>([]);
@@ -191,6 +246,7 @@ export default function Plantbook2() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [bookView, setBookView] = useState<BookView>('workbench');
   const [treeCharacterFilter, setTreeCharacterFilter] = useState('');
+  const [treeElementFilter, setTreeElementFilter] = useState('');
 
   const [elementName, setElementName] = useState('');
   const [elementMode, setElementMode] = useState<ElementMode>('base');
@@ -503,6 +559,43 @@ export default function Plantbook2() {
     const basePlant = character ? plants.find((plant) => plant.id === character.base_plant_id) : null;
     return basePlant ? [basePlant] : [];
   }, [characters, familyTree.roots, plants, treeCharacterFilter]);
+  const elementTree = useMemo(() => {
+    const elementById = new Map(elements.map((element) => [element.id, element]));
+    const usedAsIngredient = new Set<string>();
+    elements.forEach((element) => {
+      if (element.parent_element_id) usedAsIngredient.add(element.parent_element_id);
+      if (element.second_parent_element_id) usedAsIngredient.add(element.second_parent_element_id);
+    });
+
+    const roots = [...elements]
+      .filter((element) => !usedAsIngredient.has(element.id))
+      .sort((a, b) => b.tier - a.tier || a.title.localeCompare(b.title));
+    const visited = new Set<string>();
+    const visit = (element: Plantbook2Element, path = new Set<string>()) => {
+      if (path.has(element.id)) return;
+      visited.add(element.id);
+      const nextPath = new Set(path);
+      nextPath.add(element.id);
+      [element.parent_element_id, element.second_parent_element_id].forEach((parentId) => {
+        const parent = parentId ? elementById.get(parentId) : null;
+        if (parent) visit(parent, nextPath);
+      });
+    };
+    roots.forEach((root) => visit(root));
+    elements.forEach((element) => {
+      if (!visited.has(element.id)) {
+        roots.push(element);
+        visit(element);
+      }
+    });
+
+    return { roots, elementById };
+  }, [elements]);
+  const visibleElementRoots = useMemo(() => {
+    if (!treeElementFilter) return elementTree.roots;
+    const element = elementTree.elementById.get(treeElementFilter);
+    return element ? [element] : [];
+  }, [elementTree, treeElementFilter]);
   const elementParentOneRecord = elements.find((element) => element.id === elementParentOne);
   const elementParentTwoRecord = elements.find((element) => element.id === elementParentTwo);
   const nextElementTier = elementMode === 'base'
@@ -609,9 +702,10 @@ export default function Plantbook2() {
       <nav className={styles.viewBar} aria-label="Plantbook view">
         <div className={styles.viewSwitcher} role="group" aria-label="Choose a Plantbook view">
           <button type="button" className={bookView === 'workbench' ? styles.viewActive : ''} aria-pressed={bookView === 'workbench'} onClick={() => setBookView('workbench')}>Workbench</button>
-          <button type="button" className={bookView === 'tree' ? styles.viewActive : ''} aria-pressed={bookView === 'tree'} onClick={() => setBookView('tree')}>Family tree</button>
+          <button type="button" className={bookView === 'plant-tree' ? styles.viewActive : ''} aria-pressed={bookView === 'plant-tree'} onClick={() => setBookView('plant-tree')}>Plant trees</button>
+          <button type="button" className={bookView === 'element-tree' ? styles.viewActive : ''} aria-pressed={bookView === 'element-tree'} onClick={() => setBookView('element-tree')}>Element trees</button>
         </div>
-        <span>{bookView === 'workbench' ? 'Create and record hybrids' : 'Trace every plant lineage'}</span>
+        <span>{bookView === 'workbench' ? 'Create and record hybrids' : bookView === 'plant-tree' ? 'Trace every plant lineage' : 'Trace every element fusion'}</span>
       </nav>
 
       {pageError && <div className={styles.alert}>{pageError} <button onClick={() => void fetchBook()}>Try again</button></div>}
@@ -718,7 +812,7 @@ export default function Plantbook2() {
           <td><span className={styles.tierBadge}>T{craft.result_plant?.tier}</span></td><td className={styles.noteCell}>{craft.notes || '—'}</td><td><div className={styles.itemActions}><button type="button" onClick={() => openCraftEditor(craft)}>Edit</button><button type="button" disabled={busy === 'delete'} onClick={() => void deleteItem('craft', craft.id, craft.result_plant?.title || 'recipe')}>Delete</button></div></td>
         </tr>)}</tbody></table></div> : <div className={styles.empty}><span>♧ + ✦</span><h3>{crafts.length ? 'No recipes match these filters.' : 'Your first recipe begins above.'}</h3><p>{crafts.length ? 'Choose another character or element to see more plants.' : 'Every result will be kept here and returned to your plant library.'}</p>{crafts.length > 0 && <button type="button" onClick={() => { setCharacterFilter(''); setElementFilter(''); }}>Clear filters</button>}</div>}
       </section>
-      </> : <section className={styles.familyView}>
+      </> : bookView === 'plant-tree' ? <section className={styles.familyView}>
         <div className={styles.familyHeading}>
           <div><p>Lineage atlas</p><h1>Plant family trees</h1><span>Follow each base plant through every element-led hybrid.</span></div>
           <label>Character family
@@ -746,6 +840,32 @@ export default function Plantbook2() {
           </div>
         ) : <div className={styles.empty}><span>♧</span><h3>No plant families yet.</h3><p>Return to the workbench to add a character and their base plant.</p><button type="button" onClick={() => setBookView('workbench')}>Open workbench</button></div>}
         {!loading && visibleFamilyRoots.length > 0 && <p className={styles.treeHint}>Scroll sideways to explore wide families. Each connector follows a plant into its next hybrid.</p>}
+      </section> : <section className={styles.familyView}>
+        <div className={styles.familyHeading}>
+          <div><p>Element genealogy</p><h1>Element family trees</h1><span>Trace each fused element back through both of its ingredients.</span></div>
+          <label>Element lineage
+            <select value={treeElementFilter} onChange={(event) => setTreeElementFilter(event.target.value)}>
+              <option value="">All final elements</option>
+              {elements.map((element) => <option key={element.id} value={element.id}>T{element.tier} · {element.title}</option>)}
+            </select>
+          </label>
+        </div>
+        {loading ? <div className={styles.empty}>Tracing the element lineages…</div> : visibleElementRoots.length > 0 ? (
+          <div className={styles.familyCanvas}>
+            <div className={`${styles.familyForest} ${styles.reversedElementForest}`}>
+              {visibleElementRoots.map((root) => (
+                <ul className={`${styles.treeRoot} ${styles.reversedElementTree}`} key={root.id}>
+                  <ElementFamilyBranch
+                    element={root}
+                    elementById={elementTree.elementById}
+                    onEditElement={openElementEditor}
+                  />
+                </ul>
+              ))}
+            </div>
+          </div>
+        ) : <div className={styles.empty}><span>✦</span><h3>No element families yet.</h3><p>Return to the workbench to add or fuse elements.</p><button type="button" onClick={() => setBookView('workbench')}>Open workbench</button></div>}
+        {!loading && visibleElementRoots.length > 0 && <p className={styles.treeHint}>Original ingredients form each crown; follow the branches downward to the final fusion.</p>}
       </section>}
 
       {editor && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>

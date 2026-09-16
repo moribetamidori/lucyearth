@@ -24,8 +24,8 @@
 .previous { justify-self: end; color: rgba(30, 51, 41, .56) !important; border-bottom: 1px solid var(--line); }
 .viewBar { display: flex; max-width: 1180px; align-items: center; justify-content: space-between; gap: 18px; margin: 22px auto 0; }
 .viewBar > span { color: rgba(30, 51, 41, .48); text-transform: uppercase; font-size: 7px; letter-spacing: .13em; }
-.viewSwitcher { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--ink); background: rgba(250, 247, 238, .6); }
-.viewSwitcher button { min-width: 132px; min-height: 36px; border: 0; background: transparent; color: rgba(30, 51, 41, .58); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .13em; }
+.viewSwitcher { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--ink); background: rgba(250, 247, 238, .6); }
+.viewSwitcher button { min-width: 124px; min-height: 36px; border: 0; background: transparent; color: rgba(30, 51, 41, .58); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .13em; }
 .viewSwitcher button + button { border-left: 1px solid var(--ink); }
 .viewSwitcher .viewActive { background: var(--ink); color: var(--cream); }
 .sectionHeading p, .ledgerHeading p { margin: 0; color: var(--moss); text-transform: uppercase; font-size: 9px; letter-spacing: .2em; }
@@ -113,6 +113,9 @@
 .treeBranch > ul::before { position: absolute; top: 0; left: 50%; height: 30px; border-left: 1px solid var(--moss); content: ''; }
 .treeRoot > .treeBranch { padding-top: 0; }
 .treeRoot > .treeBranch::before, .treeRoot > .treeBranch::after { display: none; }
+.reversedElementForest { align-items: flex-end; }
+.reversedElementTree { transform: scaleY(-1); }
+.reversedElementTree .treeNode { transform: scaleY(-1); }
 .treeNode { position: relative; z-index: 1; width: 196px; margin: 0 auto; overflow: hidden; border: 1px solid var(--forest); background: var(--cream); box-shadow: 6px 6px 0 rgba(41, 77, 59, .08); text-align: left; }
 .rootNode { background: rgba(112, 134, 114, .12); }
 .hybridNode { border-color: var(--line); }
@@ -132,6 +135,12 @@
 .treeCatalyst strong { overflow: hidden; font: 12px Georgia, serif; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .treeCatalyst button { display: block; margin: 8px auto 0; border: 0; border-bottom: 1px solid transparent; padding: 1px 0; background: transparent; color: rgba(30, 51, 41, .48); text-transform: uppercase; font: 6px var(--font-courier), monospace; letter-spacing: .1em; }
 .treeCatalyst button:hover { border-bottom-color: currentColor; color: var(--ink); }
+.elementTreeNode .treePlant .specimen { border-radius: 50%; }
+.elementFormula { min-height: 50px; padding: 9px 10px; border-top: 1px solid var(--line); text-align: center; }
+.elementFormula span { display: block; color: rgba(30, 51, 41, .46); text-transform: uppercase; font-size: 6px; letter-spacing: .1em; }
+.elementFormula strong { display: block; margin-top: 5px; overflow-wrap: anywhere; font: 12px/1.3 Georgia, serif; font-weight: 400; }
+.treeEditButton { display: block; margin: 0 auto 10px; border: 0; border-bottom: 1px solid transparent; padding: 1px 0; background: transparent; color: rgba(30, 51, 41, .48); text-transform: uppercase; font: 6px var(--font-courier), monospace; letter-spacing: .1em; }
+.treeEditButton:hover { border-bottom-color: currentColor; color: var(--ink); }
 .treeHint { margin: 12px 0 0; color: rgba(30, 51, 41, .46); font: italic 11px Georgia, serif; text-align: right; }
 .modalBackdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(18, 34, 27, .7); backdrop-filter: blur(4px); }
 .editorModal { width: min(600px, 100%); max-height: 92vh; overflow: auto; border: 1px solid var(--ink); background: var(--paper); box-shadow: 14px 14px 0 rgba(10, 22, 16, .25); }
@@ -150,7 +159,7 @@
 }
 @media (max-width: 560px) {
   .topbar { grid-template-columns: 1fr 1fr; }.topbar > span { display: none; }
-  .viewBar, .workspace, .craftSection, .ledger, .familyView, .alert, .notice { margin-left: 12px; margin-right: 12px; }.viewBar { align-items: stretch; flex-direction: column; }.viewBar > span { padding-left: 2px; }.viewSwitcher button { min-width: 0; }.setupPanel, .craftSection { padding: 20px 16px; }.compactForm { grid-template-columns: 1fr; }.elementForm > .imagePicker, .elementForm > .inkButton, .inkButton { grid-column: auto; }.library, .roster { grid-template-columns: 1fr; }
+  .viewBar, .workspace, .craftSection, .ledger, .familyView, .alert, .notice { margin-left: 12px; margin-right: 12px; }.viewBar { align-items: stretch; flex-direction: column; }.viewBar > span { padding-left: 2px; }.viewSwitcher button { min-width: 0; padding: 0 5px; font-size: 7px; letter-spacing: .08em; }.setupPanel, .craftSection { padding: 20px 16px; }.compactForm { grid-template-columns: 1fr; }.elementForm > .imagePicker, .elementForm > .inkButton, .inkButton { grid-column: auto; }.library, .roster { grid-template-columns: 1fr; }
   .equation { grid-template-columns: 1fr; gap: 12px; }.operator { height: 22px; transform: rotate(90deg); }.arrow { grid-column: auto; height: 22px; }.resultCard { grid-column: auto; }.specimen.large { width: 120px; }.ledgerHeading { gap: 12px; }.ledgerTools { display: grid; grid-template-columns: 1fr 1fr; }.ledgerTools > span { grid-column: 1 / -1; margin-left: 0; text-align: left; }.footer span:last-child { display: none; }
   .familyView { margin-top: 38px; }.familyHeading h1 { font-size: 32px; }.familyForest { justify-content: flex-start; padding-right: 24px; padding-left: 24px; }.treeHint { text-align: left; }
   .editorModal form { grid-template-columns: 1fr; }.editorModal form > label, .modalNotes, .modalImage { grid-column: auto; }
