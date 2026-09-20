@@ -24,8 +24,8 @@
 .previous { justify-self: end; color: rgba(30, 51, 41, .56) !important; border-bottom: 1px solid var(--line); }
 .viewBar { display: flex; max-width: 1180px; align-items: center; justify-content: space-between; gap: 18px; margin: 22px auto 0; }
 .viewBar > span { color: rgba(30, 51, 41, .48); text-transform: uppercase; font-size: 7px; letter-spacing: .13em; }
-.viewSwitcher { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--ink); background: rgba(250, 247, 238, .6); }
-.viewSwitcher button { min-width: 124px; min-height: 36px; border: 0; background: transparent; color: rgba(30, 51, 41, .58); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .13em; }
+.viewSwitcher { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ink); background: rgba(250, 247, 238, .6); }
+.viewSwitcher button { min-width: 116px; min-height: 36px; border: 0; background: transparent; color: rgba(30, 51, 41, .58); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .11em; }
 .viewSwitcher button + button { border-left: 1px solid var(--ink); }
 .viewSwitcher .viewActive { background: var(--ink); color: var(--cream); }
 .sectionHeading p, .ledgerHeading p { margin: 0; color: var(--moss); text-transform: uppercase; font-size: 9px; letter-spacing: .2em; }
@@ -69,6 +69,7 @@
 .itemActions button { border: 0; border-bottom: 1px solid transparent; padding: 2px 0; background: transparent; color: rgba(30, 51, 41, .56); text-transform: uppercase; font: 6px var(--font-courier), monospace; letter-spacing: .08em; }
 .itemActions button:hover:not(:disabled) { border-bottom-color: currentColor; color: var(--ink); }
 .itemActions button:disabled { opacity: .35; }
+.aiTag { display: inline-flex; width: max-content; align-items: center; margin-left: 6px; padding: 3px 5px 2px; border: 1px solid rgba(185, 134, 70, .65); background: rgba(185, 134, 70, .09); color: #8b5d27; text-transform: uppercase; font: normal 6px var(--font-courier), monospace; letter-spacing: .08em; white-space: nowrap; }
 .specimen { display: grid; overflow: hidden; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); background: rgba(112, 134, 114, .08); color: var(--moss); }.specimen > span:first-child { width: 100%; height: 100%; background-position: center; background-size: cover; }.specimen b { font: 22px Georgia, serif; font-weight: 400; }.specimen.plant { border-radius: 50% 50% 5px 50%; }.specimen.element { border-radius: 50%; }.specimen.small { width: 42px; height: 42px; }.specimen.normal { width: 76px; height: 76px; }.specimen.large { width: min(150px, 65%); aspect-ratio: 1; margin: 27px auto; }.specimen.large b { font-size: 49px; }
 .craftSection { max-width: 1180px; margin: 0 auto 70px; padding: 30px; border: 1px solid var(--ink); background: rgba(250, 247, 238, .68); box-shadow: 11px 11px 0 rgba(41, 77, 59, .09); }.craftSection > .sectionHeading { margin-bottom: 28px; }
 .equation { display: grid; grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr) 48px minmax(0, 1.08fr); align-items: stretch; }
@@ -92,6 +93,55 @@
 .tierBadge { border: 1px solid var(--amber); border-radius: 50%; padding: 7px 6px; color: #93662f; font: 8px var(--font-courier), monospace; }
 .noteCell { max-width: 230px; color: rgba(30, 51, 41, .56); font: italic 12px Georgia, serif; }
 .empty { display: flex; min-height: 230px; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--line); border-top: 0; background: rgba(250, 247, 238, .45); color: rgba(30, 51, 41, .5); font: italic 14px Georgia, serif; text-align: center; }.empty > span { color: var(--amber); font: 35px Georgia, serif; }.empty h3 { margin: 15px 0 4px; color: var(--ink); font: 25px Georgia, serif; font-weight: 400; }.empty p { margin: 0; }.empty button { margin-top: 16px; border: 0; border-bottom: 1px solid var(--ink); background: transparent; color: var(--ink); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .12em; }
+.reviewView { max-width: 1180px; margin: 54px auto 76px; }
+.reviewHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; padding-bottom: 24px; border-bottom: 1px solid var(--ink); }
+.reviewHeading p { margin: 0; color: var(--moss); text-transform: uppercase; font-size: 9px; letter-spacing: .2em; }
+.reviewHeading h1 { margin: 6px 0 7px; font: 40px/1 Georgia, serif; font-weight: 400; letter-spacing: -.04em; }
+.reviewHeading > div > span { color: rgba(30, 51, 41, .56); font: italic 13px Georgia, serif; }
+.reviewTotals { display: grid; grid-template-columns: repeat(3, auto); flex: 0 0 auto; border: 1px solid var(--line); }
+.reviewTotals span { min-width: 95px; padding: 12px 14px; color: var(--moss); text-align: center; text-transform: uppercase; font-size: 6px; letter-spacing: .1em; }
+.reviewTotals span + span { border-left: 1px solid var(--line); }
+.reviewTotals b { display: block; margin-bottom: 5px; color: var(--ink); font: 23px Georgia, serif; font-weight: 400; }
+.reviewTools { display: grid; grid-template-columns: 1fr 220px; gap: 18px; padding: 19px; border: 1px solid var(--line); border-top: 0; background: rgba(250, 247, 238, .48); }
+.reviewTools label { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: var(--moss); text-transform: uppercase; font-size: 7px; letter-spacing: .12em; }
+.reviewTools input, .reviewTools select { width: 100%; min-height: 38px; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; outline: none; background: transparent; color: var(--ink); font: 14px Georgia, serif; }
+.reviewGroup { margin-top: 40px; }
+.reviewGroup > header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 13px; border-bottom: 1px solid var(--ink); }
+.reviewGroup > header span { color: var(--moss); text-transform: uppercase; font-size: 7px; letter-spacing: .15em; }
+.reviewGroup > header h2 { margin: 4px 0 0; font: 28px Georgia, serif; font-weight: 400; }
+.reviewGroup > header > b { color: var(--amber); font: 22px Georgia, serif; font-weight: 400; }
+.reviewGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 14px; }
+.reviewCard, .reviewRecipe { border: 1px solid var(--line); background: rgba(250, 247, 238, .58); }
+.reviewCard { padding: 16px; }
+.reviewCardTop { display: flex; min-height: 22px; align-items: center; justify-content: space-between; gap: 10px; }
+.reviewCardTop .aiTag { margin-left: 0; }
+.pendingTag, .approvedTag { text-transform: uppercase; font-size: 6px; letter-spacing: .1em; }
+.pendingTag { color: #965f27; }.approvedTag { color: var(--forest); }
+.reviewFormula { display: flex; min-width: 0; align-items: center; gap: 9px; margin-top: 16px; font: 16px Georgia, serif; }
+.reviewFormula span, .reviewFormula strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reviewFormula strong { color: var(--forest); font-weight: 400; }
+.reviewFormula i { color: var(--amber); font-style: normal; }
+.reviewVisualFormula { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 20px minmax(0, 1fr); align-items: center; gap: 7px; margin-top: 10px; }
+.reviewVisualFormula > div { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.reviewVisualFormula > div > span { min-width: 0; overflow: hidden; font: 14px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.reviewVisualFormula small { display: block; margin-bottom: 3px; color: var(--moss); text-transform: uppercase; font: 6px var(--font-courier), monospace; letter-spacing: .09em; }
+.reviewVisualFormula > i { color: var(--amber); font: normal 17px Georgia, serif; text-align: center; }
+.reviewVisualFormula .reviewResult > span { color: var(--forest); }
+.photoCredits { display: flex; gap: 12px; margin-top: 7px; }
+.photoCredits a { color: rgba(30, 51, 41, .48); text-transform: uppercase; font-size: 6px; letter-spacing: .08em; text-underline-offset: 2px; }
+.reviewCard p, .reviewRecipeMain > p { margin: 9px 0 0; color: rgba(30, 51, 41, .5); font: italic 11px Georgia, serif; }
+.reviewCard footer, .reviewRecipe > footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.reviewCard footer button, .reviewRecipe footer button { min-height: 32px; padding: 0 11px; text-transform: uppercase; font: 7px var(--font-courier), monospace; letter-spacing: .1em; }
+.approveButton { border: 1px solid var(--forest); background: var(--forest); color: var(--cream); }
+.editButton { border: 1px solid var(--moss); background: transparent; color: var(--forest); }
+.rejectButton { border: 1px solid rgba(121, 62, 47, .48); background: transparent; color: #794033; }
+.reviewCard footer button:disabled, .reviewRecipe footer button:disabled { opacity: .45; }
+.reviewList { border: 1px solid var(--line); border-top: 0; }
+.reviewRecipe { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 14px 16px; border: 0; }
+.reviewRecipe + .reviewRecipe { border-top: 1px solid var(--line); }
+.reviewRecipe .reviewFormula { margin-top: 9px; }
+.reviewRecipe > footer { margin: 0; }
+.reviewEmpty { min-height: 110px; padding: 46px 20px; border: 1px solid var(--line); border-top: 0; color: rgba(30, 51, 41, .48); font: italic 13px Georgia, serif; text-align: center; }
 .familyView { max-width: 1180px; margin: 54px auto 70px; }
 .familyHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; padding-bottom: 22px; border-bottom: 1px solid var(--ink); }
 .familyHeading p { margin: 0; color: var(--moss); text-transform: uppercase; font-size: 9px; letter-spacing: .2em; }
@@ -120,6 +170,8 @@
 .rootNode { background: rgba(112, 134, 114, .12); }
 .hybridNode { border-color: var(--line); }
 .treeNodeTop { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--moss); text-transform: uppercase; font-size: 6px; letter-spacing: .12em; }
+.treeNodeTop > span { display: flex; align-items: center; }
+.treeNodeTop .aiTag { padding: 2px 4px 1px; font-size: 5px; }
 .treeNodeTop b { color: var(--amber); font-size: 7px; }
 .treePlant { display: flex; min-height: 98px; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 12px; text-align: center; }
 .treePlant .specimen { width: 58px; height: 58px; }
@@ -144,23 +196,36 @@
 .treeHint { margin: 12px 0 0; color: rgba(30, 51, 41, .46); font: italic 11px Georgia, serif; text-align: right; }
 .modalBackdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(18, 34, 27, .7); backdrop-filter: blur(4px); }
 .editorModal { width: min(600px, 100%); max-height: 92vh; overflow: auto; border: 1px solid var(--ink); background: var(--paper); box-shadow: 14px 14px 0 rgba(10, 22, 16, .25); }
+.craftEditorModal { width: min(900px, 100%); }
 .editorModal > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px; border-bottom: 1px solid var(--line); }.editorModal header p { margin: 0; color: var(--moss); text-transform: uppercase; font-size: 8px; letter-spacing: .16em; }.editorModal header h2 { margin: 5px 0 0; font: 28px Georgia, serif; font-weight: 400; }.editorModal header button { width: 34px; height: 34px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 22px Georgia, serif; }
 .editorModal form { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 24px; }.editorModal form > label, .modalImage { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: rgba(30, 51, 41, .58); text-transform: uppercase; font-size: 8px; letter-spacing: .14em; }.editorModal input, .editorModal select, .editorModal textarea { width: 100%; min-height: 41px; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; outline: 0; background: transparent; color: var(--ink); font: 16px Georgia, serif; }.editorModal textarea { min-height: 70px; resize: vertical; }.modalNotes, .modalImage { grid-column: 1 / -1; }.modalImage .imagePicker > button:first-of-type { height: 70px; }.modalImage .pickerEmpty, .modalImage .pickerPreview { height: 68px; flex-basis: 68px; }
+.editorRecipePreview { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 18px; border: 1px solid var(--line); background: rgba(112, 134, 114, .07); }
+.editorRecipePreview figure { min-width: 0; margin: 0; text-align: center; }
+.editorRecipePreview .specimen { width: min(170px, 100%); height: auto; aspect-ratio: 1; margin: 0 auto 10px; }
+.editorRecipePreview figcaption small { display: block; margin-bottom: 4px; color: var(--moss); text-transform: uppercase; font: 7px var(--font-courier), monospace; letter-spacing: .12em; }
+.editorRecipePreview figcaption strong { display: block; overflow-wrap: anywhere; font: 18px/1.15 Georgia, serif; font-weight: 400; }
+.editorRecipePreview > i { color: var(--amber); font: normal 28px Georgia, serif; text-align: center; }
+.craftEditorModal .modalImage .imagePicker > button:first-of-type { height: 190px; }
+.craftEditorModal .modalImage .pickerEmpty, .craftEditorModal .modalImage .pickerPreview { height: 188px; flex-basis: 188px; }
 .editorModal form > footer { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px; }.editorModal form > footer button { min-width: 110px; min-height: 39px; border: 1px solid var(--ink); background: transparent; color: var(--ink); text-transform: uppercase; font: 8px var(--font-courier), monospace; letter-spacing: .12em; }.editorModal form > footer button[type='submit'] { background: var(--ink); color: var(--cream); }.editorModal form > footer button:disabled { opacity: .5; }
 .footer { display: flex; justify-content: space-between; padding: 22px clamp(20px, 4vw, 60px); border-top: 1px solid var(--line); color: rgba(30, 51, 41, .46); text-transform: uppercase; font-size: 7px; letter-spacing: .14em; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-@media (max-width: 1220px) { .viewBar, .workspace, .craftSection, .ledger, .familyView, .alert, .notice { margin-left: 24px; margin-right: 24px; } }
+@media (max-width: 1220px) { .viewBar, .workspace, .craftSection, .ledger, .familyView, .reviewView, .alert, .notice { margin-left: 24px; margin-right: 24px; } }
 @media (max-width: 820px) {
   .compactForm { grid-template-columns: 1fr 1fr; }.elementForm > .imagePicker, .elementForm > .inkButton { grid-column: 1 / -1; }.library, .roster { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .equation { grid-template-columns: 1fr 34px 1fr; }.arrow { grid-column: 1 / -1; height: 42px; transform: rotate(90deg); }.resultCard { grid-column: 1 / -1; width: min(100%, 430px); justify-self: center; }.notes { grid-column: 1 / -1; padding-right: 0; }.craftButton { grid-column: 1 / -1; }
   .ledgerHeading { align-items: flex-start; flex-direction: column; }.ledgerTools { width: 100%; flex-wrap: wrap; }.ledgerTools label { flex: 1; }.ledgerTools select { width: 100%; }.ledgerTools > span { margin-left: auto; }
   .familyHeading { align-items: flex-start; flex-direction: column; }.familyHeading label { width: min(100%, 360px); }
+  .reviewHeading { align-items: flex-start; flex-direction: column; }.reviewTotals { width: 100%; }.reviewTotals span { flex: 1; min-width: 0; }.reviewGrid { grid-template-columns: 1fr; }
+  .reviewRecipe { align-items: flex-start; grid-template-columns: 1fr; }.reviewRecipe > footer { justify-content: flex-start; }
+  .reviewVisualFormula { grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr) 16px minmax(0, 1fr); }
 }
 @media (max-width: 560px) {
   .topbar { grid-template-columns: 1fr 1fr; }.topbar > span { display: none; }
-  .viewBar, .workspace, .craftSection, .ledger, .familyView, .alert, .notice { margin-left: 12px; margin-right: 12px; }.viewBar { align-items: stretch; flex-direction: column; }.viewBar > span { padding-left: 2px; }.viewSwitcher button { min-width: 0; padding: 0 5px; font-size: 7px; letter-spacing: .08em; }.setupPanel, .craftSection { padding: 20px 16px; }.compactForm { grid-template-columns: 1fr; }.elementForm > .imagePicker, .elementForm > .inkButton, .inkButton { grid-column: auto; }.library, .roster { grid-template-columns: 1fr; }
+  .viewBar, .workspace, .craftSection, .ledger, .familyView, .reviewView, .alert, .notice { margin-left: 12px; margin-right: 12px; }.viewBar { align-items: stretch; flex-direction: column; }.viewBar > span { padding-left: 2px; }.viewSwitcher button { min-width: 0; padding: 0 4px; font-size: 6px; letter-spacing: .05em; }.setupPanel, .craftSection { padding: 20px 16px; }.compactForm { grid-template-columns: 1fr; }.elementForm > .imagePicker, .elementForm > .inkButton, .inkButton { grid-column: auto; }.library, .roster { grid-template-columns: 1fr; }
   .equation { grid-template-columns: 1fr; gap: 12px; }.operator { height: 22px; transform: rotate(90deg); }.arrow { grid-column: auto; height: 22px; }.resultCard { grid-column: auto; }.specimen.large { width: 120px; }.ledgerHeading { gap: 12px; }.ledgerTools { display: grid; grid-template-columns: 1fr 1fr; }.ledgerTools > span { grid-column: 1 / -1; margin-left: 0; text-align: left; }.footer span:last-child { display: none; }
   .familyView { margin-top: 38px; }.familyHeading h1 { font-size: 32px; }.familyForest { justify-content: flex-start; padding-right: 24px; padding-left: 24px; }.treeHint { text-align: left; }
-  .editorModal form { grid-template-columns: 1fr; }.editorModal form > label, .modalNotes, .modalImage { grid-column: auto; }
+  .reviewView { margin-top: 38px; }.reviewHeading h1 { font-size: 32px; }.reviewTotals { grid-template-columns: 1fr; }.reviewTotals span + span { border-top: 1px solid var(--line); border-left: 0; }.reviewTools { grid-template-columns: 1fr; }.reviewFormula { flex-wrap: wrap; }.reviewVisualFormula { grid-template-columns: 1fr; }.reviewVisualFormula > i { transform: rotate(90deg); }.reviewCard footer, .reviewRecipe > footer { align-items: stretch; flex-direction: column; }.reviewCard footer button, .reviewRecipe footer button { width: 100%; }
+  .editorModal form { grid-template-columns: 1fr; }.editorModal form > label, .modalNotes, .modalImage { grid-column: auto; }.editorRecipePreview { grid-column: auto; grid-template-columns: 1fr; }.editorRecipePreview > i { transform: rotate(90deg); }.editorRecipePreview .specimen { width: min(180px, 72vw); }
 }

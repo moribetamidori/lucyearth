@@ -316,7 +316,11 @@ export type Plantbook2Plant = {
   tier: number;
   image_url: string | null;
   image_path: string | null;
+  image_source_url: string | null;
+  image_attribution: string | null;
   parent_plant_id: string | null;
+  ai_generated: boolean;
+  curation_status: 'pending' | 'approved';
   created_at: string;
   updated_at: string;
 };
@@ -330,6 +334,8 @@ export type Plantbook2Element = {
   image_path: string | null;
   parent_element_id: string | null;
   second_parent_element_id: string | null;
+  ai_generated: boolean;
+  curation_status: 'pending' | 'approved';
   created_at: string;
   updated_at: string;
 };
@@ -351,6 +357,8 @@ export type Plantbook2Craft = {
   element_id: string;
   result_plant_id: string;
   notes: string | null;
+  ai_generated: boolean;
+  curation_status: 'pending' | 'approved';
   created_at: string;
   updated_at: string;
   plant?: Plantbook2Plant | null;

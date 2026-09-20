@@ -27,13 +27,17 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 type ImageDraft = { file: File | null; preview: string | null };
 type ElementMode = 'base' | 'fusion';
 type EditKind = 'plant' | 'element' | 'character' | 'craft';
-type BookView = 'workbench' | 'plant-tree' | 'element-tree';
+type BookView = 'workbench' | 'ai-review' | 'plant-tree' | 'element-tree';
+type ReviewFilter = 'pending' | 'approved' | 'all';
+type SuggestionKind = 'element' | 'craft';
 type Editor = {
   kind: EditKind;
   id: string;
   name: string;
   image: ImageDraft;
   originalImagePath: string | null;
+  originalImageSource: string | null;
+  originalImageAttribution: string | null;
   removeImage: boolean;
   plantId: string;
   elementId: string;
@@ -136,7 +140,7 @@ function PlantFamilyBranch({
     <li className={styles.treeBranch}>
       <article className={`${styles.treeNode} ${craft ? styles.hybridNode : styles.rootNode}`}>
         <div className={styles.treeNodeTop}>
-          <span>{craft ? 'Hybrid plant' : 'Base plant'}</span>
+          <span>{craft ? 'Hybrid plant' : 'Base plant'}{plant.ai_generated && <em className={styles.aiTag}>AI generated</em>}</span>
           <b>T{plant.tier}</b>
         </div>
         <div className={styles.treePlant}>
@@ -202,7 +206,7 @@ function ElementFamilyBranch({
     <li className={styles.treeBranch}>
       <article className={`${styles.treeNode} ${styles.elementTreeNode} ${isFusion ? styles.hybridNode : styles.rootNode}`}>
         <div className={styles.treeNodeTop}>
-          <span>{isFusion ? 'Fused element' : 'Base element'}</span>
+          <span>{isFusion ? 'Fused element' : 'Base element'}{element.ai_generated && <em className={styles.aiTag}>AI generated</em>}</span>
           <b>T{element.tier}</b>
         </div>
         <div className={styles.treePlant}>
@@ -242,11 +246,13 @@ export default function Plantbook2() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState<'element' | 'character' | 'craft' | 'edit' | 'delete' | ''>('');
+  const [busy, setBusy] = useState<'element' | 'character' | 'craft' | 'edit' | 'delete' | 'curation' | ''>('');
   const [editor, setEditor] = useState<Editor | null>(null);
   const [bookView, setBookView] = useState<BookView>('workbench');
   const [treeCharacterFilter, setTreeCharacterFilter] = useState('');
   const [treeElementFilter, setTreeElementFilter] = useState('');
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('pending');
+  const [reviewSearch, setReviewSearch] = useState('');
 
   const [elementName, setElementName] = useState('');
   const [elementMode, setElementMode] = useState<ElementMode>('base');
@@ -349,6 +355,7 @@ export default function Plantbook2() {
   const openElementEditor = (element: Plantbook2Element) => setEditor({
     kind: 'element', id: element.id, name: element.title,
     image: { file: null, preview: element.image_url }, originalImagePath: element.image_path,
+    originalImageSource: null, originalImageAttribution: null,
     removeImage: false, plantId: '', elementId: '', basePlantId: '',
     parentOneId: element.parent_element_id || '',
     parentTwoId: element.second_parent_element_id || '', notes: '',
@@ -356,14 +363,18 @@ export default function Plantbook2() {
 
   const openCharacterEditor = (character: Plantbook2Character) => setEditor({
     kind: 'character', id: character.id, name: character.name, image: blankImage(),
-    originalImagePath: null, removeImage: false, plantId: '', elementId: '',
+    originalImagePath: null, originalImageSource: null, originalImageAttribution: null,
+    removeImage: false, plantId: '', elementId: '',
     basePlantId: character.base_plant_id, parentOneId: '', parentTwoId: '', notes: '',
   });
 
   const openCraftEditor = (craft: Plantbook2Craft) => setEditor({
     kind: 'craft', id: craft.id, name: craft.result_plant?.title || '',
     image: { file: null, preview: craft.result_plant?.image_url || null },
-    originalImagePath: craft.result_plant?.image_path || null, removeImage: false,
+    originalImagePath: craft.result_plant?.image_path || null,
+    originalImageSource: craft.result_plant?.image_source_url || null,
+    originalImageAttribution: craft.result_plant?.image_attribution || null,
+    removeImage: false,
     plantId: craft.plant_id, elementId: craft.element_id, basePlantId: '',
     parentOneId: '', parentTwoId: '', notes: craft.notes || '',
   });
@@ -398,9 +409,13 @@ export default function Plantbook2() {
         image_url: uploaded?.url || (editor.removeImage ? null : editor.image.preview),
         image_path: uploaded?.path || (editor.removeImage ? null : editor.originalImagePath),
       };
+      const plantCreditValues = {
+        image_source_url: uploaded || editor.removeImage ? null : editor.originalImageSource,
+        image_attribution: uploaded || editor.removeImage ? null : editor.originalImageAttribution,
+      };
 
       if (editor.kind === 'plant') {
-        const { error } = await supabase.from('plantbook2_plants').update({ title: editor.name.trim(), ...imageValues }).eq('id', editor.id);
+        const { error } = await supabase.from('plantbook2_plants').update({ title: editor.name.trim(), ...imageValues, ...plantCreditValues }).eq('id', editor.id);
         if (error) throw error;
       } else if (editor.kind === 'element') {
         const firstParent = elements.find((item) => item.id === editor.parentOneId);
@@ -422,9 +437,17 @@ export default function Plantbook2() {
         const craft = crafts.find((item) => item.id === editor.id);
         const source = plants.find((item) => item.id === editor.plantId);
         if (!craft?.result_plant || !source || !editor.elementId) throw new Error('Choose both recipe ingredients.');
+        const ingredientConflict = crafts.find((item) =>
+          item.id !== editor.id
+          && item.plant_id === editor.plantId
+          && item.element_id === editor.elementId
+        );
+        if (ingredientConflict) {
+          throw new Error(`${source.title} + ${elements.find((item) => item.id === editor.elementId)?.title || 'that element'} already creates ${ingredientConflict.result_plant?.title || 'another plant'}. Choose a unique pair.`);
+        }
         const originalResult = craft.result_plant;
         const { error: plantError } = await supabase.from('plantbook2_plants').update({
-          title: editor.name.trim(), tier: source.tier + 1, parent_plant_id: source.id, ...imageValues,
+          title: editor.name.trim(), tier: source.tier + 1, parent_plant_id: source.id, ...imageValues, ...plantCreditValues,
         }).eq('id', originalResult.id);
         if (plantError) throw plantError;
         const { error: craftError } = await supabase.from('plantbook2_crafts').update({
@@ -435,6 +458,8 @@ export default function Plantbook2() {
             title: originalResult.title, tier: originalResult.tier,
             parent_plant_id: originalResult.parent_plant_id,
             image_url: originalResult.image_url, image_path: originalResult.image_path,
+            image_source_url: originalResult.image_source_url,
+            image_attribution: originalResult.image_attribution,
           }).eq('id', originalResult.id);
           throw craftError;
         }
@@ -454,9 +479,35 @@ export default function Plantbook2() {
   };
 
   const deleteItem = async (kind: EditKind, id: string, title: string, imagePath: string | null = null) => {
-    const detail = kind === 'craft' ? 'The result plant will stay in your plant library.' : 'This cannot be undone.';
+    const generated = kind === 'craft'
+      ? crafts.find((craft) => craft.id === id)?.ai_generated
+      : kind === 'element'
+        ? elements.find((element) => element.id === id)?.ai_generated
+        : false;
+    const detail = generated
+      ? kind === 'craft'
+        ? 'Its AI-generated result branch will also be removed.'
+        : 'This AI-generated suggestion will be removed.'
+      : kind === 'craft'
+        ? 'The result plant will stay in your plant library.'
+        : 'This cannot be undone.';
     if (!window.confirm(`Delete ${kind === 'craft' ? 'the recipe for' : ''} “${title}”? ${detail}`)) return;
     setBusy('delete'); setNotice('');
+    if (generated && (kind === 'craft' || kind === 'element')) {
+      const { error } = await supabase.rpc('delete_plantbook2_ai_suggestion', {
+        item_kind: kind,
+        item_id: id,
+      });
+      if (error) {
+        setNotice(errorMessage(error, 'This AI suggestion could not be deleted.'));
+      } else {
+        if (imagePath) void appStorage.from(STORAGE_BUCKET).remove([imagePath]);
+        await fetchBook();
+        setNotice(`“${title}” and its generated branch were deleted.`);
+      }
+      setBusy('');
+      return;
+    }
     const table = {
       plant: 'plantbook2_plants', element: 'plantbook2_elements',
       character: 'plantbook2_characters', craft: 'plantbook2_crafts',
@@ -471,6 +522,56 @@ export default function Plantbook2() {
       if (imagePath) void appStorage.from(STORAGE_BUCKET).remove([imagePath]);
       await fetchBook();
       setNotice(`“${title}” deleted.`);
+    }
+    setBusy('');
+  };
+
+  const approveSuggestion = async (kind: SuggestionKind, id: string, title: string) => {
+    setBusy('curation'); setNotice('');
+    const { error } = await supabase.rpc('set_plantbook2_ai_curation', {
+      item_kind: kind,
+      item_id: id,
+      next_status: 'approved',
+    });
+    if (error) {
+      setNotice(errorMessage(error, 'This suggestion could not be approved.'));
+    } else {
+      await fetchBook();
+      setNotice(`“${title}” approved and kept in Plantbook II.`);
+    }
+    setBusy('');
+  };
+
+  const deleteSuggestion = async (kind: SuggestionKind, id: string, title: string) => {
+    const craft = kind === 'craft' ? crafts.find((item) => item.id === id) : null;
+    const descendants = craft ? (() => {
+      const ids = new Set<string>([craft.result_plant_id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        plants.forEach((plant) => {
+          if (plant.parent_plant_id && ids.has(plant.parent_plant_id) && !ids.has(plant.id)) {
+            ids.add(plant.id); changed = true;
+          }
+        });
+      }
+      return ids.size - 1;
+    })() : 0;
+    const branchNote = descendants > 0
+      ? ` This will also remove ${descendants} generated descendant${descendants === 1 ? '' : 's'} in its family branch.`
+      : '';
+    if (!window.confirm(`Delete AI suggestion “${title}”?${branchNote} This cannot be undone.`)) return;
+
+    setBusy('curation'); setNotice('');
+    const { error } = await supabase.rpc('delete_plantbook2_ai_suggestion', {
+      item_kind: kind,
+      item_id: id,
+    });
+    if (error) {
+      setNotice(errorMessage(error, 'This suggestion could not be deleted. It may now be used by a hand-made recipe.'));
+    } else {
+      await fetchBook();
+      setNotice(`“${title}” deleted from the generated suggestions.`);
     }
     setBusy('');
   };
@@ -515,6 +616,25 @@ export default function Plantbook2() {
       return matchesCharacter && matchesElement;
     });
   }, [characterFilter, characterPlantIds, crafts, elementFilter]);
+  const generatedElements = useMemo(() => elements.filter((element) => element.ai_generated), [elements]);
+  const generatedCrafts = useMemo(() => crafts.filter((craft) => craft.ai_generated), [crafts]);
+  const pendingSuggestionCount = useMemo(
+    () => generatedElements.filter((element) => element.curation_status === 'pending').length
+      + generatedCrafts.filter((craft) => craft.curation_status === 'pending').length,
+    [generatedCrafts, generatedElements],
+  );
+  const reviewItems = useMemo(() => {
+    const term = reviewSearch.trim().toLocaleLowerCase();
+    const statusMatches = (status: 'pending' | 'approved') => reviewFilter === 'all' || status === reviewFilter;
+    const matches = (...values: Array<string | null | undefined>) => !term
+      || values.some((value) => value?.toLocaleLowerCase().includes(term));
+    return {
+      elements: generatedElements.filter((element) => statusMatches(element.curation_status)
+        && matches(element.title)),
+      crafts: generatedCrafts.filter((craft) => statusMatches(craft.curation_status)
+        && matches(craft.plant?.title, craft.element?.title, craft.result_plant?.title, craft.notes)),
+    };
+  }, [generatedCrafts, generatedElements, reviewFilter, reviewSearch]);
   const familyTree = useMemo(() => {
     const plantIds = new Set(plants.map((plant) => plant.id));
     const childrenByPlant = new Map<string, Plantbook2Plant[]>();
@@ -603,6 +723,24 @@ export default function Plantbook2() {
     : Math.max(elementParentOneRecord?.tier || 0, elementParentTwoRecord?.tier || 0) + 1;
   const nextPlantTier = (selectedPlant?.tier || 0) + 1;
   const editingCraft = editor?.kind === 'craft' ? crafts.find((craft) => craft.id === editor.id) : null;
+  const editingSourcePlant = editor?.kind === 'craft' ? plants.find((plant) => plant.id === editor.plantId) : null;
+  const editingElement = editor?.kind === 'craft' ? elements.find((element) => element.id === editor.elementId) : null;
+  const blockedEditingSourceIds = (() => {
+    const ids = new Set<string>();
+    if (!editingCraft?.result_plant_id) return ids;
+    ids.add(editingCraft.result_plant_id);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      plants.forEach((plant) => {
+        if (plant.parent_plant_id && ids.has(plant.parent_plant_id) && !ids.has(plant.id)) {
+          ids.add(plant.id);
+          changed = true;
+        }
+      });
+    }
+    return ids;
+  })();
 
   const addElement = async (event: FormEvent) => {
     event.preventDefault();
@@ -664,6 +802,12 @@ export default function Plantbook2() {
   const craftPlant = async (event: FormEvent) => {
     event.preventDefault();
     if (!selectedPlant || !selectedElement || !resultName.trim()) return setNotice('Choose a plant and element, then name the result.');
+    const ingredientConflict = crafts.find((craft) =>
+      craft.plant_id === selectedPlant.id && craft.element_id === selectedElement.id
+    );
+    if (ingredientConflict) {
+      return setNotice(`${selectedPlant.title} + ${selectedElement.title} already creates ${ingredientConflict.result_plant?.title || 'another plant'}. Every ingredient pair can have only one result.`);
+    }
     setBusy('craft'); setNotice('');
     let uploaded: { url: string; path: string } | null = null;
     let newPlant: Plantbook2Plant | null = null;
@@ -702,10 +846,11 @@ export default function Plantbook2() {
       <nav className={styles.viewBar} aria-label="Plantbook view">
         <div className={styles.viewSwitcher} role="group" aria-label="Choose a Plantbook view">
           <button type="button" className={bookView === 'workbench' ? styles.viewActive : ''} aria-pressed={bookView === 'workbench'} onClick={() => setBookView('workbench')}>Workbench</button>
+          <button type="button" className={bookView === 'ai-review' ? styles.viewActive : ''} aria-pressed={bookView === 'ai-review'} onClick={() => setBookView('ai-review')}>AI review{pendingSuggestionCount > 0 ? ` · ${pendingSuggestionCount}` : ''}</button>
           <button type="button" className={bookView === 'plant-tree' ? styles.viewActive : ''} aria-pressed={bookView === 'plant-tree'} onClick={() => setBookView('plant-tree')}>Plant trees</button>
           <button type="button" className={bookView === 'element-tree' ? styles.viewActive : ''} aria-pressed={bookView === 'element-tree'} onClick={() => setBookView('element-tree')}>Element trees</button>
         </div>
-        <span>{bookView === 'workbench' ? 'Create and record hybrids' : bookView === 'plant-tree' ? 'Trace every plant lineage' : 'Trace every element fusion'}</span>
+        <span>{bookView === 'workbench' ? 'Create and record hybrids' : bookView === 'ai-review' ? 'Approve or reject generated curiosities' : bookView === 'plant-tree' ? 'Trace every plant lineage' : 'Trace every element fusion'}</span>
       </nav>
 
       {pageError && <div className={styles.alert}>{pageError} <button onClick={() => void fetchBook()}>Try again</button></div>}
@@ -760,7 +905,7 @@ export default function Plantbook2() {
           <div className={styles.library}>
             {elements.length ? elements.map((element) => <div className={styles.libraryItem} key={element.id}>
               <Specimen image={element.image_url} name={element.title} kind="element" size="small" />
-              <span><b>{element.title}</b><small>Tier {element.tier}{element.parent_element_id && element.second_parent_element_id ? ' · fused' : ''}</small></span>
+              <span><b>{element.title}</b><small>Tier {element.tier}{element.parent_element_id && element.second_parent_element_id ? ' · fused' : ''}{element.ai_generated && <em className={styles.aiTag}>AI generated</em>}</small></span>
               <span className={styles.useCount}>{elementUseCounts.get(element.id) || 0} {(elementUseCounts.get(element.id) || 0) === 1 ? 'plant' : 'plants'}</span>
               <div className={styles.itemActions}><button type="button" onClick={() => openElementEditor(element)}>Edit</button><button type="button" disabled={busy === 'delete'} onClick={() => void deleteItem('element', element.id, element.title, element.image_path)}>Delete</button></div>
             </div>) : <p>No elements yet. Add the first material.</p>}
@@ -808,11 +953,60 @@ export default function Plantbook2() {
           <td className={styles.symbol}>+</td>
           <td><div className={styles.tableSpecimen}><Specimen image={craft.element?.image_url || null} name={craft.element?.title || ''} kind="element" size="small" /><b>{craft.element?.title}</b></div></td>
           <td className={styles.symbol}>→</td>
-          <td><div className={styles.tableSpecimen}><Specimen image={craft.result_plant?.image_url || null} name={craft.result_plant?.title || ''} kind="plant" size="small" /><b>{craft.result_plant?.title}</b></div></td>
+          <td><div className={styles.tableSpecimen}><Specimen image={craft.result_plant?.image_url || null} name={craft.result_plant?.title || ''} kind="plant" size="small" /><b>{craft.result_plant?.title}</b>{craft.ai_generated && <span className={styles.aiTag}>AI generated</span>}</div></td>
           <td><span className={styles.tierBadge}>T{craft.result_plant?.tier}</span></td><td className={styles.noteCell}>{craft.notes || '—'}</td><td><div className={styles.itemActions}><button type="button" onClick={() => openCraftEditor(craft)}>Edit</button><button type="button" disabled={busy === 'delete'} onClick={() => void deleteItem('craft', craft.id, craft.result_plant?.title || 'recipe')}>Delete</button></div></td>
         </tr>)}</tbody></table></div> : <div className={styles.empty}><span>♧ + ✦</span><h3>{crafts.length ? 'No recipes match these filters.' : 'Your first recipe begins above.'}</h3><p>{crafts.length ? 'Choose another character or element to see more plants.' : 'Every result will be kept here and returned to your plant library.'}</p>{crafts.length > 0 && <button type="button" onClick={() => { setCharacterFilter(''); setElementFilter(''); }}>Clear filters</button>}</div>}
       </section>
-      </> : bookView === 'plant-tree' ? <section className={styles.familyView}>
+      </> : bookView === 'ai-review' ? <section className={styles.reviewView}>
+        <div className={styles.reviewHeading}>
+          <div><p>Curator&apos;s cabinet</p><h1>AI-generated suggestions</h1><span>Every result is a documented real-world plant or fungus. Keep the delightful ones; remove the rest.</span></div>
+          <div className={styles.reviewTotals}>
+            <span><b>{plants.length}</b> plants</span>
+            <span><b>{elements.length}</b> elements</span>
+            <span><b>{pendingSuggestionCount}</b> awaiting review</span>
+          </div>
+        </div>
+        <div className={styles.reviewTools}>
+          <label>Search suggestions<input type="search" value={reviewSearch} onChange={(event) => setReviewSearch(event.target.value)} placeholder="Plant, element, or scientific name…" /></label>
+          <label>Review status<select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as ReviewFilter)}><option value="pending">Awaiting review</option><option value="approved">Approved</option><option value="all">All AI generated</option></select></label>
+        </div>
+
+        <section className={styles.reviewGroup}>
+          <header><div><span>Element + element</span><h2>Element fusions</h2></div><b>{reviewItems.elements.length}</b></header>
+          {reviewItems.elements.length > 0 ? <div className={styles.reviewGrid}>{reviewItems.elements.map((element) => {
+            const firstParent = element.parent_element_id ? elementTree.elementById.get(element.parent_element_id) : null;
+            const secondParent = element.second_parent_element_id ? elementTree.elementById.get(element.second_parent_element_id) : null;
+            return <article className={styles.reviewCard} key={element.id}>
+              <div className={styles.reviewCardTop}><span className={styles.aiTag}>AI generated</span><span className={element.curation_status === 'approved' ? styles.approvedTag : styles.pendingTag}>{element.curation_status === 'approved' ? 'Approved' : 'Awaiting review'}</span></div>
+              <div className={styles.reviewFormula}><span>{firstParent?.title || '?'}</span><i>+</i><span>{secondParent?.title || '?'}</span><i>→</i><strong>{element.title}</strong></div>
+              <p>Tier {element.tier} element fusion</p>
+              <footer>{element.curation_status === 'pending' && <button className={styles.approveButton} type="button" disabled={busy === 'curation'} onClick={() => void approveSuggestion('element', element.id, element.title)}>Approve &amp; keep</button>}<button className={styles.rejectButton} type="button" disabled={busy === 'curation'} onClick={() => void deleteSuggestion('element', element.id, element.title)}>Delete</button></footer>
+            </article>;
+          })}</div> : <div className={styles.reviewEmpty}>No element suggestions match this view.</div>}
+        </section>
+
+        <section className={styles.reviewGroup}>
+          <header><div><span>Plant + element</span><h2>Real-world plant families</h2></div><b>{reviewItems.crafts.length}</b></header>
+          {reviewItems.crafts.length > 0 ? <div className={styles.reviewList}>{reviewItems.crafts.map((craft) => <article className={styles.reviewRecipe} key={craft.id}>
+            <div className={styles.reviewRecipeMain}>
+              <div className={styles.reviewCardTop}><span className={styles.aiTag}>AI generated</span><span className={craft.curation_status === 'approved' ? styles.approvedTag : styles.pendingTag}>{craft.curation_status === 'approved' ? 'Approved' : 'Awaiting review'}</span></div>
+              <div className={styles.reviewVisualFormula}>
+                <div><Specimen image={craft.plant?.image_url || null} name={craft.plant?.title || 'Source plant'} kind="plant" size="small" /><span><small>Source plant</small>{craft.plant?.title || 'Unknown plant'}</span></div>
+                <i>+</i>
+                <div><Specimen image={craft.element?.image_url || null} name={craft.element?.title || 'Element'} kind="element" size="small" /><span><small>Element</small>{craft.element?.title || 'Unknown element'}</span></div>
+                <i>→</i>
+                <div className={styles.reviewResult}><Specimen image={craft.result_plant?.image_url || null} name={craft.result_plant?.title || 'Result plant'} kind="plant" size="small" /><span><small>Result · Tier {craft.result_plant?.tier || '?'}</small>{craft.result_plant?.title || 'Unknown result'}</span></div>
+              </div>
+              <p>{craft.notes || 'Verified real-world taxon.'} · Tier {craft.result_plant?.tier || '?'}</p>
+              {(craft.plant?.image_source_url || craft.result_plant?.image_source_url) && <div className={styles.photoCredits}>
+                {craft.plant?.image_source_url && <a href={craft.plant.image_source_url} target="_blank" rel="noreferrer" title={craft.plant.image_attribution || undefined}>Source photo credit</a>}
+                {craft.result_plant?.image_source_url && <a href={craft.result_plant.image_source_url} target="_blank" rel="noreferrer" title={craft.result_plant.image_attribution || undefined}>Result photo credit</a>}
+              </div>}
+            </div>
+            <footer><button className={styles.editButton} type="button" disabled={busy === 'curation'} onClick={() => openCraftEditor(craft)}>Edit</button>{craft.curation_status === 'pending' && <button className={styles.approveButton} type="button" disabled={busy === 'curation'} onClick={() => void approveSuggestion('craft', craft.id, craft.result_plant?.title || 'Plant suggestion')}>Approve &amp; keep</button>}<button className={styles.rejectButton} type="button" disabled={busy === 'curation'} onClick={() => void deleteSuggestion('craft', craft.id, craft.result_plant?.title || 'Plant suggestion')}>Delete</button></footer>
+          </article>)}</div> : <div className={styles.reviewEmpty}>No plant suggestions match this view.</div>}
+        </section>
+      </section> : bookView === 'plant-tree' ? <section className={styles.familyView}>
         <div className={styles.familyHeading}>
           <div><p>Lineage atlas</p><h1>Plant family trees</h1><span>Follow each base plant through every element-led hybrid.</span></div>
           <label>Character family
@@ -869,9 +1063,16 @@ export default function Plantbook2() {
       </section>}
 
       {editor && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
-        <section className={styles.editorModal} role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <section className={`${styles.editorModal} ${editor.kind === 'craft' ? styles.craftEditorModal : ''}`} role="dialog" aria-modal="true" aria-labelledby="edit-title">
           <header><div><p>Edit {editor.kind}</p><h2 id="edit-title">{editor.name}</h2></div><button type="button" onClick={closeEditor} aria-label="Close editor">×</button></header>
           <form onSubmit={saveEdit}>
+            {editor.kind === 'craft' && <div className={styles.editorRecipePreview}>
+              <figure><Specimen image={editingSourcePlant?.image_url || null} name={editingSourcePlant?.title || 'Source plant'} kind="plant" size="large" /><figcaption><small>Source plant</small><strong>{editingSourcePlant?.title || 'Choose a plant'}</strong></figcaption></figure>
+              <i>+</i>
+              <figure><Specimen image={editingElement?.image_url || null} name={editingElement?.title || 'Element'} kind="element" size="large" /><figcaption><small>Element</small><strong>{editingElement?.title || 'Choose an element'}</strong></figcaption></figure>
+              <i>→</i>
+              <figure><Specimen image={editor.image.preview} name={editor.name || 'Result plant'} kind="plant" size="large" /><figcaption><small>Result plant</small><strong>{editor.name || 'Unnamed plant'}</strong></figcaption></figure>
+            </div>}
             <label>{editor.kind === 'craft' ? 'Result plant name' : 'Name'}<input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} /></label>
             {editor.kind === 'character' && <label>Base plant<select value={editor.basePlantId} onChange={(event) => setEditor({ ...editor, basePlantId: event.target.value })}>{plants.filter((plant) => plant.tier === 1).map((plant) => <option key={plant.id} value={plant.id}>{plant.title}</option>)}</select></label>}
             {editor.kind === 'element' && <>
@@ -879,7 +1080,7 @@ export default function Plantbook2() {
               <label>Second ingredient<select value={editor.parentTwoId} disabled={!editor.parentOneId} onChange={(event) => setEditor({ ...editor, parentTwoId: event.target.value })}><option value="">Select an element…</option>{elements.filter((element) => element.id !== editor.id).map((element) => <option key={element.id} value={element.id}>T{element.tier} · {element.title}</option>)}</select></label>
             </>}
             {editor.kind === 'craft' && <>
-              <label>Source plant<select value={editor.plantId} onChange={(event) => setEditor({ ...editor, plantId: event.target.value })}>{plants.filter((plant) => plant.id !== editingCraft?.result_plant_id).map((plant) => <option key={plant.id} value={plant.id}>T{plant.tier} · {plant.title}</option>)}</select></label>
+              <label>Source plant<select value={editor.plantId} onChange={(event) => setEditor({ ...editor, plantId: event.target.value })}>{plants.filter((plant) => !blockedEditingSourceIds.has(plant.id)).map((plant) => <option key={plant.id} value={plant.id}>T{plant.tier} · {plant.title}</option>)}</select></label>
               <label>Element<select value={editor.elementId} onChange={(event) => setEditor({ ...editor, elementId: event.target.value })}>{elements.map((element) => <option key={element.id} value={element.id}>T{element.tier} · {element.title}</option>)}</select></label>
               <label className={styles.modalNotes}>Field notes<textarea value={editor.notes} onChange={(event) => setEditor({ ...editor, notes: event.target.value })} /></label>
             </>}
