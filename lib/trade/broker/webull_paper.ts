@@ -9,6 +9,7 @@ export const SANDBOX_HOST = 'api.sandbox.webull.com';
 const endpoints = {
   accounts: '/trading/accounts/list', balance: '/trading/assets/balances/get', positions: '/trading/assets/positions/list',
   quote: '/market-data/stocks/snapshots/list', bars: '/market-data/stocks/bars/list',
+  optionContracts: '/trading/instruments/options/contracts/list', optionSnapshots: '/market-data/options/snapshots/list',
   instrument: '/trading/instruments/stocks/profiles/list', open: '/trading/orders/open-orders/list',
   history: '/trading/orders/historical-orders/list', detail: '/trading/orders/get',
   preview: '/trading/orders/preview', place: '/trading/orders/place', cancel: '/trading/orders/cancel',
@@ -146,6 +147,18 @@ export class WebullPaperBroker implements PaperBroker {
     if (!r) throw new Error('Webull did not return the requested symbol.');
     return { symbol, last: number(r.price, 'quote price'), bid: optionalNumber(r.bid, 'bid'), ask: optionalNumber(r.ask, 'ask'), asOf: timestamp(r.last_trade_time), receivedAt: new Date().toISOString(), delaySeconds: 900, source: this.kind };
   }
+  async getWatchQuotes(symbols: string[], category: 'US_STOCK' | 'US_ETF') {
+    if (symbols.length === 0) return [];
+    if (symbols.length > 20 || symbols.some(symbol => !/^[A-Z][A-Z0-9.]{0,9}$/.test(symbol))) throw new Error('Invalid watchlist symbols.');
+    return items(await this.request('quote', { symbols: symbols.join(','), category })).map(value => {
+      const row = record(value);
+      const symbol = string(row.symbol, 'watchlist symbol');
+      if (!symbols.includes(symbol)) throw new Error('Webull returned an unexpected watchlist symbol.');
+      const preClose = optionalNumber(row.pre_close, 'previous close');
+      return { symbol, price: number(row.price, 'watchlist price'), preClose: preClose !== null && preClose > 0 ? preClose : null,
+        asOf: timestamp(row.last_trade_time) };
+    });
+  }
   async getBars(symbol: string, _timeframe: '15m', start: string, end: string): Promise<Bar[]> {
     const startTime = Date.parse(start); let endTime = Date.parse(end) - 1;
     if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || startTime >= endTime) throw new Error('Invalid bar date range.');
@@ -167,6 +180,56 @@ export class WebullPaperBroker implements PaperBroker {
       endTime = earliest - 1;
     }
     throw new Error('Bar range exceeds the bounded page limit. Request a smaller range.');
+  }
+  async getOneMinuteBars(symbol: string): Promise<Bar[]> {
+    return this.getHistoricalBars(symbol, 'M1', 780);
+  }
+  async getHistoricalBars(symbol: string, timespan: 'M1' | 'M5' | 'M15' | 'M30' | 'M60' | 'M240' | 'D' | 'W' | 'M', count: number,
+    category: 'US_STOCK' | 'US_ETF' = 'US_ETF', before?: string): Promise<Bar[]> {
+    if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(symbol) || !Number.isInteger(count) || count < 1 || count > (timespan === 'M1' ? 1650 : 1200)) {
+      throw new Error('Unsupported historical chart request.');
+    }
+    if (before !== undefined && !Number.isFinite(Date.parse(before))) throw new Error('Invalid historical chart cursor.');
+    const data = await this.request('bars', {}, {
+      symbols: [symbol], category, timespan, count,
+      trading_sessions: 'RTH', real_time_required: true,
+      ...(before ? { end_time: Date.parse(before) - 1 } : {}),
+    });
+    const group = items(data, ['result']).map(record).find(row => row.symbol === symbol);
+    if (!group) throw new Error('Webull did not return historical bars for the requested symbol.');
+    return items(group.result).map(value => {
+      const row = record(value);
+      return { timestamp: timestamp(row.time), open: number(row.open, 'bar open'),
+        high: number(row.high, 'bar high'), low: number(row.low, 'bar low'),
+        close: number(row.close, 'bar close'), volume: number(row.volume, 'bar volume') };
+    }).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  }
+  async getOptionContracts(symbol: string, expiration?: string) {
+    if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(symbol) || expiration && !/^20\d{2}-\d{2}-\d{2}$/.test(expiration)) throw new Error('Invalid option contract request.');
+    const today = new Date();
+    const query = { category: 'US_OPTION', underlying_symbols: symbol, status: 'LISTING',
+      start_date: expiration ?? today.toISOString().slice(0, 10),
+      end_date: expiration ?? new Date(today.getTime() + 45 * 86_400_000).toISOString().slice(0, 10) };
+    const result = record(await this.request('optionContracts', query));
+    const rows = items(result.data ?? [], []).map(record);
+    return rows.filter(row => row.underlying_symbol === symbol && row.root_symbol === symbol && row.def_type === 'STANDARD' &&
+      row.settlement_method === 'PHYSICAL' && row.currency === 'USD' && Number(row.multiplier) === 100 &&
+      row.tradable_status === 'OC' && (row.option_type === 'CALL' || row.option_type === 'PUT') &&
+      typeof row.symbol === 'string' && /^\w{1,10}\d{6}[CP]\d{8}$/.test(row.symbol) &&
+      typeof row.expiration_date === 'string' && Number.isFinite(Number(row.strike_price)))
+      .map(row => ({ symbol: String(row.symbol), expiration: String(row.expiration_date), strike: Number(row.strike_price),
+        type: row.option_type as 'CALL' | 'PUT', multiplier: 100 }));
+  }
+  async getOptionSnapshots(symbols: string[]) {
+    if (symbols.length < 1 || symbols.length > 20 || symbols.some(symbol => !/^\w{1,10}\d{6}[CP]\d{8}$/.test(symbol))) throw new Error('Invalid option snapshot request.');
+    return items(await this.request('optionSnapshots', { symbols: symbols.join(','), category: 'US_OPTION' })).map(value => {
+      const row = record(value), symbol = string(row.symbol, 'option symbol');
+      if (!symbols.includes(symbol)) throw new Error('Webull returned an unexpected option symbol.');
+      return { symbol, bid: optionalNumber(row.bid, 'option bid'), ask: optionalNumber(row.ask, 'option ask'),
+        impliedVolatility: optionalNumber(row.imp_vol, 'option implied volatility'),
+        openInterest: optionalNumber(row.open_interest, 'option open interest'),
+        asOf: timestamp(row.quote_time) };
+    });
   }
   async getCapabilities(symbol: string): Promise<Capabilities> {
     const r = items(await this.request('instrument', { symbols: symbol, category: 'US_STOCK' })).map(record).find(r => r.symbol === symbol);

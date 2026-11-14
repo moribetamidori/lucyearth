@@ -1,0 +1,48 @@
+export type Candle = { timestamp: string; open: number; high: number; low: number; close: number; volume: number };
+export type StepName = 'fetch' | 'position' | 'analyze' | 'risk' | 'order' | 'save';
+export type StepState = 'pending' | 'active' | 'complete' | 'error';
+export type Decision = 'BUY' | 'SELL' | 'HOLD' | 'ERROR';
+export type LaurieRun = {
+  id: string;
+  startedAt: string;
+  completedAt: string;
+  symbol: string;
+  mode: 'demo' | 'webull_sandbox';
+  dataSource: 'sample' | 'webull_sandbox';
+  candleTime: string;
+  decision: Decision;
+  explanation: string;
+  inputSummary: string;
+  risk: string;
+  orderStatus: string;
+  model: string;
+  promptVersion: string;
+  estimatedCostUsd: number;
+  actualCostUsd: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  error: string | null;
+};
+export type LaurieSnapshot = {
+  symbol: string;
+  mode: 'demo' | 'webull_sandbox';
+  dataSource: 'sample' | 'webull_sandbox';
+  sourceLabel: string;
+  candles: Candle[];
+  latestPrice: number;
+  dataTimestamp: string;
+  delaySeconds: number | null;
+  position: { quantity: number; cash: number; buyingPower: number };
+  runs: LaurieRun[];
+  accessNote: string | null;
+};
+export type LaurieChartSeries = {
+  symbol: string;
+  candles: Candle[];
+  dataSource: 'sample' | 'webull_sandbox';
+  sourceLabel: string;
+  accessNote: string | null;
+  hasMore?: boolean;
+};
+export type WatchSymbol = { symbol: string; name: string; category: 'US_STOCK' | 'US_ETF' };
+export type WatchQuote = { symbol: string; price: number; preClose: number | null; asOf: string };

@@ -4,6 +4,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 The paper-only Autonomous Quant Lab lives at `/trade`. See [trading setup and architecture](docs/trade.md) for sandbox credentials, the isolated database migration, operator access, safety limits, and milestone status.
 
+The smaller, single-ticker Laurie MVP lives at `/laurie`. It works in clearly labeled Demo Mode without credentials. See [Laurie setup](docs/laurie.md) for Supabase persistence and Webull sandbox activation.
+
 First, run the development server:
 
 ```bash
